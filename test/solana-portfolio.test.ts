@@ -75,6 +75,8 @@ describe("Solana self-custodial portfolio", () => {
     expect(server).toContain("Position is not held by this Solana wallet");
     expect(server).toContain("Solana action contains an unreviewed program");
     expect(server).toContain("shouldClaimAndClose: true");
+    expect(server).toContain("toPubkey: lamportRecipient");
+    expect(server).not.toContain("toPubkey: treasury");
     expect(server).not.toContain('status !== "watch"');
     expect(zapServer).toContain("Solana allocation contains an unreviewed program");
     expect(zapServer).toContain("Solana allocation requests an unexpected signer");

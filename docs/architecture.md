@@ -46,6 +46,8 @@ A one-confirmation cross-chain call path is a later capability gate. Relay can e
 
 Relay delivers native SOL to the user's Privy Solana wallet. Una uses the pinned Meteora zap SDK to create positions only in pools from `src/config/solana-markets.json`. Position reads query those pools by owner. Withdraw and reinvest plans verify the owner, pool, position, fee, expiry, signer set, and instruction program allowlist before Privy requests signatures.
 
+Solana token fees land in associated token accounts controlled by `UNABOT_SOLANA_TREASURY`. Native SOL fees accrue as recoverable surplus lamports on the same per-market token account, avoiding an undisclosed rent top-up for an otherwise empty treasury system account.
+
 ## Analytics contract
 
 Revert's position tooling makes the useful comparison set concrete: pool and fee tier, NFT ID, owner, asset amounts, PnL, fee APR, total return, age, range state, time in range, and performance versus holding. Una should show those at position level and aggregate value, fees, chain allocation, range health, and risk at portfolio level.

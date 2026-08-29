@@ -378,12 +378,46 @@ function feeTransaction(input: {
   yFee: BN;
 }): Transaction | null {
   const transaction = new Transaction();
-  appendFeeTransfer(transaction, input.owner, input.treasury, input.pool.tokenX, input.xFee);
-  appendFeeTransfer(transaction, input.owner, input.treasury, input.pool.tokenY, input.yFee);
+  const fees = [
+    { reserve: input.pool.tokenX, amount: input.xFee },
+    { reserve: input.pool.tokenY, amount: input.yFee },
+  ];
+  const tokenFee = fees.find(({ reserve }) => !reserve.publicKey.equals(NATIVE_MINT));
+  if (!tokenFee) throw new Error("A Meteora fee pair must include a non-native token");
+  const lamportRecipient = getAssociatedTokenAddressSync(
+    tokenFee.reserve.publicKey,
+    input.treasury,
+    false,
+    tokenFee.reserve.owner,
+  );
+  for (const fee of fees.filter(({ reserve }) => !reserve.publicKey.equals(NATIVE_MINT))) {
+    appendTokenFeeTransfer(transaction, input.owner, input.treasury, fee.reserve, fee.amount);
+  }
+  const nativeFee = fees.find(({ reserve }) => reserve.publicKey.equals(NATIVE_MINT));
+  if (nativeFee && !nativeFee.amount.isZero()) {
+    // The token fee transfer normally creates this account first. When a
+    // position is entirely SOL-sided, create it explicitly. Sending lamports
+    // to the initialized token account avoids the rent floor for a new system
+    // account while keeping the fee recoverable by the treasury authority.
+    if (tokenFee.amount.isZero()) {
+      transaction.add(createAssociatedTokenAccountIdempotentInstruction(
+        input.owner,
+        lamportRecipient,
+        input.treasury,
+        tokenFee.reserve.publicKey,
+        tokenFee.reserve.owner,
+      ));
+    }
+    transaction.add(SystemProgram.transfer({
+      fromPubkey: input.owner,
+      toPubkey: lamportRecipient,
+      lamports: BigInt(nativeFee.amount.toString()),
+    }));
+  }
   return transaction.instructions.length ? transaction : null;
 }
 
-function appendFeeTransfer(
+function appendTokenFeeTransfer(
   transaction: Transaction,
   owner: PublicKey,
   treasury: PublicKey,
@@ -391,10 +425,7 @@ function appendFeeTransfer(
   amount: BN,
 ): void {
   if (amount.isZero()) return;
-  if (reserve.publicKey.equals(NATIVE_MINT)) {
-    transaction.add(SystemProgram.transfer({ fromPubkey: owner, toPubkey: treasury, lamports: BigInt(amount.toString()) }));
-    return;
-  }
+  if (reserve.publicKey.equals(NATIVE_MINT)) throw new Error("Native SOL fees require a token fee account");
   if (!reserve.owner.equals(TOKEN_PROGRAM_ID) && !reserve.owner.equals(TOKEN_2022_PROGRAM_ID)) {
     throw new Error("Unsupported Solana token program");
   }

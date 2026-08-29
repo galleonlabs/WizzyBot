@@ -21,6 +21,7 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Full index live");
     expect(portfolio).toContain('label: "Positions"');
     expect(portfolio).toContain('id="positions"');
+    expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain("https://assets.relay.link/icons/792703809/light.png");
     expect(portfolio).not.toContain("https://avatars.githubusercontent.com/u/35608259");
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);

@@ -339,7 +339,6 @@ svg {
 .position-empty { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 92px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, .012); color: var(--muted); text-align: center; }
 .position-empty svg { width: 16px; }
 .position-empty p { max-width: 62ch; margin: 0; font-size: 11px; line-height: 1.5; }
-.position-ledger { scroll-margin-top: 92px; }
 .portfolio-summary { display: grid; grid-template-columns: 1.35fr repeat(4, 1fr); overflow: hidden; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .portfolio-summary > div { display: grid; align-content: center; gap: 6px; min-height: 118px; padding: 18px; }
 .portfolio-summary > div + div { border-left: 1px solid var(--line); }

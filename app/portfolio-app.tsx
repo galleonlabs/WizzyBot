@@ -142,17 +142,6 @@ export function PortfolioApp() {
   }, [loadPositions, previewMode]);
 
   useEffect(() => {
-    if (tab !== "positions") return;
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById("positions")?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "start",
-      });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [marketsState, tab]);
-
-  useEffect(() => {
     setPlan(null);
     setPlanState({ kind: "idle" });
   }, [amount]);
@@ -321,6 +310,22 @@ export function PortfolioApp() {
     }
   }
 
+  const positionLedger = (
+    <PositionLedger
+      authenticated={authenticated || previewMode}
+      positions={positions}
+      state={positionsState}
+      constituentCount={activeMarkets.length}
+      stats={stats}
+      onLogin={() => void login()}
+      onAction={preparePositionAction}
+      actionPlan={actionPlan}
+      actionState={actionState}
+      onExecute={executePositionAction}
+      onCancel={() => { setActionPlan(null); setActionState({ kind: "idle" }); }}
+    />
+  );
+
   return (
     <main className="index-app">
       <header className="index-nav">
@@ -347,7 +352,7 @@ export function PortfolioApp() {
       {previewMode ? <div className="preview-banner">Illustrative preview · development only</div> : null}
 
       <div className="index-shell" data-view={tab}>
-          {tab !== "markets" ? (
+          {tab === "overview" ? (
             <>
               <section className="index-hero">
                 <div className="hero-stage">
@@ -374,28 +379,20 @@ export function PortfolioApp() {
               </section>
               <section className="index-main">
                 <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} compact />
-                <PositionLedger
-                  authenticated={authenticated || previewMode}
-                  positions={positions}
-                  state={positionsState}
-                  constituentCount={activeMarkets.length}
-                  stats={stats}
-                  onLogin={() => void login()}
-                  onAction={preparePositionAction}
-                  actionPlan={actionPlan}
-                  actionState={actionState}
-                  onExecute={executePositionAction}
-                  onCancel={() => { setActionPlan(null); setActionState({ kind: "idle" }); }}
-                />
+                {positionLedger}
               </section>
             </>
-          ) : (
+          ) : tab === "markets" ? (
             <section className="index-main markets-view">
               <header className="index-title-row">
                 <div><h1>Eight markets. One index.</h1><p>Live pool performance across Base, Robinhood, and Solana.</p></div>
                 <button className="icon-button" type="button" onClick={() => void (previewMode ? Promise.resolve() : loadPositions())} aria-label="Refresh market data"><RefreshIcon /></button>
               </header>
               <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} />
+            </section>
+          ) : (
+            <section className="index-main markets-view">
+              {positionLedger}
             </section>
           )}
       </div>

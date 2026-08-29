@@ -214,11 +214,6 @@ a:focus-visible {
   letter-spacing: -0.035em;
 }
 
-.landing h1 em {
-  font-style: italic;
-  color: var(--accent);
-}
-
 .landing .sub {
   margin: 22px 0 0;
   color: var(--muted);

@@ -10,6 +10,8 @@ export function LpPanel({
   ready,
   onLogin,
   onNew,
+  onBack,
+  sheetOpen = false,
   state,
   onSelect,
 }: {
@@ -17,12 +19,18 @@ export function LpPanel({
   ready: boolean;
   onLogin: () => void;
   onNew: () => void;
+  onBack?: () => void;
+  sheetOpen?: boolean;
   state: PanelState;
   onSelect: (view: PositionView) => void;
 }) {
+  const selected = state.selected;
+  const projection = state.projection;
+  const open = sheetOpen || Boolean(projection && state.positions.length === 0 && (selected || projection));
+
   if (!ready) {
     return (
-      <aside className="lp-board">
+      <aside className="lp-board" data-sheet="closed">
         <div className="lp-col">
           <PanelHead onNew={onNew} />
           <div className="lp-empty">
@@ -35,10 +43,13 @@ export function LpPanel({
 
   if (!connected) {
     return (
-      <aside className="lp-board">
+      <aside className="lp-board" data-sheet="closed">
         <div className="lp-col">
           <PanelHead onNew={onNew} />
           <div className="lp-empty">
+            <div className="empty-art" aria-hidden="true">
+              <i className="mark" />
+            </div>
             <h2>No LP yet.</h2>
             <p>Continue with email to load the wallet. Ask the agent to quote a mint.</p>
             <button className="btn btn-accent" type="button" onClick={onLogin}>
@@ -50,18 +61,19 @@ export function LpPanel({
     );
   }
 
-  const selected = state.selected;
-  const projection = state.projection;
   const empty = state.positions.length === 0 && !selected && !projection;
 
   return (
-    <aside className="lp-board">
+    <aside className="lp-board" data-sheet={open ? "open" : "closed"}>
       <div className="lp-col">
         <PanelHead count={state.positions.length} onNew={onNew} />
         {state.loadError ? <p className="lp-err">{state.loadError}</p> : null}
 
         {empty ? (
           <div className="lp-empty">
+            <div className="empty-art" aria-hidden="true">
+              <i className="mark" />
+            </div>
             <h2>No LP yet.</h2>
             <p>Ask the agent to quote a mint. Dry-run first. Confirm to go live.</p>
             <button className="btn btn-accent" type="button" onClick={onNew}>
@@ -89,7 +101,7 @@ export function LpPanel({
                 <RangeStrip live={view} compact />
                 <div className="lp-money">
                   <span className="lp-usd-n">{usd(view.lpUsd ?? view.positionUsd)}</span>
-                  <span className="muted">uncollected {usd(view.feesUsd)}</span>
+                  <span className="muted">fees {usd(view.feesUsd)}</span>
                 </div>
               </button>
             ))}
@@ -97,7 +109,9 @@ export function LpPanel({
         )}
       </div>
 
-      {selected || projection ? <PositionDetail live={selected} projection={projection} /> : null}
+      {selected || projection ? (
+        <PositionDetail live={selected} projection={projection} onBack={onBack} />
+      ) : null}
     </aside>
   );
 }
@@ -124,7 +138,15 @@ function StatusPill({ status, fullRange }: { status: PositionView["status"]; ful
   );
 }
 
-function PositionDetail({ live, projection }: { live?: PositionView; projection?: PositionView }) {
+function PositionDetail({
+  live,
+  projection,
+  onBack,
+}: {
+  live?: PositionView;
+  projection?: PositionView;
+  onBack?: () => void;
+}) {
   const view = live ?? projection;
   if (!view) return null;
   const shares = compositionShares(view);
@@ -132,6 +154,11 @@ function PositionDetail({ live, projection }: { live?: PositionView; projection?
 
   return (
     <section className="lp-detail">
+      {onBack ? (
+        <button className="lp-back" type="button" onClick={onBack}>
+          Back
+        </button>
+      ) : null}
       <header className="lp-detail-head">
         <PairDiscs symbol0={view.symbol0} symbol1={view.symbol1} large />
         <div className="lp-detail-id">

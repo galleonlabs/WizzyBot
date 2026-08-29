@@ -50,6 +50,8 @@ Run with persistent state:
 bun run curate:index -- --state-dir ~/.local/state/unabot-curator
 ```
 
+The dappnode unit uses an isolated Bun 1.4 runtime at `~/.local/share/unabot-bun/bin/bun`. Keeping it separate from the host's shared Bun installation prevents an Una upgrade from changing another service's runtime. Install the pinned runtime with Bun's official versioned installer before enabling `deploy/dappnode/unabot-curator.timer`.
+
 The service writes private files outside the repository:
 
 - `history.jsonl`: rolling hourly snapshots, pruned to the configured 30-day window.

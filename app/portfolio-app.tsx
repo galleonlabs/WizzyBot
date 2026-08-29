@@ -37,9 +37,9 @@ type IndexMarket = {
 
 const CHAIN_SHARES: Record<IndexChain, number> = { base: 6_000, robinhood: 1_500, solana: 2_500 };
 const BRAND_ASSETS = {
-  base: "https://avatars.githubusercontent.com/u/108554348?v=4",
-  robinhood: "https://cdn.robinhood.com/assets/generated_assets/hoodchain_docsite/feather-light.svg",
-  solana: "https://avatars.githubusercontent.com/u/35608259?v=4",
+  base: "https://assets.relay.link/icons/8453/light.png",
+  robinhood: "https://assets.relay.link/icons/4663/light.png",
+  solana: "https://assets.relay.link/icons/792703809/light.png",
   uniswap: "https://avatars.githubusercontent.com/u/36115574?v=4",
   aerodrome: "https://avatars.githubusercontent.com/u/139490796?v=4",
   meteora: "https://avatars.githubusercontent.com/u/126859799?v=4",

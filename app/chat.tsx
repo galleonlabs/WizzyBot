@@ -100,6 +100,9 @@ export function Chat({
         <div className="thread-inner">
           {messages.length === 0 ? (
             <div className="empty">
+              <div className="empty-art" aria-hidden="true">
+                <i className="mark" />
+              </div>
               <h2>Dry-run until you say yes.</h2>
               <p>List, compound, re-range, exit. Live writes wait for confirm, then Privy.</p>
               <div className="chips">
@@ -171,7 +174,7 @@ export function Chat({
                 authenticated ? "List my positions, status a tokenId, or plan a compound…" : "Sign in with email to chat"
               }
             />
-            <button className="btn btn-accent" type="submit" disabled={isResuming || !authenticated}>
+            <button className="btn btn-accent btn-send" type="submit" disabled={isResuming || !authenticated}>
               Send
             </button>
           </form>

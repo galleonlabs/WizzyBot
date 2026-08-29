@@ -13,12 +13,14 @@ export function Cockpit() {
   const { ready, authenticated, login, logout, user } = usePrivy();
   const [panel, setPanel] = useState<PanelState>(emptyPanel);
   const [tab, setTab] = useState<"positions" | "agent">("positions");
+  const [sheet, setSheet] = useState(false);
   const [shot, setShot] = useState(false);
   const address = user?.wallet?.address;
   const account = user?.email?.address ?? (address ? short(address) : null);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tab") === "agent") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") === "agent") {
       setTab("agent");
     }
     if (isShotQuery()) {
@@ -28,6 +30,7 @@ export function Cockpit() {
         selected: SHOT_VIEWS[0],
         selectedId: SHOT_VIEWS[0]?.tokenId,
       });
+      if (params.get("detail") === "1") setSheet(true);
     }
   }, []);
 
@@ -35,6 +38,7 @@ export function Cockpit() {
     if (shot) return;
     if (!authenticated || !address) {
       setPanel(emptyPanel);
+      setSheet(false);
       return;
     }
     let cancelled = false;
@@ -57,11 +61,18 @@ export function Cockpit() {
   }, [authenticated, address, shot]);
 
   const onToolOutput = useCallback((toolName: string | undefined, output: unknown) => {
-    setPanel((prev) => applyToolOutput(prev, toolName, output));
+    setPanel((prev) => {
+      const next = applyToolOutput(prev, toolName, output);
+      if (next.projection && next.positions.length === 0) {
+        queueMicrotask(() => setSheet(true));
+      }
+      return next;
+    });
   }, []);
 
   const onSelect = useCallback((view: PositionView) => {
     setPanel((prev) => ({ ...prev, selected: view, selectedId: view.tokenId, projection: undefined }));
+    setSheet(true);
     setTab("positions");
     if (!view.tokenId) return;
     fetch(`/api/positions/${encodeURIComponent(view.tokenId)}`)
@@ -101,15 +112,6 @@ export function Cockpit() {
         onTab={onTab}
       />
 
-      <nav className="app-tabs" aria-label="App sections">
-        <button className={tab === "positions" ? "is-on" : ""} type="button" onClick={() => onTab("positions")}>
-          Positions
-        </button>
-        <button className={tab === "agent" ? "is-on" : ""} type="button" onClick={() => onTab("agent")}>
-          Agent
-        </button>
-      </nav>
-
       <Chat
         authenticated={authenticated}
         onLogin={() => void login()}
@@ -121,9 +123,20 @@ export function Cockpit() {
         ready={ready || shot}
         onLogin={() => void login()}
         onNew={onNew}
+        onBack={() => setSheet(false)}
+        sheetOpen={sheet}
         state={panel}
         onSelect={onSelect}
       />
+
+      <nav className="app-tabs" aria-label="App sections">
+        <button className={tab === "positions" ? "is-on" : ""} type="button" onClick={() => onTab("positions")}>
+          Positions
+        </button>
+        <button className={tab === "agent" ? "is-on" : ""} type="button" onClick={() => onTab("agent")}>
+          Agent
+        </button>
+      </nav>
     </div>
   );
 }

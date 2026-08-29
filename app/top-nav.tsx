@@ -23,7 +23,7 @@ export function TopNav({
     <header className="topnav">
       <Link className="wordmark" href="/">
         <i className="mark" aria-hidden="true" />
-        UNA
+        Una
       </Link>
       <nav className="topnav-links" aria-label="Primary">
         <Link

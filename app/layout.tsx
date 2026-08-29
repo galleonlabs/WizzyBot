@@ -1,26 +1,12 @@
-import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Instrument_Serif } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
-const sans = IBM_Plex_Sans({
+const sans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-sans",
-  display: "swap",
-});
-
-const serif = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-serif",
-  display: "swap",
-});
-
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-mono",
   display: "swap",
 });
 
@@ -29,10 +15,17 @@ export const metadata: Metadata = {
   description: "Liquidity, as an agent. v2, v3, and v4. You hold the NFT.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0b0b10",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${sans.variable} ${serif.variable} ${mono.variable} ${sans.className}`}>
+      <body className={`${sans.variable} ${sans.className}`}>
         <Providers>{children}</Providers>
       </body>
     </html>

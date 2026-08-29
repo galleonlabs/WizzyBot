@@ -57,12 +57,10 @@ export default function Page() {
 
       <section className="landing-body">
         <div className="landing-hero">
-          <h1>
-            Liquidity, as an agent.
-          </h1>
+          <h1>Liquidity, as an agent.</h1>
           <p className="sub">v2, v3, and v4. You hold the NFT.</p>
           <div className="cta-row">
-            <Link className="btn btn-accent" href="/app">
+            <Link className="btn btn-accent btn-cta" href="/app">
               Open app
             </Link>
             {ready && !authenticated ? (

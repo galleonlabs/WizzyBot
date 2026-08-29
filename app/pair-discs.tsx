@@ -1,12 +1,12 @@
 /** Two overlapping initials discs. Not token art. */
 
 const TONES = [
-  { bg: "#2a261c", fg: "#e8c07a" },
-  { bg: "#1c2422", fg: "#8ec8b0" },
-  { bg: "#241c1c", fg: "#d4a08c" },
-  { bg: "#1c2028", fg: "#9aa8c0" },
-  { bg: "#22201c", fg: "#c8b89a" },
-  { bg: "#1a2220", fg: "#7fbf9a" },
+  { bg: "#3d2432", fg: "#ffb3c6" },
+  { bg: "#1d322c", fg: "#7dffc8" },
+  { bg: "#2a2840", fg: "#c9b8ff" },
+  { bg: "#33281c", fg: "#ffd39a" },
+  { bg: "#1c2c3a", fg: "#9ad4ff" },
+  { bg: "#32241c", fg: "#ffc2a0" },
 ] as const;
 
 function toneFor(symbol: string): (typeof TONES)[number] {

@@ -3,8 +3,8 @@
 import { PrivyProvider } from "@privy-io/react-auth";
 import { base } from "viem/chains";
 
-/** UnaBot Privy app (public). Secret is never shipped. */
-const DEFAULT_PRIVY_APP_ID = "cmte7ydie07zb0djopp7gds6m";
+/** Una Privy app (public). Secret is never shipped. */
+const DEFAULT_PRIVY_APP_ID = "cmteeqkjc03e20cjl59c9kbwu";
 
 const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? process.env.PRIVY_APP_ID ?? DEFAULT_PRIVY_APP_ID;
 

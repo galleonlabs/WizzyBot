@@ -1,9 +1,9 @@
-# UnaBot
+# Una
 
-Uniswap LP on autopilot.
+Liquidity, as an agent.
 
-v2, v3, and v4. You keep the position.
+v2, v3, and v4. You hold the NFT.
 
-Compound, re-range, exit.
+Dry-run first. Confirm to go live.
 
 [Production runbook](docs/RUNBOOK.md)

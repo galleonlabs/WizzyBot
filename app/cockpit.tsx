@@ -63,7 +63,7 @@ export function Cockpit() {
       <header className="cockpit-bar">
         <Link className="wordmark" href="/">
           <i className="mark" aria-hidden="true" />
-          UnaBot
+          UNA
         </Link>
         <div className="chat-bar-meta">
           <span>Base · dry-run default</span>
@@ -97,7 +97,7 @@ export function Cockpit() {
 
       <footer className="cockpit-foot">
         <span>Dry-run first. Confirm to go live.</span>
-        <span>You keep the NFT.</span>
+        <span>You hold the NFT.</span>
       </footer>
     </div>
   );

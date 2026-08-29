@@ -1,10 +1,10 @@
-# UnaBot product thesis, fees, surfaces, threat model
+# Una product thesis, fees, surfaces, threat model
 
 Last verified: 29 Aug 2026 against README.md, src/constants.ts, and this corpus.
 
 ## 1. One-sentence position
 
-UnaBot. Uniswap LP on autopilot. v2, v3, and v4. You keep the position. Compound, re-range, exit.
+Una. Liquidity, as an agent. v2, v3, and v4. You hold the NFT.
 
 Not a trading desk, not an Aerodrome yield vault, not a bot that silent-signs from X.
 
@@ -70,7 +70,7 @@ Without an API key the agent still does full read / PnL / dry-run and builds cal
 7. Policy file + keeper loop (cooldown, spend cap, min position USD).
 8. CLI + MCP + SKILL.md + NL chat.
 9. Dry-run default; --live requires key + typed yes.
-10. You keep the position.
+10. You hold the NFT.
 
 ## 7. Threat model
 
@@ -110,7 +110,7 @@ Without an API key the agent still does full read / PnL / dry-run and builds cal
 
 ## 8. 10-line product thesis
 
-1. UnaBot is Uniswap LP on autopilot; the user holds the position.
+1. Una. Liquidity, as an agent. You hold the NFT.
 2. The product is three jobs — compound, re-range, exit — not a DEX front-end.
 3. Fees are Revert-shaped (2% compound; 0.15% notional or 2% of fees on range/exit) and settle to treasury.
 4. Surfaces are CLI, local NL, MCP, and a skill — Bankr good shape without Bankr social signer.

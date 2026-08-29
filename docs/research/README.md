@@ -1,6 +1,6 @@
-# UnaBot research corpus
+# Una research corpus
 
-Durable SME notes for UnaBot. Written 29 Aug 2026 (Europe/London). Product knowledge — not a Uniswap Labs, Bankr, Revert, or Virtuals publication.
+Durable SME notes for Una. Written 29 Aug 2026 (Europe/London). Product knowledge — not a Uniswap Labs, Bankr, Revert, or Virtuals publication.
 
 **Rule:** every address and fee in this folder is copied from a cited official page or `deployments.json`. If a number is inferred, it is marked **speculation**. Do not invent contract addresses.
 
@@ -12,13 +12,13 @@ Durable SME notes for UnaBot. Written 29 Aug 2026 (Europe/London). Product knowl
 | [bankr.md](bankr.md) | Product surfaces, Club pricing, Doppler 1.75% table, `$BNKR` CA, skills org, May 2026 prompt-injection incidents, copy vs skip |
 | [revert.md](revert.md) | Compound / range / exit, user-held position, Base automator addresses, fees, v3 vs v1 Compoundor, Jan 2026 Aerodrome Lend incident |
 | [virtuals.md](virtuals.md) | Tokenized-agent launch, 1% tax 70/30, 42k VIRTUAL graduation, 10y lock, ACP, Tax Manager, treasury-as-creator wallet |
-| [product.md](product.md) | UnaBot positioning, fee schedule, surfaces, threat model |
+| [product.md](product.md) | Una positioning, fee schedule, surfaces, threat model |
 
 ## Canonical product facts
 
-- UnaBot. Uniswap LP on autopilot.
-- v2, v3, and v4. You keep the position.
-- Compound, re-range, exit.
+- Una. Liquidity, as an agent.
+- v2, v3, and v4. You hold the NFT.
+- Dry-run first. Confirm to go live.
 - Chain: Base `8453`
 - Treasury: `0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD`
 - No vault custody. No Revert Lend. No Aerodrome.

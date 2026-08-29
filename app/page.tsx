@@ -18,18 +18,18 @@ export default function Page() {
       <header className="landing-top">
         <span className="wordmark">
           <i className="mark" aria-hidden="true" />
-          UnaBot
+          UNA
         </span>
         <span>Base</span>
       </header>
 
       <section className="landing-hero">
         <h1>
-          Uniswap LP
+          Liquidity,
           <br />
-          on autopilot.
+          as an agent.
         </h1>
-        <p className="sub">v2, v3, and v4. You keep the position.</p>
+        <p className="sub">v2, v3, and v4. You hold the NFT.</p>
         <div className="cta-row">
           <Link className="btn btn-accent" href="/app">
             Open cockpit
@@ -44,7 +44,7 @@ export default function Page() {
 
       <footer className="landing-foot">
         <span>Dry-run first. Confirm to go live.</span>
-        <span>You keep the NFT.</span>
+        <span>You hold the NFT.</span>
       </footer>
 
       <div className="landing-range" aria-hidden="true">

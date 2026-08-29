@@ -34,7 +34,7 @@ export function LpPanel({
         <PanelHead />
         <div className="lp-empty">
           <h2>Your positions live here.</h2>
-          <p>Continue with email to load the wallet. You keep the NFT.</p>
+          <p>Continue with email to load the wallet. You hold the NFT.</p>
           <button className="btn btn-accent" type="button" onClick={onLogin}>
             Continue with email
           </button>

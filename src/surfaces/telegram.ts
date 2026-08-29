@@ -1,5 +1,5 @@
 import { parseIntent, confirmPhrase, isWrite, protocolOf, type Intent } from "../agent/nlp.js";
-import { PRODUCT_HELP, PRODUCT_LINE } from "../copy.js";
+import { PRODUCT_HELP, PRODUCT_LINE, PRODUCT_NAME } from "../copy.js";
 
 export const TELEGRAM_TOKEN_HELP =
   "TELEGRAM_BOT_TOKEN is not set. Create a bot with @BotFather, export TELEGRAM_BOT_TOKEN (never commit it), then re-run: unabot telegram";
@@ -7,13 +7,13 @@ export const TELEGRAM_TOKEN_HELP =
 export function telegramBootMessage(token: string | undefined): string {
   if (!token) {
     return [
-      "UnaBot telegram surface started (no token).",
+      `${PRODUCT_NAME} telegram surface started (no token).`,
       TELEGRAM_TOKEN_HELP,
       PRODUCT_LINE,
       "Dry-run is the default. Live writes still require an explicit yes.",
     ].join("\n");
   }
-  return `UnaBot. ${PRODUCT_LINE} Dry-run unless --live. Live writes require yes.`;
+  return `${PRODUCT_NAME}. ${PRODUCT_LINE} Dry-run unless --live. Live writes require yes.`;
 }
 
 export function telegramRequiresConfirm(text: string, live: boolean): boolean {

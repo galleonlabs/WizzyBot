@@ -100,7 +100,7 @@ export function Chat({
         <div className="thread-inner">
           {messages.length === 0 ? (
             <div className="empty">
-              <h2>Dry-run until you say yes.</h2>
+              <h2>Dry-run first. Confirm to go live.</h2>
               <p>List, compound, re-range, exit. Live writes wait for confirm, then Privy.</p>
               <div className="chips">
                 {STARTERS.map((item) => (

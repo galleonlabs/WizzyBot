@@ -39,7 +39,7 @@ Activation is an **operator approval**, not a transfer:
 
 **v1 Compoundor (deprecated) is the opposite:** user transfers the NFT into the Compoundor contract. Only the original owner can withdraw liquidity; anyone can collect-and-redeposit for a 2% reward. FAQ: you transfer it to the Compoundor contract and can withdraw anytime but the NFT is contract-owned.
 
-**UnaBot copies the user-held model, not v1 custody.** Product line: You keep the position. No vault custody.
+**UnaBot copies the user-held model, not v1 custody.** Product line: You hold the NFT. No vault custody.
 
 ## 3. v3 vs v1 Compoundor
 

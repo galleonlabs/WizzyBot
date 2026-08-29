@@ -1,6 +1,6 @@
 # Production runbook
 
-How to run UnaBot. Base only. You keep the position (v3/v4 NFT; v2 LP token).
+How to run Una. Base only. You hold the NFT (v3/v4 NFT; v2 LP token).
 
 **Never commit `.env`.** Copy `.env.example` locally. `.env` is gitignored. Do not paste secrets into git, Vercel project settings screenshots, or this file.
 

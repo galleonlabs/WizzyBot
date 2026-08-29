@@ -25,8 +25,8 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UnaBot",
-  description: "Uniswap LP on autopilot. v2, v3, and v4. You keep the position.",
+  title: "Una",
+  description: "Liquidity, as an agent. v2, v3, and v4. You hold the NFT.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

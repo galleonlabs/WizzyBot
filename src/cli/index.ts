@@ -21,7 +21,7 @@ import { runTelegramLoop } from "../surfaces/telegram.js";
 import { COMPOUND_FEE_BPS, NOTIONAL_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
 import { rangeFromWidthPct, snapRange, tickSpacingForFee } from "../core/ticks.js";
 import { parseIntent, confirmPhrase, isWrite, protocolOf, type Intent } from "../agent/nlp.js";
-import { PRODUCT_LINE, PRODUCT_HELP } from "../copy.js";
+import { PRODUCT_LINE, PRODUCT_HELP, PRODUCT_BLURB, PRODUCT_NAME } from "../copy.js";
 import { createAlertSink } from "../keeper/alerts.js";
 import { runLoop, runOnce } from "../keeper/loop.js";
 import { safeExecute } from "../keeper/execute.js";
@@ -32,7 +32,7 @@ const program = new Command();
 
 program
   .name("unabot")
-  .description(PRODUCT_LINE)
+  .description(PRODUCT_BLURB)
   .version("1.0.0")
   .argument("[utterance...]", "natural-language command, e.g. unabot \"status 12345\"")
   .option("--live", "broadcast (default is dry-run)")
@@ -387,7 +387,7 @@ program
   .description("Chat. Live writes need yes.")
   .action(async (_opts, cmd) => {
     const rl = createInterface({ input, output });
-    console.log(`UnaBot chat. ${PRODUCT_LINE} Type help or quit.`);
+    console.log(`${PRODUCT_NAME} chat. ${PRODUCT_LINE} Type help or quit.`);
     try {
       while (true) {
         const line = (await rl.question("> ")).trim();

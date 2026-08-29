@@ -20,6 +20,7 @@ import type {
 import { alert } from "./alerts.js";
 import { safeExecute, type SafeExecuteDeps } from "./execute.js";
 import { skippedReceipt, withSkipReason } from "./skip.js";
+import { PRODUCT_LINE } from "../copy.js";
 
 export interface KeeperPrices {
   feesUsd: number;
@@ -266,7 +267,7 @@ export async function runLoop(deps: KeeperDeps, signal?: AbortSignal): Promise<v
     deps.sink,
     "info",
     "keeper",
-    `Uniswap LP on autopilot. starting loop interval=${deps.intervalMs}ms live=${deps.live}`,
+    `${PRODUCT_LINE} starting loop interval=${deps.intervalMs}ms live=${deps.live}`,
     undefined,
     { dryRun: !deps.live },
   );

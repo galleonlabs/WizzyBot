@@ -13,7 +13,7 @@ export { V2Protocol, V3Protocol, V4Protocol, v4AdapterStub, adapterFor, V4_NEXT 
 export { parseProtocol, parseTokenId, writeTarget } from "./core/protocol.js";
 export { startMcpStdio, MCP_TOOLS, MCP_TOOL_DEFS, listMcpTools, callTool, createMcpServer, schemaFor, protocolFromArgs } from "./mcp/server.js";
 export { parseIntent, confirmPhrase, isWrite, captureProtocol, protocolOf } from "./agent/nlp.js";
-export { PRODUCT_LINE, PRODUCT_HELP, PRODUCT_VERBS } from "./copy.js";
+export { PRODUCT_NAME, PRODUCT_HANDLE, PRODUCT_LINE, PRODUCT_SUPPORT, PRODUCT_CONFIRM, PRODUCT_BLURB, PRODUCT_HELP, PRODUCT_VERBS } from "./copy.js";
 export { hydrateCalldata } from "./core/hydrate.js";
 export { planMint, quoteMintFromPool, quoteMintV2, resolveMintToken } from "./core/mint.js";
 export { addLiquidityTx, removeLiquidityTx } from "./uniswap/v2-calldata.js";

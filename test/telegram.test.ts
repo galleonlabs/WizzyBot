@@ -14,7 +14,7 @@ describe("telegram dry-path", () => {
     expect(msg).toContain("@BotFather");
     expect(msg).toBeTruthy();
     expect(TELEGRAM_TOKEN_HELP).toMatch(/unabot telegram/);
-    expect(telegramBootMessage("x:y")).toMatch(/autopilot|yes/);
+    expect(telegramBootMessage("x:y")).toMatch(/agent|yes/);
   });
 
   it("does not require confirm on dry-run writes", () => {

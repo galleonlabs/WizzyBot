@@ -1,10 +1,8 @@
-# UnaBot
+# Una
 
-Uniswap LP on autopilot.
+Liquidity, as an agent.
 
-v2, v3, and v4. You keep the position.
-
-Compound, re-range, exit.
+v2, v3, and v4. You hold the NFT.
 
 ## Use
 
@@ -15,7 +13,7 @@ List, status, mint, compound, range, exit. Chat, Telegram, or MCP.
 - Base. Dry-run default. Live needs `yes`.
 - Never print keys or `.env`.
 - `--no-fee` skips the take. `--fee-source fees|notional` on range/exit.
-- You keep the position. No vault.
+- You hold the NFT. No vault.
 
 ## Commands
 
@@ -33,4 +31,4 @@ unabot mcp
 
 MCP verbs: `list`, `status`, `mint`, `compound`, `range`, `exit`, `simulate`. Aliases: `position_list`, `position_pnl`, `create`, `rebalance`, plus `pool_info`, `quote_mint`, `increase`, `decrease`, `claim`.
 
-`--protocol v2|v3|v4` defaults to v3. You keep the position.
+`--protocol v2|v3|v4` defaults to v3. You hold the NFT.

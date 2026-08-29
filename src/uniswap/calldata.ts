@@ -129,6 +129,7 @@ export function decreaseCalldata(
   recipient: Address,
   slippageBps = DEFAULT_SLIPPAGE_BPS,
   deadlineSec = DEFAULT_DEADLINE_SEC,
+  burnToken = false,
 ): PlannedTx {
   const sdkPos = sdkPosition(position);
   const { calldata, value } = NonfungiblePositionManager.removeCallParameters(sdkPos, {
@@ -136,6 +137,7 @@ export function decreaseCalldata(
     liquidityPercentage: new Percent(Math.round(pct), 100),
     slippageTolerance: slippage(slippageBps),
     deadline: Math.floor(Date.now() / 1000) + deadlineSec,
+    burnToken,
     collectOptions: {
       expectedCurrencyOwed0: CurrencyAmount.fromRawAmount(sdkPos.pool.token0, position.uncollected0.toString()),
       expectedCurrencyOwed1: CurrencyAmount.fromRawAmount(sdkPos.pool.token1, position.uncollected1.toString()),
@@ -176,9 +178,9 @@ export function erc20ApproveTx(token: Address, spender: Address, amount: bigint)
   };
 }
 
-export function wrapEthTx(amount: bigint): PlannedTx {
+export function wrapEthTx(amount: bigint, chainId: number = CHAIN_ID): PlannedTx {
   return {
-    to: ADDRESSES.weth,
+    to: addressesFor(slugForChainId(chainId)).weth,
     data: encodeFunctionData({
       abi: wethAbi,
       functionName: "deposit",
@@ -188,9 +190,9 @@ export function wrapEthTx(amount: bigint): PlannedTx {
   };
 }
 
-export function unwrapEthTx(amount: bigint): PlannedTx {
+export function unwrapEthTx(amount: bigint, chainId: number = CHAIN_ID): PlannedTx {
   return {
-    to: ADDRESSES.weth,
+    to: addressesFor(slugForChainId(chainId)).weth,
     data: encodeFunctionData({
       abi: wethAbi,
       functionName: "withdraw",
@@ -198,5 +200,14 @@ export function unwrapEthTx(amount: bigint): PlannedTx {
     }),
     value: 0n,
     description: `WETH.withdraw ${amount}`,
+  };
+}
+
+export function nativeTransferTx(to: Address, amount: bigint): PlannedTx {
+  return {
+    to: getAddress(to),
+    data: "0x",
+    value: amount,
+    description: `native transfer ${amount} → ${to}`,
   };
 }

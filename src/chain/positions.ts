@@ -144,6 +144,7 @@ export class V3Adapter implements ProtocolAdapter {
     });
 
     const amounts = amountsForPosition({
+      chainId,
       token0: token0Meta,
       token1: token1Meta,
       fee,
@@ -188,6 +189,7 @@ export async function readTokenMeta(client: PublicClient, address: Address): Pro
 }
 
 export function amountsForPosition(args: {
+  chainId?: number;
   token0: TokenRef;
   token1: TokenRef;
   fee: number;
@@ -198,8 +200,9 @@ export function amountsForPosition(args: {
   liquidity: bigint;
 }): { amount0: bigint; amount1: bigint } {
   if (args.liquidity === 0n) return { amount0: 0n, amount1: 0n };
-  const t0 = new Token(CHAIN_ID, args.token0.address, args.token0.decimals, args.token0.symbol);
-  const t1 = new Token(CHAIN_ID, args.token1.address, args.token1.decimals, args.token1.symbol);
+  const chainId = args.chainId ?? CHAIN_ID;
+  const t0 = new Token(chainId, args.token0.address, args.token0.decimals, args.token0.symbol);
+  const t1 = new Token(chainId, args.token1.address, args.token1.decimals, args.token1.symbol);
   const pool = new Pool(t0, t1, args.fee, args.sqrtPriceX96.toString(), "0", args.tickCurrent);
   const position = new SdkPosition({
     pool,

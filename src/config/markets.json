@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-29",
+  "fees": {
+    "allocateBps": 15,
+    "withdrawBps": 15,
+    "rebalanceBps": 15,
+    "compoundBps": 200
+  },
+  "chains": [
+    {
+      "slug": "base",
+      "chainId": 8453,
+      "label": "Base",
+      "accent": "#89a8ff",
+      "minimumAllocationWei": "40000000000000000",
+      "markets": [
+        {
+          "id": "base-toshi",
+          "name": "Toshi",
+          "symbol": "TOSHI",
+          "token": "0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x4b0aaf3ebb163dd45f663b38b6d93f6093ebc2d3",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 40,
+          "weightBps": 3000,
+          "status": "active",
+          "risk": "established",
+          "coingeckoId": "toshi",
+          "color": "#76e7cf"
+        },
+        {
+          "id": "base-brett",
+          "name": "Brett",
+          "symbol": "BRETT",
+          "token": "0x532f27101965dd16442E59d40670FaF5eBB142E4",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xba3f945812a83471d709bce9c3ca699a19fb46f7",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 40,
+          "weightBps": 3000,
+          "status": "active",
+          "risk": "established",
+          "coingeckoId": "based-brett",
+          "color": "#6f96ff"
+        },
+        {
+          "id": "base-degen",
+          "name": "Degen",
+          "symbol": "DEGEN",
+          "token": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x0ca6485b7e9cf814a3fd09d81672b07323535b64",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 45,
+          "weightBps": 2500,
+          "status": "active",
+          "risk": "established",
+          "coingeckoId": "degen-base",
+          "color": "#b99aff"
+        },
+        {
+          "id": "base-basecat",
+          "name": "Basecat",
+          "symbol": "BASECAT",
+          "token": "0xB2000000000000000000004c27f6523082f41D01",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xf79478d5a6bae4546f7e489e80b2fc690b558944",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 60,
+          "weightBps": 1500,
+          "status": "active",
+          "risk": "emerging",
+          "coingeckoId": "basecat",
+          "color": "#ff8f6b"
+        }
+      ]
+    },
+    {
+      "slug": "robinhood",
+      "chainId": 4663,
+      "label": "Robinhood Chain",
+      "accent": "#5ef0b6",
+      "minimumAllocationWei": "10000000000000000",
+      "markets": [
+        {
+          "id": "robinhood-cashcat",
+          "name": "Cash Cat",
+          "symbol": "CASHCAT",
+          "token": "0x020bfC650A365f8BB26819deAAbF3E21291018b4",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xa70fc67c9f69da90b63a0e4c05d229954574e313",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 65,
+          "weightBps": 10000,
+          "status": "active",
+          "risk": "emerging",
+          "color": "#5ef0b6"
+        }
+      ]
+    }
+  ]
+}

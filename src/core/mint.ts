@@ -1,9 +1,9 @@
 import { Token } from "@uniswap/sdk-core";
 import { Pool, Position } from "@uniswap/v3-sdk";
 import { getAddress, type Address, type PublicClient } from "viem";
-import { ADDRESSES, CHAIN_ID } from "../constants.js";
+import { CHAIN_ID } from "../constants.js";
 import type { ChainSlug } from "../chains.js";
-import { addressesFor, slugForChainId } from "../chains.js";
+import { addressesFor, slugForChainId, slugOfClient } from "../chains.js";
 import { factoryAbi, poolAbi, v2FactoryAbi, v2PairAbi } from "../chain/abi.js";
 import { erc20ApproveTx, mintCalldata } from "../uniswap/calldata.js";
 import { addLiquidityTx } from "../uniswap/v2-calldata.js";
@@ -33,7 +33,6 @@ export interface MintQuote {
   singleSided: boolean;
   useNative: boolean;
   nativeIsToken0: boolean;
-  chainId?: number;
   poolId?: `0x${string}`;
   hooks?: Address;
 }
@@ -184,6 +183,7 @@ export function planMint(quote: MintQuote, owner: Address, dryRun: boolean): Act
 
 function planMintV3(quote: MintQuote, owner: Address, dryRun: boolean): ActionReceipt {
   const actions: PlannedAction[] = [];
+  const addresses = addressesFor(slugForChainId(quote.chainId));
   const nativeAmount = quote.useNative
     ? quote.nativeIsToken0
       ? quote.amount0
@@ -194,7 +194,7 @@ function planMintV3(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
     actions.push({
       kind: "wrap",
       description: `ETH value ${nativeAmount} wraps inside NFPM.mint (useNative). You keep the NFT.`,
-      tokenOut: ADDRESSES.weth,
+      tokenOut: addresses.weth,
       amountOut: nativeAmount,
     });
   }
@@ -208,7 +208,7 @@ function planMintV3(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `approve NFPM for ${quote.symbol0}`,
       tokenIn: quote.token0,
       amountIn: quote.amount0,
-      tx: erc20ApproveTx(quote.token0, addressesFor(slugForChainId(quote.chainId)).nfpm, quote.amount0),
+      tx: erc20ApproveTx(quote.token0, addresses.nfpm, quote.amount0),
     });
   }
   if (needApprove1) {
@@ -217,7 +217,7 @@ function planMintV3(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `approve NFPM for ${quote.symbol1}`,
       tokenIn: quote.token1,
       amountIn: quote.amount1,
-      tx: erc20ApproveTx(quote.token1, addressesFor(slugForChainId(quote.chainId)).nfpm, quote.amount1),
+      tx: erc20ApproveTx(quote.token1, addresses.nfpm, quote.amount1),
     });
   }
 
@@ -239,7 +239,7 @@ function planMintV3(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
     }),
   });
 
-  return mintReceipt(quote, owner, dryRun, actions, addressesFor(slugForChainId(quote.chainId)).nfpm);
+  return mintReceipt(quote, owner, dryRun, actions, addresses.nfpm);
 }
 
 function planMintV2(quote: MintQuote, owner: Address, dryRun: boolean): ActionReceipt {
@@ -286,8 +286,9 @@ function planMintV2(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
 
 function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionReceipt {
   const actions: PlannedAction[] = [];
-  const hooks = quote.hooks ?? ADDRESSES.nativeEth;
-  if (hooks.toLowerCase() !== ADDRESSES.nativeEth.toLowerCase()) {
+  const addresses = addressesFor(slugForChainId(quote.chainId));
+  const hooks = quote.hooks ?? addresses.nativeEth;
+  if (hooks.toLowerCase() !== addresses.nativeEth.toLowerCase()) {
     throw new Error(`Refuse unknown v4 hooks ${hooks}`);
   }
   const needApprove0 = quote.amount0 > 0n && !(quote.useNative && quote.nativeIsToken0);
@@ -298,14 +299,14 @@ function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `approve Permit2 for ${quote.symbol0}`,
       tokenIn: quote.token0,
       amountIn: quote.amount0,
-      tx: erc20ApproveTx(quote.token0, ADDRESSES.permit2, quote.amount0),
+      tx: erc20ApproveTx(quote.token0, addresses.permit2, quote.amount0),
     });
     actions.push({
       kind: "approve",
       description: `Permit2.approve PositionManager for ${quote.symbol0}`,
       tokenIn: quote.token0,
       amountIn: quote.amount0,
-      tx: permit2ApproveTx(quote.token0, addressesFor(slugForChainId(quote.chainId)).v4PositionManager, quote.amount0),
+      tx: permit2ApproveTx(quote.token0, addresses.v4PositionManager, quote.amount0),
     });
   }
   if (needApprove1) {
@@ -314,18 +315,18 @@ function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `approve Permit2 for ${quote.symbol1}`,
       tokenIn: quote.token1,
       amountIn: quote.amount1,
-      tx: erc20ApproveTx(quote.token1, ADDRESSES.permit2, quote.amount1),
+      tx: erc20ApproveTx(quote.token1, addresses.permit2, quote.amount1),
     });
     actions.push({
       kind: "approve",
       description: `Permit2.approve PositionManager for ${quote.symbol1}`,
       tokenIn: quote.token1,
       amountIn: quote.amount1,
-      tx: permit2ApproveTx(quote.token1, addressesFor(slugForChainId(quote.chainId)).v4PositionManager, quote.amount1),
+      tx: permit2ApproveTx(quote.token1, addresses.v4PositionManager, quote.amount1),
     });
   }
-  const currency0 = quote.useNative && quote.nativeIsToken0 ? ADDRESSES.nativeEth : quote.token0;
-  const currency1 = quote.useNative && !quote.nativeIsToken0 ? ADDRESSES.nativeEth : quote.token1;
+  const currency0 = quote.useNative && quote.nativeIsToken0 ? addresses.nativeEth : quote.token0;
+  const currency1 = quote.useNative && !quote.nativeIsToken0 ? addresses.nativeEth : quote.token1;
   const [c0, c1] = currency0.toLowerCase() < currency1.toLowerCase() ? [currency0, currency1] : [currency1, currency0];
   actions.push({
     kind: "mint",
@@ -350,7 +351,7 @@ function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       chainId: quote.chainId,
     }),
   });
-  return mintReceipt(quote, owner, dryRun, actions, addressesFor(slugForChainId(quote.chainId)).v4PositionManager);
+  return mintReceipt(quote, owner, dryRun, actions, addresses.v4PositionManager);
 }
 
 function mintReceipt(
@@ -477,4 +478,3 @@ export function quoteMintV2(args: {
     nativeIsToken0: Boolean(args.nativeIsToken0),
   };
 }
-

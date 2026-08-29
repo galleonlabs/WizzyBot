@@ -1,5 +1,6 @@
 import { concatHex, encodeAbiParameters, encodeFunctionData, padHex, toHex, type Address, type Hex } from "viem";
-import { ADDRESSES } from "../constants.js";
+import { CHAIN_ID } from "../constants.js";
+import { addressesFor, slugForChainId } from "../chains.js";
 import type { PlannedTx } from "../types.js";
 
 const UR_ABI = [
@@ -36,6 +37,7 @@ export function exactInV3Tx(args: {
   recipient: Address;
   payerIsUser?: boolean;
   deadlineSec?: number;
+  chainId?: number;
 }): PlannedTx {
   const path = v3Path(args.tokenIn, args.fee, args.tokenOut);
   const input = encodeAbiParameters(
@@ -57,8 +59,9 @@ export function exactInV3Tx(args: {
       BigInt(Math.floor(Date.now() / 1000) + (args.deadlineSec ?? 600)),
     ],
   });
+  const addresses = addressesFor(slugForChainId(args.chainId ?? CHAIN_ID));
   return {
-    to: ADDRESSES.universalRouter,
+    to: addresses.universalRouter,
     data,
     value: 0n,
     description: `UR v3 exact-in ${args.tokenIn} → ${args.tokenOut}`,

@@ -2,7 +2,7 @@ import type { Address } from "viem";
 import { slugForChainId } from "../chains.js";
 import { Token } from "@uniswap/sdk-core";
 import { Pool, Position } from "@uniswap/v3-sdk";
-import { TREASURY, CHAIN_ID } from "../constants.js";
+import { TREASURY } from "../constants.js";
 import { collectCalldata, decreaseCalldata, erc20TransferTx, increaseCalldata, mintCalldata } from "../uniswap/calldata.js";
 import { v2AddFromPosition, v2RemoveFromPosition } from "../uniswap/v2-calldata.js";
 import { poolKeyFromPosition, v4BurnTx, v4ClaimFeesTx, v4DecreaseTx, v4IncreaseTx, v4MintTx } from "../uniswap/v4-calldata.js";
@@ -30,8 +30,8 @@ export function availableAfterUnwind(
 
 function liquidityForAmounts(position: PositionSnapshot, add0: bigint, add1: bigint, tickLower = position.tickLower, tickUpper = position.tickUpper): bigint {
   if (add0 === 0n && add1 === 0n) return 0n;
-  const t0 = new Token(CHAIN_ID, position.token0.address, position.token0.decimals, position.token0.symbol);
-  const t1 = new Token(CHAIN_ID, position.token1.address, position.token1.decimals, position.token1.symbol);
+  const t0 = new Token(position.ref.chainId, position.token0.address, position.token0.decimals, position.token0.symbol);
+  const t1 = new Token(position.ref.chainId, position.token1.address, position.token1.decimals, position.token1.symbol);
   const pool = new Pool(t0, t1, position.fee, position.sqrtPriceX96.toString(), "0", position.tickCurrent);
   const next = Position.fromAmounts({
     pool,

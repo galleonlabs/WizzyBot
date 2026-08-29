@@ -2,7 +2,6 @@ import { getAddress, isAddress, type Address } from "viem";
 import { loadEnv } from "../config/env.js";
 import { loadConfig, policyFor } from "../config/policy.js";
 import { makePublicClient } from "../signer/broadcast.js";
-import { allowlistWithTokens } from "../signer/allowlist.js";
 import { V3Adapter } from "../chain/positions.js";
 import { snapshotUsd, usdPricesForPosition } from "../chain/prices.js";
 import { adapterFor } from "../core/protocols.js";
@@ -10,8 +9,8 @@ import { formatReceipt, planCompound, planExit, planRerange, type PlanContext } 
 import { COMPOUND_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
 import { buildCard, formatCard } from "../core/card.js";
 import { formatHoldNote, getHold, holdAmounts } from "../core/hold.js";
-import { importHoldForToken } from "../chain/mint-history.js";
-import { extraAllowForMint, persistMintHold, runMintFlow } from "../core/mint-flow.js";
+import { readHoldBaseline } from "../chain/mint-history.js";
+import { runMintFlow } from "../core/mint-flow.js";
 import { hydrateCalldata } from "../core/hydrate.js";
 import { decideForPosition, runOnce } from "../keeper/loop.js";
 import { StdoutSink } from "../keeper/alerts.js";
@@ -28,11 +27,9 @@ import {
   getPrivyAccount,
   loadPrivyEnv,
   privyConfigured,
-  resolveHostedWallet,
-  sendWithPrivy,
-  PRIVY_STUB_MESSAGE,
 } from "../signer/privy.js";
 import { parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
+import { scoutMarkets as getMarketScout } from "../markets/scout.js";
 
 export type WriteFlags = {
   live?: boolean;
@@ -41,6 +38,10 @@ export type WriteFlags = {
 
 export function jsonSafe<T>(value: T): T {
   return JSON.parse(JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? v.toString() : v))) as T;
+}
+
+export async function scoutMarkets(chain?: ChainSlug | string) {
+  return jsonSafe(await getMarketScout(chain ? slugOf(chain) : undefined));
 }
 
 export function assertWriteAllowed(flags: WriteFlags): boolean {
@@ -66,23 +67,15 @@ export async function connectHosted(ownerArg?: string, chain: ChainSlug | string
   const { env, client, adapter, chain: slug } = connectRead(chain);
   let owner: Address | undefined;
   if (ownerArg && isAddress(ownerArg)) owner = getAddress(ownerArg);
-  if (!owner && privyConfigured()) {
-    try {
-      owner = (await resolveHostedWallet()).address;
-    } catch {
-      owner = undefined;
-    }
-  }
   if (!owner) {
-    throw new Error("Pass owner, or set PRIVY_APP_SECRET so the hosted Privy wallet can be resolved.");
+    throw new Error("Pass the connected user's wallet address.");
   }
   return { env, client, owner, adapter, chain: slug };
 }
 
 async function liveViewFor(snap: PositionSnapshot, client: ReturnType<typeof makePublicClient>, ethUsd?: number) {
   const prices = await usdPricesForPosition(client, snap, ethUsd);
-  let rec = getHold(snap.ref.tokenId);
-  if (!rec) rec = await importHoldForToken(client, snap.ref.tokenId, { amount0: snap.amount0, amount1: snap.amount1 });
+  const rec = await readHoldBaseline(client, snap.ref.tokenId, { amount0: snap.amount0, amount1: snap.amount1 });
   const card = buildCard(snap, prices, holdAmounts(rec), rec.createdAt, undefined, {
     source: rec.source,
     note: formatHoldNote(rec),
@@ -192,32 +185,14 @@ async function maybeBroadcast(
   if (receipt.skipped || !live) {
     return { ...receipt, dryRun: !live };
   }
-  const env = loadEnv();
   const filled = hydrateCalldata(receipt, snap, owner);
-  const extra = allowlistWithTokens(snap.token0.address, snap.token1.address, chain);
-  if (!privyConfigured()) {
-    return {
-      ...filled,
-      dryRun: true,
-      reason: PRIVY_STUB_MESSAGE,
-      stubbed: true,
-    };
-  }
-  const hashes: string[] = [];
-  const wallet = await resolveHostedWallet();
-  const chainId = chain === "robinhood" ? 4663 : 8453;
-  for (const tx of filled.txs) {
-    const sent = await sendWithPrivy({
-      rpcUrl: env.rpcByChain[chain],
-      tx,
-      extraAllow: extra,
-      live: true,
-      wallet,
-      chainId,
-    });
-    if (sent.hash) hashes.push(sent.hash);
-  }
-  return { ...filled, dryRun: false, hashes, hash: hashes.at(-1) as ActionReceipt["hash"] };
+  void chain;
+  return {
+    ...filled,
+    dryRun: true,
+    reason: "Prepared for the connected user wallet. Hosted chat never signs consumer transactions.",
+    stubbed: true,
+  };
 }
 
 export async function compoundPosition(input: {
@@ -350,7 +325,7 @@ export async function mintPosition(input: {
     tickUpper: input.tickUpper,
     amount0: input.amount0 ? BigInt(input.amount0) : undefined,
     amount1: input.amount1 ? BigInt(input.amount1) : undefined,
-    dryRun: !live,
+    dryRun: true,
     apiKey: env.uniswapApiKey,
   });
   if (!live) {
@@ -368,36 +343,6 @@ export async function mintPosition(input: {
       note: "dry-run: no broadcast. Set live=true and confirm=true to mint. NFT stays in your wallet.",
     });
   }
-  if (!privyConfigured()) {
-    const view = serializeMintView(result.quote);
-    return jsonSafe({
-      card: result.card,
-      text: formatReceipt(result.receipt),
-      receipt: result.receipt,
-      view,
-      projection: view,
-      chain: slug,
-      confirm: confirmFromMint(result.quote, result.receipt),
-      stubbed: true,
-      note: PRIVY_STUB_MESSAGE,
-    });
-  }
-  const extra = extraAllowForMint(result.quote);
-  const wallet = await resolveHostedWallet();
-  const hashes: string[] = [];
-  const chainId = slug === "robinhood" ? 4663 : 8453;
-  for (const tx of result.receipt.txs) {
-    const sent = await sendWithPrivy({
-      rpcUrl: env.rpcByChain[slug],
-      tx,
-      extraAllow: extra,
-      live: true,
-      wallet,
-      chainId,
-    });
-    if (sent.hash) hashes.push(sent.hash);
-  }
-  persistMintHold(result.quote, 0n);
   const view = serializeMintView(result.quote);
   return jsonSafe({
     card: result.card,
@@ -406,9 +351,9 @@ export async function mintPosition(input: {
     view,
     projection: view,
     chain: slug,
-    confirm: confirmFromMint(result.quote, { ...result.receipt, dryRun: false }),
-    hashes,
-    note: "Mint submitted via Privy. HOLD persists on next status once the NFT exists.",
+    confirm: confirmFromMint(result.quote, result.receipt),
+    stubbed: true,
+    note: "Prepared for the connected user wallet. Hosted chat never signs consumer transactions.",
   });
 }
 

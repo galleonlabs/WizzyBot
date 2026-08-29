@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 export type HostedSurface = {
   listPositions: (owner?: string, chain?: string) => Promise<unknown>;
   statusPosition: (tokenId: string, chain?: string) => Promise<unknown>;
+  scoutMarkets: (chain?: string) => Promise<unknown>;
   compoundPosition: (input: {
     tokenId: string;
     owner?: string;
@@ -77,6 +78,7 @@ const hosted = loadHosted();
 
 export const listPositions = hosted.listPositions;
 export const statusPosition = hosted.statusPosition;
+export const scoutMarkets = hosted.scoutMarkets;
 export const compoundPosition = hosted.compoundPosition;
 export const rangePosition = hosted.rangePosition;
 export const exitPosition = hosted.exitPosition;

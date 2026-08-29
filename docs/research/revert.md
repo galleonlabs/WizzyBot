@@ -14,6 +14,8 @@ Sources (official):
 - Contract addresses: https://docs.revert.finance/revert/resources/contract-addresses
 - Compoundor whitepaper: https://hackmd.io/@revert/BJcGIJQ35
 - Aerodrome Lend post-mortem 30 Jan 2026: https://paragraph.com/@revertfinance/post-mortem-aerodrome-lend-vault-incident-on-base
+- Top positions: https://revert.finance/#/top-positions
+- Open source organization: https://github.com/revert-finance
 
 ## 1. The three jobs
 
@@ -139,3 +141,10 @@ A later Revert post (Aerodrome Lend relaunches on Base) lists a new vault 0x1EF7
 - Revert Auto-Range technical page says approved for the Auto-Exit contract in the activate paragraph — likely a docs copy-paste. The Auto-Range product page is the fee/behavior source; the v3 Auto-Range address is the one in the table above.
 - Confirm whether UnaBot should ever call Revert on-chain automators vs reimplementing the three jobs with the Uniswap LP API. Current product: reimplement, do not take a Revert operator dependency.
 
+## 9. What the live analytics product adds
+
+The Top Positions table was inspected live on 29 Aug 2026. It filters open positions above $500, says data is updated hourly from onchain sources, supports network/exchange filters, and exposes the comparison set LP users actually need: pool and fee tier, NFT id, owner, pooled assets, PnL, APR, fee APR, ROI, and age. Each row can be copied into a new position.
+
+Robinhood Chain occupied many of the highest current rows. Several extreme annualized numbers belonged to positions younger than one day. Una must not reuse that number without context: show position age beside annualization, call recent results a pace, and suppress longer projections until enough history exists. “Copy position” becomes an advisory “study this range” interaction, never a blind copy or an AI-authorized transaction.
+
+The open-source backtester derives fees from fee-growth state, models dilution by competing liquidity, computes time in range, and evaluates PnL against reference inventory. The Compoundor keeper does another important thing: it estimates gas, simulates compound results, compares swap/no-swap variants, groups compatible positions, and backs off after repeated failures. Una adopts those decision patterns while preserving direct user signing.

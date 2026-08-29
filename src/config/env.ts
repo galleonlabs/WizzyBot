@@ -70,8 +70,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   let parsed: z.infer<typeof EnvSchema>;
   try {
     parsed = EnvSchema.parse({
-      BASE_RPC_URL: env.BASE_RPC_URL ?? BASE_RPC_DEFAULT,
-      ROBINHOOD_RPC_URL: env.ROBINHOOD_RPC_URL ?? ROBINHOOD_RPC_DEFAULT,
+      BASE_RPC_URL: env.BASE_RPC_URL || BASE_RPC_DEFAULT,
+      ROBINHOOD_RPC_URL: env.ROBINHOOD_RPC_URL || ROBINHOOD_RPC_DEFAULT,
       UNISWAP_API_KEY: env.UNISWAP_API_KEY ?? "",
       UNABOT_PRIVATE_KEY: env.UNABOT_PRIVATE_KEY || undefined,
       UNABOT_TREASURY: env.UNABOT_TREASURY || undefined,

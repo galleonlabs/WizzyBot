@@ -9,7 +9,7 @@ import {
   slugForChainId,
 } from "../src/chains.js";
 import { isAllowedTarget, allowlistWithTokens } from "../src/signer/allowlist.js";
-import { resolveMintToken } from "../src/core/mint.js";
+import { planMint, quoteMintFromPool, resolveMintToken } from "../src/core/mint.js";
 import { LpApi } from "../src/uniswap/lp-api.js";
 
 describe("chain registry", () => {
@@ -52,7 +52,7 @@ describe("chain registry", () => {
   it("sends Robinhood chainId on LP API create", async () => {
     const posted: unknown[] = [];
     const api = new LpApi({
-      lp: async (_path, body) => {
+      lp: async (_path: string, body: unknown) => {
         posted.push(body);
         return { create: { to: "0x1", data: "0x", value: "0" } };
       },
@@ -64,5 +64,31 @@ describe("chain registry", () => {
       independentToken: { tokenAddress: "0x0", amount: "1" },
     });
     expect((posted[0] as { chainId: number }).chainId).toBe(4663);
+  });
+
+  it("plans Robinhood v4 mints against Robinhood contracts", () => {
+    const addresses = addressesFor("robinhood");
+    const quote = quoteMintFromPool({
+      protocol: "V4",
+      chainId: 4663,
+      token0: { address: addresses.weth, symbol: "WETH", decimals: 18 },
+      token1: { address: addresses.usdg!, symbol: "USDG", decimals: 6 },
+      fee: 500,
+      sqrtPriceX96: 2n ** 96n,
+      tickCurrent: 0,
+      pool: addresses.v4PoolManager,
+      widthPct: 10,
+      amount0Desired: 10n ** 18n,
+      amount1Desired: 1_000_000n,
+    });
+    const receipt = planMint(
+      quote,
+      getAddress("0x1111111111111111111111111111111111111111"),
+      true,
+    );
+    expect(quote.chainId).toBe(4663);
+    expect(receipt.to).toContain(addresses.v4PositionManager);
+    expect(receipt.txs.at(-1)?.to).toBe(addresses.v4PositionManager);
+    expect(receipt.txs.every((tx) => tx.to !== ADDRESSES.v4PositionManager)).toBe(true);
   });
 });

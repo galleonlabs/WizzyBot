@@ -10,6 +10,7 @@ Durable SME notes for UnaBot. Written 29 Aug 2026 (Europe/London). Product knowl
 | --- | --- |
 | [uniswap.md](uniswap.md) | Uniswap LP API + Trading API, Base v2/v3/v4 addresses, MCP/skills/CLI, LP primitives |
 | [bankr.md](bankr.md) | Product surfaces, Club pricing, Doppler 1.75% table, `$BNKR` CA, skills org, May 2026 prompt-injection incidents, copy vs skip |
+| [fomo-relay.md](fomo-relay.md) | Fomo’s single-balance UX, Privy custody boundary, Relay’s permissionless two-stage path, and the enterprise one-click gate |
 | [revert.md](revert.md) | Compound / range / exit, user-held position, Base automator addresses, fees, v3 vs v1 Compoundor, Jan 2026 Aerodrome Lend incident |
 | [virtuals.md](virtuals.md) | Tokenized-agent launch, 1% tax 70/30, 42k VIRTUAL graduation, 10y lock, ACP, Tax Manager, treasury-as-creator wallet |
 | [product.md](product.md) | UnaBot positioning, fee schedule, surfaces, threat model |

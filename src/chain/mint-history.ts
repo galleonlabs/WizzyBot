@@ -1,5 +1,5 @@
 import type { Address, PublicClient } from "viem";
-import { ADDRESSES } from "../constants.js";
+import { addressesFor, slugOfClient } from "../chains.js";
 import { nfpmAbi } from "./abi.js";
 import { rememberHold, type HoldRecord, type HoldSource } from "../core/hold.js";
 
@@ -45,6 +45,7 @@ export async function fetchIncreaseLiquidity(
   tokenId: bigint,
   fromBlock?: bigint,
 ): Promise<MintHistory | undefined> {
+  const nfpm = addressesFor(slugOfClient(client)).nfpm;
   const latest = await latestBlock(client);
   if (latest === undefined) return undefined;
   const { start, chunks } = windowFor(latest, fromBlock);
@@ -54,7 +55,7 @@ export async function fetchIncreaseLiquidity(
     const to = cursor + CHUNK > latest ? latest : cursor + CHUNK;
     try {
       const logs = await client.getContractEvents({
-        address: ADDRESSES.nfpm,
+        address: nfpm,
         abi: nfpmAbi,
         eventName: "IncreaseLiquidity",
         args: { tokenId },
@@ -89,6 +90,7 @@ export async function fetchMintTransfer(
   tokenId: bigint,
   fromBlock?: bigint,
 ): Promise<{ to: Address; createdAt: number } | undefined> {
+  const nfpm = addressesFor(slugOfClient(client)).nfpm;
   const latest = await latestBlock(client);
   if (latest === undefined) return undefined;
   const { start, chunks } = windowFor(latest, fromBlock);
@@ -99,7 +101,7 @@ export async function fetchMintTransfer(
     const toBlock = cursor + CHUNK > latest ? latest : cursor + CHUNK;
     try {
       const logs = await client.getContractEvents({
-        address: ADDRESSES.nfpm,
+        address: nfpm,
         abi: nfpmAbi,
         eventName: "Transfer",
         args: { from: zero as Address, tokenId },
@@ -182,6 +184,34 @@ export async function importHoldForToken(
     path: opts.path,
     note: "Mint predates this store or IncreaseLiquidity logs were unavailable. HOLD is first-seen inventory, not the original mint bag.",
   }).record;
+}
+
+/** Resolve a transparent HOLD baseline without writing server-side state. */
+export async function readHoldBaseline(
+  client: PublicClient,
+  tokenId: bigint,
+  current: { amount0: bigint; amount1: bigint },
+  opts: { fromBlock?: bigint } = {},
+): Promise<HoldRecord> {
+  const history = await fetchIncreaseLiquidity(client, tokenId, opts.fromBlock);
+  if (history) {
+    return {
+      tokenId: tokenId.toString(),
+      hold0: history.amount0.toString(),
+      hold1: history.amount1.toString(),
+      createdAt: history.createdAt,
+      source: history.source,
+    };
+  }
+  const transfer = await fetchMintTransfer(client, tokenId, opts.fromBlock);
+  return {
+    tokenId: tokenId.toString(),
+    hold0: current.amount0.toString(),
+    hold1: current.amount1.toString(),
+    createdAt: transfer?.createdAt ?? 0,
+    source: "first-seen-import",
+    note: "Original mint inventory was not available from the bounded log scan. HOLD comparisons use current first-seen inventory and are not historical PnL.",
+  };
 }
 
 export async function simulateTxs(

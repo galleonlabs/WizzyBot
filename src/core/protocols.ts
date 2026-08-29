@@ -222,6 +222,7 @@ export class V4Protocol implements ProtocolAdapter {
     const sqrtPriceX96 = slot0[0];
     const tickCurrent = slot0[1];
     const amounts = amountsForPosition({
+      chainId: chainIdOfClient(this.client),
       token0,
       token1,
       fee: poolKey.fee,

@@ -44,6 +44,7 @@ describe("HOLD persistence", () => {
     persistMintHold(
       {
         protocol: "V3",
+        chainId: 8453,
         token0: ADDRESSES.weth,
         token1: ADDRESSES.usdc,
         symbol0: "WETH",

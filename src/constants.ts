@@ -3,7 +3,10 @@ import { getAddress, type Address, type Hex } from "viem";
 /** Base mainnet. */
 export const CHAIN_ID = 8453 as const;
 
-export const BASE_RPC_DEFAULT = "https://mainnet.base.org";
+// Base's publicnode endpoint has materially higher public read capacity than
+// the rate-limited mainnet.base.org endpoint. Operators should still provide a
+// dedicated RPC URL in production.
+export const BASE_RPC_DEFAULT = "https://base-rpc.publicnode.com";
 
 export const LP_API_URL = "https://liquidity.api.uniswap.org";
 export const TRADE_API_URL = "https://trade-api.gateway.uniswap.org/v1";

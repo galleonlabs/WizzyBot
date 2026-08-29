@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -60,5 +60,37 @@ describe("eve hosted CJS isolation", () => {
     const bundle = readFileSync(bundlePath, "utf8");
     expect(bundle).toMatch(/compoundPosition|assertWriteAllowed/);
     expect(bundle.includes('require("@uniswap/sdk-core")')).toBe(false);
+  });
+});
+
+
+function walkAppSources(dir = "app"): string[] {
+  const files: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const full = path.join(dir, name);
+    const st = statSync(full);
+    if (st.isDirectory()) {
+      if (name === "node_modules" || name === ".next") continue;
+      files.push(...walkAppSources(full));
+    } else if (name.endsWith(".ts") || name.endsWith(".tsx") || name.endsWith(".css")) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+describe("hosted UI isolation", () => {
+  it("keeps Uniswap SDK out of client UI and API routes", () => {
+    const blocked = ["@uniswap/sdk-core", "@uniswap/v3-sdk", "src/surfaces/hosted"];
+    for (const file of walkAppSources()) {
+      const src = readFileSync(file, "utf8");
+      for (const needle of blocked) {
+        expect(src, file).not.toContain(needle);
+      }
+      expect(src, file).not.toMatch(/#ff007a/i);
+    }
+    const loader = readFileSync("app/lib/hosted-server.ts", "utf8");
+    expect(loader).toContain("createRequire");
+    expect(loader).toContain("../../vendor/hosted-cjs/index.cjs");
   });
 });

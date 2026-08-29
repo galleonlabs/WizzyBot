@@ -1,9 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef } from "react";
-import { usePrivy } from "@privy-io/react-auth";
 import { useEveAgent } from "eve/react";
+import { usePrivy } from "@privy-io/react-auth";
+import { ConfirmCard } from "./confirm-card";
+import { isConfirmView, isRecord, type ConfirmView } from "./lib/cards";
+import { unwrapToolOutput } from "./lib/panel";
 
 type InputRequest = {
   requestId: string;
@@ -32,15 +34,22 @@ type ChatMessage = {
   parts: MessagePart[];
 };
 
-const STARTERS = [
-  "List my positions",
-  "Plan a compound",
-  "Re-range if I'm out",
-  "Exit a position",
-];
+const STARTERS = ["List my positions", "Plan a compound", "Re-range if I'm out", "Quote a mint"];
 
-export function Chat() {
-  const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
+const WRITE_TOOLS = new Set(["mint", "compound", "range", "exit"]);
+
+export function Chat({
+  authenticated,
+  onLogin,
+  onToolOutput,
+  lastConfirm,
+}: {
+  authenticated: boolean;
+  onLogin: () => void;
+  onToolOutput?: (toolName: string | undefined, output: unknown) => void;
+  lastConfirm?: ConfirmView;
+}) {
+  const { getAccessToken } = usePrivy();
   const agent = useEveAgent({
     headers: async (): Promise<Record<string, string>> => {
       const token = await getAccessToken();
@@ -51,12 +60,13 @@ export function Chat() {
   const isResuming = agent.status === "resuming";
   const scroller = useRef<HTMLDivElement>(null);
   const messages = agent.data.messages as ChatMessage[];
+  const seen = useRef<Set<string>>(new Set());
 
   const pending = messages.flatMap((message) =>
     message.parts.flatMap((part) => {
       if (!isTool(part) || part.state !== "approval-requested") return [];
       const request = part.toolMetadata?.eve?.inputRequest;
-      return request ? [request] : [];
+      return request ? [{ request, toolName: part.toolName, input: part.input }] : [];
     }),
   );
 
@@ -65,43 +75,33 @@ export function Chat() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, agent.status, pending.length]);
 
+  useEffect(() => {
+    if (!onToolOutput) return;
+    for (const message of messages) {
+      for (const [index, part] of message.parts.entries()) {
+        if (!isTool(part) || part.state !== "output-available") continue;
+        const key = `${message.id}:${index}:${part.toolName}`;
+        if (seen.current.has(key)) continue;
+        seen.current.add(key);
+        onToolOutput(part.toolName, part.output);
+      }
+    }
+  }, [messages, onToolOutput]);
+
   function send(text: string) {
     const message = text.trim();
     if (!message || isResuming) return;
     void agent.send(message, isBusy ? { turnPolicy: "steer" } : undefined);
   }
 
-  const account = user?.email?.address ?? (user?.wallet?.address ? short(user.wallet.address) : null);
-
   return (
-    <div className="chat">
-      <header className="chat-bar">
-        <Link className="wordmark" href="/">
-          <i className="mark" aria-hidden="true" />
-          UnaBot
-        </Link>
-        <div className="chat-bar-meta">
-          <span>Base · dry-run default</span>
-          {!ready ? (
-            <span>…</span>
-          ) : authenticated ? (
-            <button className="ghost" type="button" onClick={() => void logout()}>
-              {account ?? "Sign out"}
-            </button>
-          ) : (
-            <button className="ghost" type="button" onClick={() => void login()}>
-              Email login
-            </button>
-          )}
-        </div>
-      </header>
-
+    <section className="chat cockpit-chat">
       <div className="thread" ref={scroller}>
         <div className="thread-inner">
           {messages.length === 0 ? (
             <div className="empty">
               <h2>Dry-run until you say yes.</h2>
-              <p>List, compound, re-range, exit. Live writes wait for confirm.</p>
+              <p>List, compound, re-range, exit. Live writes wait for confirm, then Privy.</p>
               <div className="chips">
                 {STARTERS.map((item) => (
                   <button
@@ -111,7 +111,7 @@ export function Chat() {
                     disabled={isResuming}
                     onClick={() => {
                       if (!authenticated) {
-                        void login();
+                        onLogin();
                         return;
                       }
                       send(item);
@@ -138,23 +138,14 @@ export function Chat() {
 
       <footer className="dock">
         <div className="dock-inner">
-          {pending.map((request) => (
-            <section className="confirm" key={request.requestId}>
-              <h3>{request.kind === "tool-approval" ? "Confirm live write" : "Question"}</h3>
-              <p>{request.prompt}</p>
-              <div className="confirm-row">
-                {request.options?.map((option, i) => (
-                  <button
-                    key={option.id}
-                    className={i === 0 ? "btn btn-accent" : "btn"}
-                    type="button"
-                    onClick={() => void agent.respond([{ requestId: request.requestId, optionId: option.id }])}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </section>
+          {pending.map(({ request }) => (
+            <ConfirmCard
+              key={request.requestId}
+              confirm={lastConfirm}
+              prompt={request.prompt}
+              options={request.options}
+              onPick={(optionId) => void agent.respond([{ requestId: request.requestId, optionId }])}
+            />
           ))}
           <form
             className="composer"
@@ -163,7 +154,7 @@ export function Chat() {
               const form = event.currentTarget;
               const value = String(new FormData(form).get("message") ?? "");
               if (!authenticated) {
-                void login();
+                onLogin();
                 return;
               }
               if (value.trim()) {
@@ -184,9 +175,10 @@ export function Chat() {
               Send
             </button>
           </form>
+          <p className="dock-hint">Dry-run first. Confirm to go live.</p>
         </div>
       </footer>
-    </div>
+    </section>
   );
 }
 
@@ -199,7 +191,11 @@ function PartView({ part }: { part: MessagePart }) {
     return <p className="tool-line">{part.toolName ?? "write"} · waiting on confirm</p>;
   }
   if (part.state === "input-streaming" || part.state === "input-available") {
-    return <p className="tool-line">{part.toolName ?? "tool"} · {part.state === "input-available" ? "running" : "planning"}</p>;
+    return (
+      <p className="tool-line">
+        {part.toolName ?? "tool"} · {part.state === "input-available" ? "running" : "planning"}
+      </p>
+    );
   }
   if (part.state === "output-error") {
     return <p className="err">{part.errorText || "Tool failed."}</p>;
@@ -214,57 +210,71 @@ function PartView({ part }: { part: MessagePart }) {
 }
 
 function ReceiptView({ toolName, output }: { toolName?: string; output: unknown }) {
-  const data = unwrap(output);
+  const data = unwrapToolOutput(output);
   const receipt = isRecord(data.receipt) ? data.receipt : looksLikeReceipt(data) ? data : null;
   const positions = Array.isArray(data.positions) ? data.positions : null;
   const card = typeof data.card === "string" ? data.card : null;
   const text = typeof data.text === "string" ? data.text : typeof output === "string" ? output : null;
   const note = typeof data.note === "string" ? data.note : null;
+  const confirm = isConfirmView(data.confirm) ? data.confirm : null;
 
   if (receipt) {
-    const dry = receipt.dryRun !== false;
-    const skipped = Boolean(receipt.skipped);
-    const actions = asArray(receipt.actions);
     const hashes = asArray(receipt.hashes).map(String);
     if (typeof receipt.hash === "string") hashes.push(receipt.hash);
+    const dry = receipt.dryRun !== false;
+    const skipped = Boolean(receipt.skipped);
+    const write = WRITE_TOOLS.has(toolName ?? "") || Boolean(receipt.action);
+    const signed = hashes.length > 0 && !dry && !skipped;
+    const actions = asArray(receipt.actions);
     return (
       <section className="receipt">
         <div className="receipt-head">
           <span>{String(receipt.action ?? toolName ?? "receipt")}</span>
-          <span className={skipped ? "badge-skip" : dry ? "badge-dry" : "badge-live"}>
-            {skipped ? "skipped" : dry ? "dry-run" : "live"}
+          <span className={skipped ? "badge-skip" : signed ? "badge-live" : dry ? "badge-dry" : "badge-wait"}>
+            {skipped ? "skipped" : signed ? "signed" : dry ? "dry-run" : write ? "awaiting Privy" : "live"}
           </span>
         </div>
-        <dl>
-          {receipt.tokenId != null ? (
-            <>
-              <dt>token</dt>
-              <dd>{String(receipt.tokenId)}</dd>
-            </>
-          ) : null}
-          {typeof receipt.from === "string" ? (
-            <>
-              <dt>from</dt>
-              <dd>{short(receipt.from)}</dd>
-            </>
-          ) : null}
-          {typeof receipt.reason === "string" ? (
-            <>
-              <dt>reason</dt>
-              <dd>{receipt.reason}</dd>
-            </>
-          ) : null}
-          {hashes.length > 0 ? (
-            <>
-              <dt>tx</dt>
-              <dd>{hashes.map(short).join(" ")}</dd>
-            </>
-          ) : null}
-        </dl>
+        {confirm ? (
+          <dl>
+            <dt>pair</dt>
+            <dd>
+              {confirm.pair} · {confirm.protocol} · {confirm.feeLabel}
+            </dd>
+            {confirm.tickLower !== undefined ? (
+              <>
+                <dt>range</dt>
+                <dd>
+                  [{confirm.tickLower}, {confirm.tickUpper}]
+                </dd>
+              </>
+            ) : null}
+          </dl>
+        ) : (
+          <dl>
+            {receipt.tokenId != null ? (
+              <>
+                <dt>token</dt>
+                <dd>{String(receipt.tokenId)}</dd>
+              </>
+            ) : null}
+            {typeof receipt.reason === "string" ? (
+              <>
+                <dt>reason</dt>
+                <dd>{receipt.reason}</dd>
+              </>
+            ) : null}
+            {hashes.length > 0 ? (
+              <>
+                <dt>tx</dt>
+                <dd>{hashes.map(short).join(" ")}</dd>
+              </>
+            ) : null}
+          </dl>
+        )}
         {actions.length > 0 ? (
           <ol>
             {actions.map((item, i) => {
-              const row = asRecord(item) ?? {};
+              const row = isRecord(item) ? item : {};
               return (
                 <li key={i}>
                   {typeof row.kind === "string" ? <b>{row.kind} </b> : null}
@@ -273,8 +283,11 @@ function ReceiptView({ toolName, output }: { toolName?: string; output: unknown 
               );
             })}
           </ol>
-        ) : text ? (
+        ) : text && !confirm ? (
           <pre>{text}</pre>
+        ) : null}
+        {write && !signed && !skipped ? (
+          <p className="tool-line">Not done. Confirm + Privy sign required to go live.</p>
         ) : null}
         {note ? <p className="tool-line">{note}</p> : null}
       </section>
@@ -290,16 +303,15 @@ function ReceiptView({ toolName, output }: { toolName?: string; output: unknown 
         </div>
         <div className="pos-list">
           {positions.map((item, i) => {
-            const row = asRecord(item) ?? {};
+            const row = isRecord(item) ? item : {};
             return (
               <div className="pos" key={String(row.tokenId ?? i)}>
                 <span>
                   <b>{String(row.pair ?? row.tokenId ?? "position")}</b>
                   {row.protocol != null ? ` · ${String(row.protocol)}` : ""}
-                  {row.tokenId != null ? ` · ${String(row.tokenId)}` : ""}
                 </span>
                 <span className={row.inRange === false ? "out" : "in"}>
-                  {row.inRange === false ? "out" : row.inRange === true ? "in range" : ""}
+                  {row.inRange === false ? "OOR" : row.inRange === true ? "in range" : ""}
                 </span>
               </div>
             );
@@ -341,33 +353,8 @@ function isTool(part: MessagePart): part is ToolPart {
   return part.type === "dynamic-tool";
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return isRecord(value) ? value : null;
-}
-
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
-}
-
-function unwrap(output: unknown): Record<string, unknown> {
-  if (typeof output === "string") {
-    try {
-      const parsed: unknown = JSON.parse(output);
-      if (isRecord(parsed)) return unwrap(parsed);
-    } catch {
-      return {};
-    }
-  }
-  if (!isRecord(output)) return {};
-  if (isRecord(output.result)) return unwrap(output.result);
-  if (isRecord(output.value) && ("receipt" in output.value || "positions" in output.value || "card" in output.value)) {
-    return output.value;
-  }
-  return output;
 }
 
 function looksLikeReceipt(value: Record<string, unknown>): boolean {

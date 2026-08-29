@@ -387,7 +387,7 @@ program
   .description("Chat. Live writes need yes.")
   .action(async (_opts, cmd) => {
     const rl = createInterface({ input, output });
-    console.log(`UnaBot chat. ${PRODUCT_LINE} Type help or quit.`);
+    console.log(`Una chat. ${PRODUCT_LINE} Type help or quit.`);
     try {
       while (true) {
         const line = (await rl.question("> ")).trim();

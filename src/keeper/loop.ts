@@ -266,7 +266,7 @@ export async function runLoop(deps: KeeperDeps, signal?: AbortSignal): Promise<v
     deps.sink,
     "info",
     "keeper",
-    `Uniswap LP on autopilot. starting loop interval=${deps.intervalMs}ms live=${deps.live}`,
+    `Liquidity, as an agent. starting loop interval=${deps.intervalMs}ms live=${deps.live}`,
     undefined,
     { dryRun: !deps.live },
   );

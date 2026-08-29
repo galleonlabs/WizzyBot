@@ -1,20 +1,38 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Chat } from "./chat";
 import { isPositionView, type PositionView } from "./lib/cards";
 import { applyListPayload, applyStatusView, applyToolOutput, emptyPanel, type PanelState } from "./lib/panel";
+import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { LpPanel } from "./lp-panel";
+import { TopNav } from "./top-nav";
 
 export function Cockpit() {
   const { ready, authenticated, login, logout, user } = usePrivy();
   const [panel, setPanel] = useState<PanelState>(emptyPanel);
+  const [tab, setTab] = useState<"positions" | "agent">("positions");
+  const [shot, setShot] = useState(false);
   const address = user?.wallet?.address;
   const account = user?.email?.address ?? (address ? short(address) : null);
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "agent") {
+      setTab("agent");
+    }
+    if (isShotQuery()) {
+      setShot(true);
+      setPanel({
+        positions: SHOT_VIEWS,
+        selected: SHOT_VIEWS[0],
+        selectedId: SHOT_VIEWS[0]?.tokenId,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (shot) return;
     if (!authenticated || !address) {
       setPanel(emptyPanel);
       return;
@@ -36,7 +54,7 @@ export function Cockpit() {
     return () => {
       cancelled = true;
     };
-  }, [authenticated, address]);
+  }, [authenticated, address, shot]);
 
   const onToolOutput = useCallback((toolName: string | undefined, output: unknown) => {
     setPanel((prev) => applyToolOutput(prev, toolName, output));
@@ -44,13 +62,14 @@ export function Cockpit() {
 
   const onSelect = useCallback((view: PositionView) => {
     setPanel((prev) => ({ ...prev, selected: view, selectedId: view.tokenId, projection: undefined }));
+    setTab("positions");
     if (!view.tokenId) return;
     fetch(`/api/positions/${encodeURIComponent(view.tokenId)}`)
       .then((r) => r.json())
       .then((payload: unknown) => {
         if (payload && typeof payload === "object" && "view" in payload) {
-          const view = (payload as { view: unknown }).view;
-          if (isPositionView(view)) setPanel((prev) => applyStatusView(prev, view));
+          const next = (payload as { view: unknown }).view;
+          if (isPositionView(next)) setPanel((prev) => applyStatusView(prev, next));
         }
       })
       .catch(() => {
@@ -58,28 +77,38 @@ export function Cockpit() {
       });
   }, []);
 
+  function onTab(next: "positions" | "agent") {
+    setTab(next);
+    if (next === "agent") {
+      queueMicrotask(() => document.querySelector<HTMLInputElement>(".composer input")?.focus());
+    }
+  }
+
+  function onNew() {
+    setTab("agent");
+    queueMicrotask(() => document.querySelector<HTMLInputElement>(".composer input")?.focus());
+  }
+
   return (
-    <div className="cockpit">
-      <header className="cockpit-bar">
-        <Link className="wordmark" href="/">
-          <i className="mark" aria-hidden="true" />
-          UnaBot
-        </Link>
-        <div className="chat-bar-meta">
-          <span>Base · dry-run default</span>
-          {!ready ? (
-            <span>…</span>
-          ) : authenticated ? (
-            <button className="ghost" type="button" onClick={() => void logout()}>
-              {account ?? "Sign out"}
-            </button>
-          ) : (
-            <button className="ghost" type="button" onClick={() => void login()}>
-              Email login
-            </button>
-          )}
-        </div>
-      </header>
+    <div className="cockpit" data-tab={tab}>
+      <TopNav
+        active={tab}
+        account={account}
+        ready={ready}
+        authenticated={authenticated}
+        onLogin={() => void login()}
+        onLogout={() => void logout()}
+        onTab={onTab}
+      />
+
+      <nav className="app-tabs" aria-label="App sections">
+        <button className={tab === "positions" ? "is-on" : ""} type="button" onClick={() => onTab("positions")}>
+          Positions
+        </button>
+        <button className={tab === "agent" ? "is-on" : ""} type="button" onClick={() => onTab("agent")}>
+          Agent
+        </button>
+      </nav>
 
       <Chat
         authenticated={authenticated}
@@ -88,17 +117,13 @@ export function Cockpit() {
         lastConfirm={panel.confirm}
       />
       <LpPanel
-        connected={authenticated}
-        ready={ready}
+        connected={authenticated || shot}
+        ready={ready || shot}
         onLogin={() => void login()}
+        onNew={onNew}
         state={panel}
         onSelect={onSelect}
       />
-
-      <footer className="cockpit-foot">
-        <span>Dry-run first. Confirm to go live.</span>
-        <span>You keep the NFT.</span>
-      </footer>
     </div>
   );
 }

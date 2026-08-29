@@ -34,7 +34,7 @@ describe("CLI --help smoke", () => {
     const help = buildProgram().helpInformation();
     expect(help).toContain(PRODUCT_LINE);
     expect(help).toContain("v2, v3, and v4");
-    expect(help).toContain("You keep the position");
+    expect(help).toContain("You hold the NFT");
     expect(help).not.toMatch(/galleon/i);
     expect(help).not.toMatch(/v3-only|v3 only|v3 NFTs/i);
     expect(help).toMatch(/Import existing positions \(v2, v3, v4\)/);

@@ -2,27 +2,32 @@
 
 import { compositionShares, pct, priceLabel, statusLabel, usd, type PositionView } from "./lib/cards";
 import type { PanelState } from "./lib/panel";
+import { PairDiscs } from "./pair-discs";
 import { RangeStrip } from "./range-strip";
 
 export function LpPanel({
   connected,
   ready,
   onLogin,
+  onNew,
   state,
   onSelect,
 }: {
   connected: boolean;
   ready: boolean;
   onLogin: () => void;
+  onNew: () => void;
   state: PanelState;
   onSelect: (view: PositionView) => void;
 }) {
   if (!ready) {
     return (
-      <aside className="lp-panel">
-        <PanelHead />
-        <div className="lp-empty">
-          <p>Loading wallet…</p>
+      <aside className="lp-board">
+        <div className="lp-col">
+          <PanelHead onNew={onNew} />
+          <div className="lp-empty">
+            <p>Loading wallet…</p>
+          </div>
         </div>
       </aside>
     );
@@ -30,14 +35,16 @@ export function LpPanel({
 
   if (!connected) {
     return (
-      <aside className="lp-panel">
-        <PanelHead />
-        <div className="lp-empty">
-          <h2>Your positions live here.</h2>
-          <p>Continue with email to load the wallet. You keep the NFT.</p>
-          <button className="btn btn-accent" type="button" onClick={onLogin}>
-            Continue with email
-          </button>
+      <aside className="lp-board">
+        <div className="lp-col">
+          <PanelHead onNew={onNew} />
+          <div className="lp-empty">
+            <h2>No LP yet.</h2>
+            <p>Continue with email to load the wallet. Ask the agent to quote a mint.</p>
+            <button className="btn btn-accent" type="button" onClick={onLogin}>
+              Continue with email
+            </button>
+          </div>
         </div>
       </aside>
     );
@@ -45,63 +52,66 @@ export function LpPanel({
 
   const selected = state.selected;
   const projection = state.projection;
+  const empty = state.positions.length === 0 && !selected && !projection;
 
   return (
-    <aside className="lp-panel">
-      <PanelHead count={state.positions.length} />
-      {state.loadError ? <p className="lp-err">{state.loadError}</p> : null}
+    <aside className="lp-board">
+      <div className="lp-col">
+        <PanelHead count={state.positions.length} onNew={onNew} />
+        {state.loadError ? <p className="lp-err">{state.loadError}</p> : null}
 
-      {state.positions.length === 0 && !selected && !projection ? (
-        <div className="lp-empty">
-          <h2>No LP yet.</h2>
-          <p>Ask the agent to quote a mint. Dry-run first. Confirm to go live.</p>
-        </div>
-      ) : (
-        <div className="lp-list">
-          {state.positions.map((view) => (
-            <button
-              key={view.tokenId ?? view.pair}
-              className={`lp-row ${state.selectedId === view.tokenId ? "is-on" : ""}`}
-              type="button"
-              onClick={() => onSelect(view)}
-            >
-              <div className="lp-row-top">
-                <span className="lp-pair">{view.pair}</span>
-                <StatusPill status={view.status} fullRange={view.fullRange} />
-              </div>
-              <div className="lp-row-meta">
-                <span>{view.protocol.toLowerCase()}</span>
-                <span>{view.feeLabel}</span>
-                {view.tokenId ? <span>#{view.tokenId}</span> : null}
-              </div>
-              <RangeStrip live={view} compact />
-              <div className="lp-row-stats">
-                <span>{usd(view.lpUsd ?? view.positionUsd)}</span>
-                <span className="muted">fees {usd(view.feesUsd)}</span>
-                {view.feeApr !== undefined ? <span className="muted">APR {pct(view.feeApr)}</span> : null}
-                {view.holdDeltaPct !== undefined || view.divergence !== undefined ? (
-                  <span data-delta={deltaTone(view.holdDeltaPct ?? view.divergence)}>
-                    vs HOLD {pct(view.holdDeltaPct ?? view.divergence)}
-                  </span>
-                ) : null}
-              </div>
+        {empty ? (
+          <div className="lp-empty">
+            <h2>No LP yet.</h2>
+            <p>Ask the agent to quote a mint. Dry-run first. Confirm to go live.</p>
+            <button className="btn btn-accent" type="button" onClick={onNew}>
+              Quote a mint
             </button>
-          ))}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="lp-list">
+            {state.positions.map((view) => (
+              <button
+                key={view.tokenId ?? view.pair}
+                className={`lp-row ${state.selectedId === view.tokenId ? "is-on" : ""}`}
+                type="button"
+                onClick={() => onSelect(view)}
+              >
+                <PairDiscs symbol0={view.symbol0} symbol1={view.symbol1} />
+                <div className="lp-id">
+                  <span className="lp-pair">{view.pair}</span>
+                  <span className="lp-id-meta">
+                    {view.feeLabel} · {view.protocol.toLowerCase()}
+                    {view.tokenId ? ` · #${view.tokenId}` : ""}
+                  </span>
+                </div>
+                <StatusPill status={view.status} fullRange={view.fullRange} />
+                <RangeStrip live={view} compact />
+                <div className="lp-money">
+                  <span className="lp-usd-n">{usd(view.lpUsd ?? view.positionUsd)}</span>
+                  <span className="muted">uncollected {usd(view.feesUsd)}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {selected || projection ? (
-        <PositionDetail live={selected} projection={projection} />
-      ) : null}
+      {selected || projection ? <PositionDetail live={selected} projection={projection} /> : null}
     </aside>
   );
 }
 
-function PanelHead({ count }: { count?: number }) {
+function PanelHead({ count, onNew }: { count?: number; onNew: () => void }) {
   return (
     <header className="lp-head">
-      <span>Positions</span>
-      {count !== undefined ? <span className="muted">{count}</span> : <span className="muted">Base</span>}
+      <span>
+        Positions
+        {count !== undefined ? <span className="muted"> {count}</span> : null}
+      </span>
+      <button className="btn btn-new" type="button" onClick={onNew}>
+        New
+      </button>
     </header>
   );
 }
@@ -123,7 +133,8 @@ function PositionDetail({ live, projection }: { live?: PositionView; projection?
   return (
     <section className="lp-detail">
       <header className="lp-detail-head">
-        <div>
+        <PairDiscs symbol0={view.symbol0} symbol1={view.symbol1} large />
+        <div className="lp-detail-id">
           <h3>{view.pair}</h3>
           <p>
             {view.protocol.toLowerCase()} · {view.feeLabel}
@@ -131,6 +142,7 @@ function PositionDetail({ live, projection }: { live?: PositionView; projection?
           </p>
         </div>
         <div className="lp-kinds">
+          <StatusPill status={view.status} fullRange={view.fullRange} />
           {live ? (
             <span className="kind-tag" data-kind="live">
               Live
@@ -151,7 +163,6 @@ function PositionDetail({ live, projection }: { live?: PositionView; projection?
 
       <div className="lp-usd">
         <strong>{usd(view.lpUsd ?? view.positionUsd)}</strong>
-        <StatusPill status={view.status} fullRange={view.fullRange} />
       </div>
 
       <div className="comp-bar" aria-hidden="true">
@@ -171,7 +182,7 @@ function PositionDetail({ live, projection }: { live?: PositionView; projection?
 
       <div className="lp-grid">
         <article className="lp-card">
-          <h4>Fees</h4>
+          <h4>Uncollected</h4>
           <strong>{usd(view.feesUsd)}</strong>
           <p>
             {view.uncollected0} {view.symbol0}
@@ -179,17 +190,31 @@ function PositionDetail({ live, projection }: { live?: PositionView; projection?
             {view.uncollected1} {view.symbol1}
           </p>
         </article>
-        <article className="lp-card">
-          <h4>vs HOLD</h4>
-          <strong data-delta={deltaTone(view.holdDeltaPct ?? view.divergence)}>
-            {usd(view.holdDeltaUsd)} {pct(view.holdDeltaPct ?? view.divergence)}
-          </strong>
-          <p>
-            HOLD {usd(view.holdUsd)}
-            <br />
-            fees {usd(view.feesUsd)} vs IL {usd(view.ilUsd)}
-          </p>
-        </article>
+        {view.feeApr !== undefined ? (
+          <article className="lp-card">
+            <h4>Fee APR</h4>
+            <strong>{pct(view.feeApr)}</strong>
+          </article>
+        ) : null}
+        {view.totalApr !== undefined ? (
+          <article className="lp-card">
+            <h4>Total APR</h4>
+            <strong data-delta={deltaTone(view.totalApr)}>{pct(view.totalApr)}</strong>
+          </article>
+        ) : null}
+        {view.holdDeltaPct !== undefined || view.divergence !== undefined || view.holdUsd !== undefined ? (
+          <article className="lp-card">
+            <h4>vs HOLD</h4>
+            <strong data-delta={deltaTone(view.holdDeltaPct ?? view.divergence)}>
+              {usd(view.holdDeltaUsd)} {pct(view.holdDeltaPct ?? view.divergence)}
+            </strong>
+            <p>
+              HOLD {usd(view.holdUsd)}
+              <br />
+              fees {usd(view.feesUsd)} vs IL {usd(view.ilUsd)}
+            </p>
+          </article>
+        ) : null}
       </div>
 
       <article className="lp-card lp-range">
@@ -211,8 +236,7 @@ function PositionDetail({ live, projection }: { live?: PositionView; projection?
         <RangeStrip live={live} projected={projection} />
         {projection && live ? (
           <p className="proj-note">
-            Projected ticks [{projection.tickLower}, {projection.tickUpper}] vs live [{live.tickLower}, {live.tickUpper}
-            ]
+            Projected ticks [{projection.tickLower}, {projection.tickUpper}] vs live [{live.tickLower}, {live.tickUpper}]
           </p>
         ) : null}
       </article>

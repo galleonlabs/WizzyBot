@@ -103,7 +103,7 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 | `UNABOT_TREASURY` | Optional override. Product fees go here. |
 | `UNABOT_ETH_USD` | Optional USD/ETH fallback for skip math. |
 | `TELEGRAM_BOT_TOKEN` | Telegram surface. Never commit. |
-| `PRIVY_APP_ID` / `NEXT_PUBLIC_PRIVY_APP_ID` | Public app id: `cmte7ydie07zb0djopp7gds6m` |
+| `PRIVY_APP_ID` / `NEXT_PUBLIC_PRIVY_APP_ID` | Public app id: `cmteeqkjc03e20cjl59c9kbwu` |
 | `PRIVY_APP_SECRET` | Required for hosted live signing and Privy route auth. Leave empty for dry-run / stub. **Do not put the value in this file.** |
 | `PRIVY_AUTHORIZATION_KEY` | Optional Wallet API authorization key. Later. |
 | `PRIVY_WALLET_ID` | Optional hosted wallet id. |

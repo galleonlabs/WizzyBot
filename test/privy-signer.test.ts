@@ -12,7 +12,7 @@ import { assertWriteAllowed } from "../src/surfaces/hosted.js";
 describe("Privy hosted signer", () => {
   it("defaults the public app id and stays stubbed without a secret", () => {
     const env = loadPrivyEnv({});
-    expect(DEFAULT_PRIVY_APP_ID).toBe("cmte7ydie07zb0djopp7gds6m");
+    expect(DEFAULT_PRIVY_APP_ID).toBe("cmteeqkjc03e20cjl59c9kbwu");
     expect(env.appId).toBe(DEFAULT_PRIVY_APP_ID);
     expect(privyConfigured(env)).toBe(false);
     expect(createPrivyClient(env)).toBeNull();

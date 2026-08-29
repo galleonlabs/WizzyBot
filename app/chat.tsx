@@ -34,7 +34,7 @@ type ChatMessage = {
   parts: MessagePart[];
 };
 
-const STARTERS = ["List my positions", "Plan a compound", "Re-range if I'm out", "Quote a mint"];
+const STARTERS = ["Why did my fees change?", "How much have I earned?", "Should I collect my fees?", "What could make my position lose?"];
 
 const WRITE_TOOLS = new Set(["mint", "compound", "range", "exit"]);
 
@@ -103,8 +103,8 @@ export function Chat({
               <div className="empty-art" aria-hidden="true">
                 <i className="mark" />
               </div>
-              <h2>Dry-run until you say yes.</h2>
-              <p>List, compound, re-range, exit. Live writes wait for confirm, then Privy.</p>
+              <h2>Ask before you move.</h2>
+              <p>Explain your fees, flag meaningful risks, and prepare an action. Your wallet keeps the final word.</p>
               <div className="chips">
                 {STARTERS.map((item) => (
                   <button
@@ -128,7 +128,7 @@ export function Chat({
           ) : (
             messages.map((message) => (
               <article key={message.id} className={`msg msg-${message.role}`}>
-                <header className="msg-role">{message.role === "user" ? "you" : "unabot"}</header>
+                <header className="msg-role">{message.role === "user" ? "you" : "Una"}</header>
                 {message.parts.map((part, index) => (
                   <PartView key={index} part={part} />
                 ))}
@@ -171,7 +171,7 @@ export function Chat({
               autoComplete="off"
               disabled={isResuming || !authenticated}
               placeholder={
-                authenticated ? "List my positions, status a tokenId, or plan a compound…" : "Sign in with email to chat"
+                authenticated ? "Ask about your fees, positions, or a withdrawal…" : "Sign in with email to chat"
               }
             />
             <button className="btn btn-accent btn-send" type="submit" disabled={isResuming || !authenticated}>

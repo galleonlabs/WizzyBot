@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-29",
+  "chain": {
+    "slug": "solana",
+    "chainId": 792703809,
+    "label": "Solana",
+    "accent": "#b8ff64",
+    "minimumAllocationLamports": "300000000",
+    "gasReserveLamports": "25000000",
+    "markets": [
+      {
+        "id": "solana-fartcoin",
+        "name": "Fartcoin",
+        "symbol": "FARTCOIN",
+        "token": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump",
+        "quoteToken": "So11111111111111111111111111111111111111112",
+        "quoteSymbol": "SOL",
+        "protocol": "Meteora DLMM",
+        "pool": "6wJ7W3oHj7ex6MVFp2o26NSof3aey7U8Brs8E371WCXA",
+        "feeBps": 20,
+        "binStep": 20,
+        "rangeDelta": 34,
+        "weightBps": 4000,
+        "status": "active",
+        "risk": "established",
+        "color": "#d9ff74"
+      },
+      {
+        "id": "solana-useless",
+        "name": "Useless Coin",
+        "symbol": "USELESS",
+        "token": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+        "quoteToken": "So11111111111111111111111111111111111111112",
+        "quoteSymbol": "SOL",
+        "protocol": "Meteora DLMM",
+        "pool": "8ztFxjFPfVUtEf4SLSapcFj8GW2dxyUA9no2bLPq7H7V",
+        "feeBps": 20,
+        "binStep": 20,
+        "rangeDelta": 34,
+        "weightBps": 3500,
+        "status": "active",
+        "risk": "emerging",
+        "color": "#ffd36b"
+      },
+      {
+        "id": "solana-pengu",
+        "name": "Pudgy Penguins",
+        "symbol": "PENGU",
+        "token": "2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv",
+        "quoteToken": "So11111111111111111111111111111111111111112",
+        "quoteSymbol": "SOL",
+        "protocol": "Meteora DLMM",
+        "pool": "A3N64gxHQL8b2cQ75JM3nVqoRFYWmntaEUFfDmhYe1Nv",
+        "feeBps": 20,
+        "binStep": 20,
+        "rangeDelta": 34,
+        "weightBps": 2500,
+        "status": "active",
+        "risk": "established",
+        "color": "#9dc4ff"
+      }
+    ]
+  }
+}

@@ -15,3 +15,4 @@ vendor/hosted-cjs/index.cjs
 .env*.local
 .playwright-cli/
 output/playwright/
+.impeccable/

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { activeMarkets, chainCatalog, getMarketCatalog } from "../src/markets/catalog.js";
 import { deriveMarketStats } from "../src/markets/stats.js";
+import { activeSolanaMarkets, getSolanaMarketCatalog } from "../src/markets/solana-catalog.js";
 import { weightedBudgets } from "../src/portfolio/allocation.js";
 
 describe("curated meme markets", () => {
@@ -17,6 +18,15 @@ describe("curated meme markets", () => {
     const amounts = weightedBudgets(101n, [3_000, 3_000, 2_500, 1_500]);
     expect(amounts).toEqual([30n, 30n, 25n, 16n]);
     expect(amounts.reduce((sum, amount) => sum + amount, 0n)).toBe(101n);
+  });
+
+  it("keeps the hidden Solana index at 100% with maintained Meteora pools", () => {
+    const catalog = getSolanaMarketCatalog();
+    const markets = activeSolanaMarkets();
+    expect(catalog.chainId).toBe(792703809);
+    expect(markets.map((market) => market.symbol)).toEqual(["FARTCOIN", "USELESS", "PENGU"]);
+    expect(markets.reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
+    expect(markets.every((market) => market.protocol === "Meteora DLMM" && market.pool.length >= 32)).toBe(true);
   });
 
   it("labels market returns as trailing estimates derived from live activity", () => {

@@ -1,5 +1,5 @@
-import { Cockpit } from "../cockpit";
+import { PortfolioApp } from "../portfolio-app";
 
 export default function AppPage() {
-  return <Cockpit />;
+  return <PortfolioApp />;
 }

@@ -8,61 +8,62 @@ web
 
 ## Users
 
-Una is for crypto-native users who want to put idle capital to work as a liquidity provider across leading meme markets without manually selecting pools, calculating ranges, or managing each position one at a time.
+Una is for crypto-native consumers who want to earn meme-market trading fees without becoming LP technicians. They understand deposits, fees, positions, and withdrawals. Una owns the pool selection, chain routing, asset balancing, liquidity ranges, gas reserves, and rebalancing mechanics.
 
 ## Product Purpose
 
-Una is self-custodial portfolio-management software for meme liquidity. A user signs in with Privy, chooses Base, Robinhood Chain, or both, funds a curated portfolio, and can later monitor, compound, rebalance, or withdraw it from one coherent interface. Success means the user can understand what they own, why each position exists, what it has earned, what risks it carries, and execute the intended portfolio action in the fewest safe wallet confirmations the protocols allow.
+Una is the one-click market maker for memes. A user signs in with Privy, enters one ETH amount, and makes markets through one fixed, versioned index across Base, Robinhood Chain, and Solana. The user owns every resulting position in their Privy-controlled wallets and can monitor fees or withdraw without learning the machinery behind concentrated liquidity.
 
 ## Positioning
 
-Una is the “market maker of memes”: a consumer-accessible portfolio layer that turns a curated set of meme liquidity pools into an understandable, ownable, and manageable onchain portfolio. The internal ambition is to become the “Wintermute of memes” or “Wintermeme”; public copy must not imply affiliation with Wintermute, Robinhood, or Uniswap.
+Una turns “be the market maker” into a consumer action. It should feel as direct as a swap: one index, one amount, one primary action. The internal ambition is the “Wintermute of memes” or “Wintermeme”; public copy must not imply affiliation with Wintermute, Robinhood, Uniswap, Meteora, Privy, Relay, or any listed token project.
 
 ## Operating Context
 
-- Users authenticate with the existing Una Privy app and retain control of their embedded or connected EVM wallet.
-- Users select Base, Robinhood Chain, or both, then choose or accept an allocation across curated meme LPs.
-- Portfolio actions include deposit/allocation, withdraw, compound, and later policy-driven automation with explicit user control.
-- Positions and portfolio state should be derived from wallets, LP tokens or NFTs, chain events, and live market data. Avoid a database where onchain or version-controlled state is authoritative.
-- Una may use agents and AI to explain choices, surface risks, recommend actions, and prepare transaction plans. Deterministic transaction and risk rules remain authoritative.
+- Privy creates and manages the user's self-custodial EVM and Solana wallets under one identity.
+- There is no public allocation builder, chain selector, pool selector, range editor, bridge picker, or portfolio-split control.
+- Una publishes one managed index. Its versioned chain and constituent weights are product policy, not user input.
+- Relay moves the Base deposit to Robinhood Chain and Solana. Uniswap concentrated-liquidity paths create EVM positions; Meteora DLMM zap paths create Solana positions.
+- The product vocabulary is deposit, earn fees, your liquidity, collect, and withdraw. Protocol mechanics belong in receipts and disclosures, not the primary action.
+- Portfolio state should be derived from wallets, LP positions, chain events, and live market data. Avoid a database where onchain or version-controlled state is authoritative.
+- Una may explain the index, surface risk, and prepare actions. Deterministic transaction and risk rules remain authoritative.
 
 ## Capabilities and Constraints
 
-- Support Base (chain ID 8453) and Robinhood Chain (chain ID 4663).
-- Support the Uniswap v2, v3, and v4 LP paths already implemented where the selected chain and allowlisted pool support them.
-- Keep a curated, operator-controlled asset and pool allowlist easy to review and change in version control.
-- Minimize approvals and wallet confirmations through permit and multicall or batch-capable protocol paths where safely available; show the exact transaction plan before signing.
-- Users hold their position NFT or LP token and remain in control of funds. Una is not a custodian or discretionary asset manager.
-- Show position-level and portfolio-level value, fees, APR, range state, performance versus holding, impermanent loss, chain allocation, and risk context without inventing returns.
-- Projections and gamification must be clearly labeled, use defensible inputs, and never present uncertain returns as guaranteed.
-- Una's launch fee schedule is 0.15% of allocations, withdrawals, and rebalances, plus 2% of fees compounded. Fees are explicit transfers inside the reviewed wallet batch; Relay and DEX fees are shown separately.
-- The launch set is versioned in `src/config/markets.json`: TOSHI, BRETT, DEGEN, and BASECAT on Base, plus CASHCAT on Robinhood Chain. Pool addresses, weights, ranges, status, and risk labels are code-reviewed configuration.
-- A one-chain allocation uses one atomic wallet batch. A both-chain allocation starts from Base, combines the Base allocation with a Relay deposit, then requests a second Robinhood Chain batch after the intent fills. Do not advertise a one-confirmation cross-chain path until production smart-account and sponsorship behavior is proven.
-- Do not imply endorsement by Robinhood, Uniswap, Privy, Wintermute, or any listed token project.
+- Support Base (chain ID 8453), Robinhood Chain (chain ID 4663), and Solana mainnet (Relay chain ID 792703809) as one index.
+- Maintain an operator-controlled, code-reviewed allowlist for every asset and pool.
+- Use Uniswap v3 launch pools on EVM and Meteora DLMM pools on Solana.
+- The initial Solana set is FARTCOIN, USELESS, and PENGU against SOL, configured in `src/config/solana-markets.json`.
+- Minimize approvals and confirmations with wallet batching, Relay, Privy embedded wallets, and direct single-token liquidity zaps. Never claim one cryptographic signature when destination networks require additional approvals.
+- The consumer initiates one Una action. The review state explains that Privy will request the network approvals needed to preserve self-custody.
+- The launch fee is 0.15% of deposits, withdrawals, and rebalances, plus 2% of fees compounded. Relay and DEX costs are shown separately when available.
+- Never invent yield. Show observed 24-hour fee pace as trailing evidence with an explicit non-APY disclaimer.
+- Users own the EVM LP NFTs and Solana DLMM positions. Una is not a custodian or discretionary asset manager.
 
 ## Brand Commitments
 
 - Product name: Una.
-- Category claim: “The market maker of memes.”
-- Personality: bullish, sharp, playful, and financially literate without becoming reckless or juvenile.
-- Make complex LP mechanics feel legible and rewarding while keeping risk and custody facts explicit.
-- Existing product truth to preserve: dry-run first, explicit confirmation for writes, and user ownership of the NFT or LP token.
-
-## Evidence on Hand
-
-- The repository contains working Base and Robinhood chain definitions, Uniswap v2/v3/v4 planning and calldata, Privy authentication/signing, treasury fee logic, position hydration and economics, agent tools, tests, and a production Vercel app.
-- Existing research in `docs/research/` covers product behavior, Bankr, Uniswap LP APIs, and adjacent automation.
-- No audited proprietary contracts, verified performance history, testimonials, legal opinion, or third-party endorsements are present. Future work must not fabricate them.
+- Category claim: “The meme market maker” and “one-click market maker for memes.”
+- Primary action: “Make markets.”
+- Personality: bullish, direct, and financially literate without becoming reckless or juvenile.
+- Complexity is absorbed by the product, not pushed onto the consumer.
+- Risk, variable fees, self-custody, and wallet approvals stay explicit.
 
 ## Product Principles
 
-1. Self-custody is visible, not buried: the user owns positions and approves every material action.
-2. Portfolio first: users think in goals and allocations; Una handles the per-pool mechanics transparently.
-3. Onchain by default: derive state from public, inspectable sources and keep configuration reviewable.
-4. Bullish does not mean blind: make upside legible while quantifying range, liquidity, contract, and divergence risk.
-5. AI advises and orchestrates; deterministic policy, simulation, and user consent govern execution.
-6. Trailing data stays trailing: recent fee pace, young-position annualization, and scenario projections are visibly distinguished from realized returns.
+1. One product, not a toolkit: one index, one amount, one action.
+2. Consumer language first: deposit, earn fees, collect, withdraw.
+3. Self-custody stays honest: the user owns positions and approves required wallet actions.
+4. Onchain by default: public state and version-controlled policy are authoritative.
+5. Trailing data stays trailing: observed fees are not APY or promised returns.
+6. Technical detail appears on demand, never as a prerequisite for participation.
+
+## Evidence on Hand
+
+- The repository contains Base and Robinhood definitions, Uniswap planning and calldata, Privy authentication/signing, Relay routing, treasury fee logic, position hydration, agent tools, and tests.
+- The Solana path uses Privy Solana wallets, Relay native SOL delivery, and Meteora's maintained DLMM zap SDK.
+- No audited proprietary contracts, verified performance history, testimonials, legal opinion, or third-party endorsements are present. Future work must not fabricate them.
 
 ## Accessibility & Inclusion
 
-The web product must support keyboard navigation, visible focus, reduced motion, readable numerical contrast, responsive mobile use, and plain-language explanations alongside protocol terminology.
+The web product must support keyboard navigation, visible focus, reduced motion, readable numerical contrast, responsive mobile use, and plain-language explanations alongside optional protocol detail.

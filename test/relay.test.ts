@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { quoteBaseToRobinhoodEth, relayIntentStatus } from "../src/relay/client.js";
+import { quoteBaseToRobinhoodEth, quoteBaseToSolanaSol, relayIntentStatus } from "../src/relay/client.js";
 
 const OWNER = "0x1111111111111111111111111111111111111111";
 const DEPOSITORY = "0x4cd00e387622c35bddb9b4c962c136462338bc31";
 const REQUEST_ID = `0x${"ab".repeat(32)}`;
+const SOLANA_OWNER = "8fdUHxiuNRzo5pL6sWTbKac5VfPQKuWuuYPutt3DtuMY";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
@@ -26,6 +27,21 @@ describe("Relay funding", () => {
     payload.steps[0]!.items[0]!.data.to = "0x2222222222222222222222222222222222222222";
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 })) as typeof fetch;
     await expect(quoteBaseToRobinhoodEth({ owner: OWNER, amountInWei: 5_000_000_000_000_000n })).rejects.toThrow(/depository/);
+  });
+
+  it("validates a Base to native SOL quote for the Privy Solana wallet", async () => {
+    const payload = relayQuote();
+    payload.details.currencyOut = {
+      amount: "579813478",
+      minimumAmount: "568217208",
+      currency: { chainId: 792703809, address: "11111111111111111111111111111111" },
+    };
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 })) as typeof fetch;
+    const quote = await quoteBaseToSolanaSol({ owner: OWNER, recipient: SOLANA_OWNER, amountInWei: 5_000_000_000_000_000n });
+    expect(quote.destinationChainId).toBe(792703809);
+    expect(quote.recipient).toBe(SOLANA_OWNER);
+    expect(quote.minimumAmountOutLamports).toBe("568217208");
+    expect(quote.transaction.to.toLowerCase()).toBe(DEPOSITORY);
   });
 
   it("validates status request IDs before calling Relay", async () => {

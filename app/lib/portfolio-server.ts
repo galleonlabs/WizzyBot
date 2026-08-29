@@ -2,7 +2,9 @@ import { createRequire } from "node:module";
 
 type HostedPortfolioSurface = {
   getMarketCatalog: () => unknown;
+  getSolanaMarketCatalog: () => unknown;
   fetchMarketStats: () => Promise<unknown>;
+  fetchSolanaMarketStats: () => Promise<unknown>;
   planAllocation: (input: {
     owner: string;
     chain: "base" | "robinhood";
@@ -15,6 +17,11 @@ type HostedPortfolioSurface = {
     robinhoodShareBps?: number;
     baseMarketIds?: readonly string[];
     robinhoodMarketIds?: readonly string[];
+  }) => Promise<unknown>;
+  planMemeIndex: (input: {
+    owner: string;
+    solanaOwner: string;
+    totalAmountWei: bigint;
   }) => Promise<unknown>;
   planPositionAction: (input: {
     owner: string;
@@ -38,9 +45,12 @@ function loadHostedPortfolio(): HostedPortfolioSurface {
 const hosted = loadHostedPortfolio();
 
 export const getMarketCatalog = hosted.getMarketCatalog;
+export const getSolanaMarketCatalog = hosted.getSolanaMarketCatalog;
 export const fetchMarketStats = hosted.fetchMarketStats;
+export const fetchSolanaMarketStats = hosted.fetchSolanaMarketStats;
 export const planAllocation = hosted.planAllocation;
 export const planDualChainAllocation = hosted.planDualChainAllocation;
+export const planMemeIndex = hosted.planMemeIndex;
 export const planPositionAction = hosted.planPositionAction;
 export const quoteBaseToRobinhoodEth = hosted.quoteBaseToRobinhoodEth;
 export const relayIntentStatus = hosted.relayIntentStatus;

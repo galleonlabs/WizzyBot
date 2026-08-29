@@ -22,10 +22,11 @@ import { COMPOUND_FEE_BPS, NOTIONAL_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/
 import { rangeFromWidthPct, snapRange, tickSpacingForFee } from "../core/ticks.js";
 import { parseIntent, confirmPhrase, isWrite, type Intent } from "../agent/nlp.js";
 import { PRODUCT_LINE, PRODUCT_HELP } from "../copy.js";
-import { StdoutSink } from "../keeper/alerts.js";
+import { createAlertSink } from "../keeper/alerts.js";
 import { runLoop, runOnce } from "../keeper/loop.js";
+import { safeExecute } from "../keeper/execute.js";
 import { startMcpStdio } from "../mcp/server.js";
-import type { PositionSnapshot } from "../types.js";
+import type { ActionReceipt, PositionSnapshot } from "../types.js";
 
 const program = new Command();
 
@@ -298,22 +299,69 @@ program
 
 program
   .command("run")
-  .description("Keeper loop")
+  .description("Keeper loop. Dry-run default. --live needs yes.")
   .option("--interval <ms>", "poll interval", "30000")
   .option("--once", "single pass", false)
   .action(async (opts, cmd) => {
     const live = liveFlag(cmd.optsWithGlobals(), cmd);
-    const { adapter, owner, client, env } = await connect();
-    const sink = new StdoutSink();
+    const { owner, client, env, account } = await connect(undefined, { optional: !live });
+    if (live) {
+      await confirmOrThrow("Broadcast keeper actions? Dry-run is the default.");
+      if (!account) throw new Error("missing_key: UNABOT_PRIVATE_KEY required for --live");
+    }
+    const sink = createAlertSink({ webhookUrl: env.alertWebhook });
     const deps = {
       list: async (who: Address) => {
-        const refs = await adapter.listPositions(who);
-        return Promise.all(refs.map((r) => adapter.readPosition(r.tokenId)));
+        const snaps: PositionSnapshot[] = [];
+        for (const proto of ["V2", "V3", "V4"] as const) {
+          const protoAdapter = adapterFor(proto, client);
+          protoAdapter.bindOwner?.(who);
+          let refs: { tokenId: bigint }[] = [];
+          try {
+            refs = await protoAdapter.listPositions(who);
+          } catch {
+            refs = [];
+          }
+          for (const ref of refs) {
+            try {
+              snaps.push(await protoAdapter.readPosition(ref.tokenId));
+            } catch {
+              /* unreadable position */
+            }
+          }
+        }
+        return snaps;
       },
       owner,
       live,
       intervalMs: Number(opts.interval),
       sink,
+      hasSigner: Boolean(account),
+      execute: live
+        ? async (receipt: ActionReceipt, position: PositionSnapshot) => {
+            const { hydrateCalldata } = await import("../core/hydrate.js");
+            const { sendPlannedTx, isPlaceholderTx } = await import("../signer/broadcast.js");
+            const { allowlistWithTokens } = await import("../signer/allowlist.js");
+            return safeExecute(receipt, position, {
+              live: true,
+              hasSigner: Boolean(account),
+              hydrate: (r, p) => hydrateCalldata(r, p, owner),
+              send: async (tx) => {
+                if (!account) throw new Error("missing_key: UNABOT_PRIVATE_KEY required for --live");
+                if (isPlaceholderTx(tx)) {
+                  throw new Error(`placeholder_calldata: refusing empty calldata to ${tx.to}`);
+                }
+                return sendPlannedTx({
+                  rpcUrl: env.rpcUrl,
+                  account,
+                  tx,
+                  extraAllow: allowlistWithTokens(position.token0.address, position.token1.address),
+                  live: true,
+                });
+              },
+            });
+          }
+        : undefined,
       prices: async (p: PositionSnapshot) => {
         const px = await usdPricesForPosition(client, p, env.ethUsd);
         const usd = snapshotUsd(p, px.price0Usd, px.price1Usd);

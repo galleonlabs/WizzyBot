@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
-import type { FeeSource, PolicyDefaults, PositionPolicy, UnaBotConfig } from "../types.js";
+import type { FeeSource, PolicyDefaults, PolicyProtocol, PositionPolicy, UnaBotConfig } from "../types.js";
 import {
   DEFAULT_COOLDOWN_SEC,
   DEFAULT_MAX_PRICE_IMPACT_BPS,
@@ -11,6 +11,9 @@ import {
 } from "../constants.js";
 
 const feeSource = z.enum(["fees", "notional"]);
+const protocol = z
+  .enum(["v2", "v3", "v4", "V2", "V3", "V4"])
+  .transform((v): PolicyProtocol => v.toLowerCase() as PolicyProtocol);
 
 const defaultsSchema = z.object({
   minFeeUsd: z.number().nonnegative().default(DEFAULT_MIN_FEE_USD),
@@ -26,11 +29,13 @@ const defaultsSchema = z.object({
   noFee: z.boolean().default(false),
   exitPrice: z.number().positive().optional(),
   exitToken: z.string().optional(),
+  protocol: protocol.optional(),
 });
 
 const positionSchema = defaultsSchema.partial().extend({
   tokenId: z.string(),
   lastRunAt: z.number().optional(),
+  spentUsd: z.number().nonnegative().optional(),
 });
 
 const fileSchema = z.object({
@@ -119,13 +124,18 @@ export function copyPolicyToNewToken(
   };
 }
 
-export function markRun(cfg: UnaBotConfig, tokenId: string, at = Date.now() / 1000): UnaBotConfig {
+export function markRun(cfg: UnaBotConfig, tokenId: string, at = Date.now() / 1000, spendUsd = 0): UnaBotConfig {
   const prev = cfg.positions[tokenId] ?? { tokenId };
   return {
     ...cfg,
     positions: {
       ...cfg.positions,
-      [tokenId]: { ...prev, tokenId, lastRunAt: at },
+      [tokenId]: {
+        ...prev,
+        tokenId,
+        lastRunAt: at,
+        spentUsd: (prev.spentUsd ?? 0) + spendUsd,
+      },
     },
   };
 }

@@ -73,6 +73,7 @@ export interface ActionReceipt {
   dryRun: boolean;
   skipped: boolean;
   reason?: string;
+  skipReason?: SkipReason;
   tokenId?: bigint;
   newTokenId?: bigint;
   from: Address;
@@ -140,6 +141,17 @@ export interface EconomicsDecision {
   netUsd: number;
 }
 
+export type PolicyProtocol = "v2" | "v3" | "v4";
+
+export type SkipReason =
+  | "uneconomic"
+  | "cooldown"
+  | "missing_key"
+  | "placeholder_calldata"
+  | "spend_cap"
+  | "price_impact"
+  | "protocol";
+
 export interface PolicyDefaults {
   minFeeUsd: number;
   minPositionUsd: number;
@@ -154,11 +166,13 @@ export interface PolicyDefaults {
   noFee: boolean;
   exitPrice?: number;
   exitToken?: string;
+  protocol?: PolicyProtocol;
 }
 
 export interface PositionPolicy extends Partial<PolicyDefaults> {
   tokenId: string;
   lastRunAt?: number;
+  spentUsd?: number;
 }
 
 export interface UnaBotConfig {
@@ -172,6 +186,10 @@ export interface AlertEvent {
   message: string;
   tokenId?: string;
   at: string;
+  action?: string;
+  skipped?: boolean;
+  skipReason?: SkipReason;
+  dryRun?: boolean;
 }
 
 export interface AlertSink {

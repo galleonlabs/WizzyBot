@@ -29,3 +29,11 @@ describe("env + secret hygiene", () => {
     );
   });
 });
+
+  it("loads an optional alert webhook and does not echo it on bad private key", () => {
+    const env = loadEnv({
+      BASE_RPC_URL: "https://mainnet.base.org",
+      UNABOT_ALERT_WEBHOOK: "https://example.com/hook",
+    });
+    expect(env.alertWebhook).toBe("https://example.com/hook");
+  });

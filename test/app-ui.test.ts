@@ -15,6 +15,9 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Pool fees yesterday");
     expect(portfolio).toContain("evidence, not a return forecast");
     expect(portfolio).toContain("Eight markets. One index.");
+    expect(portfolio).toContain("Index coverage");
+    expect(portfolio).toContain("Earning now");
+    expect(portfolio).toContain("Full index live");
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
     expect(portfolio).not.toMatch(/autopilot|guaranteed returns|UnaBot/i);
     expect(portfolio).not.toMatch(/one deposit · every market|self-custodial by design/i);

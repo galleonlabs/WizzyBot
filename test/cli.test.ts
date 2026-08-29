@@ -33,8 +33,9 @@ describe("CLI --help smoke", () => {
   it("is product-led: short line, no org name, not v3-only", () => {
     const help = buildProgram().helpInformation();
     expect(help).toContain(PRODUCT_LINE);
-    expect(help).toContain("v2, v3, and v4");
-    expect(help).toContain("You hold the NFT");
+    expect(help).toContain("v2, v3, v4");
+    expect(help).toContain("You own every position");
+    expect(help).not.toContain("Liquidity, as an agent");
     expect(help).not.toMatch(/galleon/i);
     expect(help).not.toMatch(/v3-only|v3 only|v3 NFTs/i);
     expect(help).toMatch(/Import existing positions \(v2, v3, v4\)/);

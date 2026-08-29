@@ -1,9 +1,9 @@
 /** Client-safe card types. Mirror src/core/view.ts. Do not import hosted or Uniswap SDK. */
 
-export type Protocol = "V2" | "V3" | "V4";
+export type Protocol = "V2" | "V3" | "V4" | "DLMM";
 export type PositionKind = "live" | "projected";
 export type RangeStatus = "in-range" | "oor" | "closed";
-export type PositionVenue = "uniswap-v3" | "aerodrome-slipstream";
+export type PositionVenue = "uniswap-v3" | "aerodrome-slipstream" | "meteora-dlmm";
 
 export const MIN_TICK = -887272;
 export const MAX_TICK = 887272;
@@ -11,12 +11,13 @@ export const MAX_TICK = 887272;
 export type PositionView = {
   kind: PositionKind;
   protocol: Protocol;
-  chain?: "base" | "robinhood";
+  chain?: "base" | "robinhood" | "solana";
   chainLabel?: string;
   venue?: PositionVenue;
   venueLabel?: string;
   positionManager?: string;
   tokenId?: string;
+  marketId?: string;
   pair: string;
   fee: number;
   feeLabel: string;
@@ -110,6 +111,7 @@ export function priceLabel(n?: number | null, infinite?: boolean): string {
 
 export function isFullRange(protocol: Protocol, tickLower: number, tickUpper: number): boolean {
   if (protocol === "V2") return true;
+  if (protocol === "DLMM") return false;
   return tickLower <= MIN_TICK + 200 && tickUpper >= MAX_TICK - 200;
 }
 
@@ -145,10 +147,10 @@ export function isConfirmView(value: unknown): value is ConfirmView {
 }
 
 export function asProtocol(value: unknown): Protocol {
-  if (value === "V2" || value === "V3" || value === "V4") return value;
+  if (value === "V2" || value === "V3" || value === "V4" || value === "DLMM") return value;
   if (typeof value === "string") {
     const up = value.toUpperCase();
-    if (up === "V2" || up === "V3" || up === "V4") return up;
+    if (up === "V2" || up === "V3" || up === "V4" || up === "DLMM") return up;
   }
   return "V3";
 }
@@ -181,12 +183,13 @@ export function lightRowToView(row: Record<string, unknown>): PositionView | nul
   return {
     kind: "live",
     protocol,
-    chain: row.chain === "robinhood" ? "robinhood" : "base",
-    chainLabel: typeof row.chainLabel === "string" ? row.chainLabel : (row.chain === "robinhood" ? "Robinhood" : "Base"),
-    venue: row.venue === "aerodrome-slipstream" ? "aerodrome-slipstream" : row.venue === "uniswap-v3" ? "uniswap-v3" : undefined,
+    chain: row.chain === "solana" ? "solana" : row.chain === "robinhood" ? "robinhood" : "base",
+    chainLabel: typeof row.chainLabel === "string" ? row.chainLabel : (row.chain === "solana" ? "Solana" : row.chain === "robinhood" ? "Robinhood" : "Base"),
+    venue: row.venue === "meteora-dlmm" ? "meteora-dlmm" : row.venue === "aerodrome-slipstream" ? "aerodrome-slipstream" : row.venue === "uniswap-v3" ? "uniswap-v3" : undefined,
     venueLabel: typeof row.venueLabel === "string" ? row.venueLabel : undefined,
     positionManager: typeof row.positionManager === "string" ? row.positionManager : undefined,
     tokenId: row.tokenId != null ? String(row.tokenId) : undefined,
+    marketId: typeof row.marketId === "string" ? row.marketId : undefined,
     pair: row.pair,
     fee,
     feeLabel: typeof row.feeLabel === "string" ? row.feeLabel : feeTierLabel(fee),

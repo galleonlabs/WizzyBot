@@ -1,5 +1,6 @@
 import { Connection, Keypair, Transaction } from "@solana/web3.js";
 import { useSignTransaction, type ConnectedStandardSolanaWallet } from "@privy-io/react-auth/solana";
+import type { SolanaPositionActionPlan } from "./solana-position-server";
 import type { SolanaZapPlan } from "./solana-zap-server";
 
 export type SolanaExecutionProgress = {
@@ -39,6 +40,40 @@ export async function executeSolanaZaps(input: {
   if (!prepared.length) throw new Error("Solana liquidity plan contains no transactions");
 
   input.onProgress?.({ market: "Solana", step: 0, total: prepared.length, label: "Approve every Solana market" });
+  const signed = await input.signTransaction(...prepared.map(({ transaction }) => ({
+    transaction,
+    wallet: input.wallet,
+    chain: "solana:mainnet" as const,
+  })));
+  const signedTransactions = Array.isArray(signed) ? signed : [signed];
+  if (signedTransactions.length !== prepared.length) throw new Error("Privy returned an incomplete Solana signing batch");
+
+  const signatures: string[] = [];
+  for (const [index, result] of signedTransactions.entries()) {
+    const item = prepared[index]!;
+    input.onProgress?.({ market: item.market, step: index + 1, total: prepared.length, label: item.label });
+    const signature = await connection.sendRawTransaction(result.signedTransaction, { maxRetries: 3, skipPreflight: false });
+    signatures.push(signature);
+    await waitForSolanaConfirmation(signature);
+  }
+  return signatures;
+}
+
+export async function executeSolanaPositionAction(input: {
+  plan: SolanaPositionActionPlan;
+  wallet: ConnectedStandardSolanaWallet;
+  signTransaction: SignTransaction;
+  onProgress?: (progress: SolanaExecutionProgress) => void;
+}): Promise<string[]> {
+  if (input.plan.owner !== input.wallet.address) throw new Error("Solana wallet does not hold this position");
+  if (Date.now() >= Date.parse(input.plan.expiresAt)) throw new Error("Solana position quote expired");
+  if (!input.plan.transactions.length) throw new Error("Solana position plan contains no transactions");
+  const prepared = input.plan.transactions.map((planned) => ({
+    market: input.plan.pair,
+    label: planned.label,
+    transaction: Transaction.from(decodeBase64(planned.transactionBase64)).serialize({ requireAllSignatures: false, verifySignatures: false }),
+  }));
+  input.onProgress?.({ market: input.plan.pair, step: 0, total: prepared.length, label: "Approve the position update" });
   const signed = await input.signTransaction(...prepared.map(({ transaction }) => ({
     transaction,
     wallet: input.wallet,

@@ -1,6 +1,6 @@
 # Production runbook
 
-How to run UnaBot. Base and Robinhood. You keep the position (v3/v4 NFT; v2 LP token).
+How to run Una. The consumer web index covers Base, Robinhood Chain, and Solana. The operator CLI covers EVM position primitives. Users keep every EVM LP NFT and Solana DLMM position.
 
 **Never commit `.env`.** Copy `.env.example` locally. `.env` is gitignored. Do not paste secrets into git, Vercel project settings screenshots, or this file.
 
@@ -99,9 +99,12 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 | --- | --- |
 | `BASE_RPC_URL` | Base RPC. Default `https://mainnet.base.org`. Use a dedicated provider in production. |
 | `ROBINHOOD_RPC_URL` | Robinhood RPC. Default `https://rpc.mainnet.chain.robinhood.com`. Use a dedicated provider in production. |
+| `SOLANA_RPC_URL` | Server-side Solana mainnet RPC for Meteora planning and position reads. Use a dedicated provider in production. |
+| `NEXT_PUBLIC_SOLANA_RPC_URL` / `NEXT_PUBLIC_SOLANA_WS_URL` | Client-side Solana submission and subscription endpoints used by Privy. |
 | `UNISWAP_API_KEY` | Optional. Write paths use Uniswap LP + Trading APIs when set. Never commit. |
 | `UNABOT_PRIVATE_KEY` | CLI `--live` signer. `0x` + 32-byte hex. Never commit. Hosted agent does **not** use this. |
 | `UNABOT_TREASURY` | Optional override. Product fees go here. |
+| `UNABOT_SOLANA_TREASURY` | Public Solana fee recipient. Required to prepare Solana withdraw and reinvest actions. |
 | `UNABOT_ETH_USD` | Optional USD/ETH fallback for skip math. |
 | `TELEGRAM_BOT_TOKEN` | Telegram surface. Never commit. |
 | `PRIVY_APP_ID` / `NEXT_PUBLIC_PRIVY_APP_ID` | Public app id: `cmteeqkjc03e20cjl59c9kbwu` |
@@ -113,6 +116,10 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 | `EVE_ALLOW_ANON` | Set to `1` to admit anonymous eve HTTP in production. Default fail-closed. |
 
 Never log env values.
+
+Production Solana treasury custody: Vercel stores only the public address. The independent private key is in the Mac login Keychain under service `unabot-solana-treasury`, account `andrewwilkinson`.
+
+Market allowlist changes ship through `src/config/markets.json` and `src/config/solana-markets.json`. Never delete an entry that may still have open positions. Mark it `paused` or `watch` so wallet positions remain discoverable and withdrawable; only `active` entries receive new liquidity.
 
 ## Dry-run vs live
 

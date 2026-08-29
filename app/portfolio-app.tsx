@@ -20,13 +20,15 @@ import {
   type PositionActionPlan,
   type SolanaCuratedMarket,
 } from "./lib/portfolio-types";
-import { executeSolanaZaps } from "./lib/solana-wallet";
+import { type SolanaPositionActionPlan } from "./lib/solana-position-server";
+import { executeSolanaPositionAction, executeSolanaZaps } from "./lib/solana-wallet";
 import { type SolanaZapPlan } from "./lib/solana-zap-server";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { relaySucceeded, sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
 
 type ViewTab = "overview" | "markets" | "agent";
 type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" | "submitted" | "error"; message?: string };
+type AnyPositionActionPlan = PositionActionPlan | SolanaPositionActionPlan;
 type IndexChain = ChainSlug | "solana";
 type IndexMarket = {
   market: CuratedMarket | SolanaCuratedMarket;
@@ -65,7 +67,7 @@ export function PortfolioApp() {
   const [previewMode, setPreviewMode] = useState(false);
   const [plan, setPlan] = useState<MemeIndexPlan | null>(null);
   const [planState, setPlanState] = useState<PlanState>({ kind: "idle" });
-  const [actionPlan, setActionPlan] = useState<PositionActionPlan | null>(null);
+  const [actionPlan, setActionPlan] = useState<AnyPositionActionPlan | null>(null);
   const [actionState, setActionState] = useState<PlanState>({ kind: "idle" });
 
   const wallet = useMemo(() => {
@@ -74,6 +76,7 @@ export function PortfolioApp() {
   }, [user?.wallet?.address, wallets]);
   const solanaWallet = useMemo(() => solanaWallets.find((candidate) => candidate.standardWallet.name.toLowerCase().includes("privy")) ?? solanaWallets[0], [solanaWallets]);
   const address = wallet?.address ?? user?.wallet?.address;
+  const solanaAddress = solanaWallet?.address;
 
   const loadPositions = useCallback(async () => {
     if (!authenticated || !address) {
@@ -83,12 +86,21 @@ export function PortfolioApp() {
     }
     setPositionsState("loading");
     try {
-      const payloads = await Promise.all((["base", "robinhood"] as const).map(async (chain) => {
+      const requests = (["base", "robinhood"] as const).map(async (chain) => {
         const response = await fetch(`/api/positions?owner=${encodeURIComponent(address)}&chain=${chain}`);
         const payload = await response.json() as { positions?: unknown[]; error?: string };
         if (!response.ok || payload.error) throw new Error(payload.error ?? `Could not load ${chain} positions`);
         return payload.positions ?? [];
-      }));
+      });
+      if (solanaReady && solanaAddress) requests.push((async () => {
+        const response = await fetch(`/api/portfolio/solana/positions?owner=${encodeURIComponent(solanaAddress)}`);
+        const payload = await response.json() as { positions?: unknown[]; error?: string };
+        if (!response.ok || payload.error) throw new Error(payload.error ?? "Could not load Solana positions");
+        return payload.positions ?? [];
+      })());
+      const settled = await Promise.allSettled(requests);
+      const payloads = settled.filter((result): result is PromiseFulfilledResult<unknown[]> => result.status === "fulfilled").map((result) => result.value);
+      if (!payloads.length) throw new Error("Could not read any wallet positions");
       const next = payloads.flat().map((row) => row && typeof row === "object" ? lightRowToView(row as Record<string, unknown>) : null)
         .filter((row): row is PositionView => Boolean(row));
       setPositions(next);
@@ -97,7 +109,7 @@ export function PortfolioApp() {
       setPositions([]);
       setPositionsState("error");
     }
-  }, [address, authenticated]);
+  }, [address, authenticated, solanaAddress, solanaReady]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -234,10 +246,17 @@ export function PortfolioApp() {
     setActionPlan(null);
     setActionState({ kind: "planning", message: `${action === "compound" ? "Collecting and redepositing" : "Preparing to withdraw"} ${position.pair}…` });
     try {
-      const response = await fetch("/api/portfolio/action", {
+      const isSolana = position.chain === "solana";
+      if (isSolana && (!solanaWallet || !position.marketId)) throw new Error("Your Solana wallet is not ready");
+      const response = await fetch(isSolana ? "/api/portfolio/solana/action" : "/api/portfolio/action", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(isSolana ? {
+          owner: solanaWallet!.address,
+          marketId: position.marketId,
+          position: position.tokenId,
+          action,
+        } : {
           owner: address,
           chain: position.chain,
           tokenId: position.tokenId,
@@ -246,7 +265,7 @@ export function PortfolioApp() {
           positionManager: position.positionManager,
         }),
       });
-      const payload = await response.json() as { plan?: PositionActionPlan; error?: string };
+      const payload = await response.json() as { plan?: AnyPositionActionPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? `Could not prepare ${action}`);
       setActionPlan(payload.plan);
       setActionState({ kind: "ready", message: "Ready for your wallet approval." });
@@ -263,7 +282,20 @@ export function PortfolioApp() {
     }
     try {
       setActionState({ kind: "signing", message: "Approve this position update in your wallet." });
-      await sendWalletCalls({ wallet: wallet as unknown as ConnectedEvmWallet, owner: address, chainId: actionPlan.chainId, transactions: actionPlan.transactions });
+      if (actionPlan.chain === "solana") {
+        if (!solanaWallet) throw new Error("Your Solana wallet is not ready");
+        await executeSolanaPositionAction({
+          plan: actionPlan,
+          wallet: solanaWallet as ConnectedStandardSolanaWallet,
+          signTransaction,
+          onProgress: ({ step, total, label }) => setActionState({
+            kind: step === 0 ? "signing" : "waiting",
+            message: step === 0 ? "Approve the Solana position update." : `${label} · ${step} of ${total}`,
+          }),
+        });
+      } else {
+        await sendWalletCalls({ wallet: wallet as unknown as ConnectedEvmWallet, owner: address, chainId: actionPlan.chainId, transactions: actionPlan.transactions });
+      }
       setActionState({ kind: "submitted", message: "Submitted. Your position will refresh after confirmation." });
       window.setTimeout(() => void loadPositions(), 8_000);
     } catch (error) {
@@ -330,6 +362,7 @@ export function PortfolioApp() {
                   authenticated={authenticated || previewMode}
                   positions={positions}
                   state={positionsState}
+                  constituentCount={activeMarkets.length}
                   onLogin={() => void login()}
                   onAction={preparePositionAction}
                   actionPlan={actionPlan}
@@ -469,20 +502,22 @@ function MarketLedger({ markets, stats, state, compact = false }: { markets: Ind
   );
 }
 
-function PositionLedger({ authenticated, positions, state, onLogin, onAction, actionPlan, actionState, onExecute, onCancel }: {
+function PositionLedger({ authenticated, positions, state, constituentCount, onLogin, onAction, actionPlan, actionState, onExecute, onCancel }: {
   authenticated: boolean;
   positions: PositionView[];
   state: "idle" | "loading" | "ready" | "error";
+  constituentCount: number;
   onLogin: () => void;
   onAction: (position: PositionView, action: "compound" | "withdraw") => void;
-  actionPlan: PositionActionPlan | null;
+  actionPlan: AnyPositionActionPlan | null;
   actionState: PlanState;
   onExecute: () => void;
   onCancel: () => void;
 }) {
+  const summary = summarizePositions(positions, constituentCount);
   return (
     <section className="position-ledger">
-      <header><div><h2>Your positions</h2><p>See their value, unclaimed fees, and status.</p></div>{!authenticated ? <button type="button" onClick={onLogin}>Connect</button> : null}</header>
+      <header><div><h2>Your positions</h2><p>Every position lives in your wallets. Track value, fees, and range health here.</p></div>{!authenticated ? <button type="button" onClick={onLogin}>Connect</button> : null}</header>
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
           <div><b>{actionPlan ? `${actionPlan.kind === "compound" ? "Collect fees" : "Withdraw"} · ${actionPlan.pair}` : "Preparing your position"}</b><p>{actionState.message}</p></div>
@@ -494,16 +529,46 @@ function PositionLedger({ authenticated, positions, state, onLogin, onAction, ac
       {authenticated && state === "loading" ? <div className="position-empty"><p>Reading your wallets…</p></div> : null}
       {authenticated && state === "error" ? <div className="position-empty"><p>We could not read your positions. Nothing has moved.</p></div> : null}
       {authenticated && state === "ready" && positions.length === 0 ? <div className="position-empty"><p>Your positions will appear here after your first deposit.</p></div> : null}
+      {positions.length ? <section className="portfolio-summary" aria-label="Portfolio summary">
+        <div className="coverage-stat">
+          <span>Index coverage</span>
+          <strong>{summary.coverage}<small> of {constituentCount || 8} markets</small></strong>
+          <div className="coverage-track" role="progressbar" aria-label="Index market coverage" aria-valuemin={0} aria-valuemax={constituentCount || 8} aria-valuenow={summary.coverage}><i style={{ width: `${summary.coveragePct}%` }} /></div>
+          <p>{summary.coverage === (constituentCount || 8) ? "Full index live" : `${(constituentCount || 8) - summary.coverage} markets not found yet`}</p>
+        </div>
+        <div><span>Position value</span><strong>{summary.priced ? money(summary.valueUsd) : "—"}</strong><small>{summary.priced} of {positions.length} priced</small></div>
+        <div><span>Fees ready</span><strong>{summary.feesPriced ? money(summary.feesUsd) : "—"}</strong><small>Unclaimed across priced positions</small></div>
+        <div><span>Earning now</span><strong>{summary.earning}</strong><small>of {positions.length} positions in range</small></div>
+        <div><span>Networks</span><strong>{summary.networks}</strong><small>of 3 networks found</small></div>
+      </section> : null}
       {positions.length ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
         <span className="position-pair"><i>{position.symbol0.slice(0, 1)}</i><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
-        <span><small>Value</small><b>{money(position.lpUsd ?? 0)}</b></span>
-        <span><small>Fees</small><b>{money(position.feesUsd ?? 0)}</b></span>
-        <span><small>vs HOLD</small><b className={(position.holdDeltaUsd ?? 0) >= 0 ? "positive" : "negative"}>{signedMoney(position.holdDeltaUsd ?? 0)}</b></span>
+        <span><small>Value</small><b>{position.lpUsd === undefined ? "—" : money(position.lpUsd)}</b></span>
+        <span><small>Fees</small><b>{position.feesUsd === undefined ? "—" : money(position.feesUsd)}</b></span>
+        <span><small>vs HOLD</small><b className={position.holdDeltaUsd === undefined ? "" : position.holdDeltaUsd >= 0 ? "positive" : "negative"}>{position.holdDeltaUsd === undefined ? "—" : signedMoney(position.holdDeltaUsd)}</b></span>
         <span className={`position-range is-${position.status}`}><i />{position.status === "in-range" ? "Earning fees" : position.status === "oor" ? "Needs attention" : "Closed"}</span>
         <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed}>Reinvest fees</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>Withdraw</button></span>
       </article>)}</div> : null}
     </section>
   );
+}
+
+function summarizePositions(positions: PositionView[], constituentCount: number) {
+  const markets = new Set(positions.map((position) => position.marketId ?? `${position.chain}:${position.pair}`));
+  const priced = positions.filter((position) => position.lpUsd !== undefined);
+  const feesPriced = positions.filter((position) => position.feesUsd !== undefined);
+  const total = constituentCount || 8;
+  const coverage = Math.min(total, markets.size);
+  return {
+    coverage,
+    coveragePct: total ? (coverage / total) * 100 : 0,
+    priced: priced.length,
+    valueUsd: priced.reduce((sum, position) => sum + position.lpUsd!, 0),
+    feesPriced: feesPriced.length,
+    feesUsd: feesPriced.reduce((sum, position) => sum + position.feesUsd!, 0),
+    earning: positions.filter((position) => position.status === "in-range").length,
+    networks: new Set(positions.map((position) => position.chain)).size,
+  };
 }
 
 function AgentWorkspace({ authenticated, onLogin }: { authenticated: boolean; onLogin: () => void }) {

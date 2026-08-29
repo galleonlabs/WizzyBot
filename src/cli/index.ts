@@ -522,7 +522,7 @@ function chainedStart(sink: AlertSink, intervalMs: number, live: boolean): void 
     void chainSink(sink, slug).emit({
       level: "info",
       kind: "keeper",
-      message: `Liquidity, as an agent. starting loop interval=${intervalMs}ms live=${live}`,
+      message: `Una keeper starting interval=${intervalMs}ms live=${live}`,
       at: new Date().toISOString(),
       dryRun: !live,
     });

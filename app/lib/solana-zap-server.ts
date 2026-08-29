@@ -1,7 +1,19 @@
 import BN from "bn.js";
 import { StrategyType } from "@meteora-ag/dlmm";
-import { Zap, estimateDlmmDirectSwap } from "@meteora-ag/zap-sdk";
-import { Connection, PublicKey, Transaction } from "@solana/web3.js";
+import {
+  DLMM_PROGRAM_ID,
+  JUP_V6_PROGRAM_ID,
+  MEMO_PROGRAM_ID,
+  ZAP_PROGRAM_ID,
+  Zap,
+  estimateDlmmDirectSwap,
+} from "@meteora-ag/zap-sdk";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
+import { ComputeBudgetProgram, Connection, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { getSolanaMarketCatalog } from "./portfolio-server";
 
 const WSOL = new PublicKey("So11111111111111111111111111111111111111112");
@@ -95,6 +107,7 @@ export async function planSolanaZap(input: {
   const transactions = ordered.map(({ id, label, tx }) => {
     tx.feePayer = owner;
     tx.recentBlockhash = blockhash;
+    assertSafeZapTransaction(tx, owner, position);
     const requiresPositionSignature = tx.instructions.some((instruction) => instruction.keys.some((key) => key.isSigner && key.pubkey.equals(position)));
     return {
       id,
@@ -116,4 +129,28 @@ export async function planSolanaZap(input: {
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 90_000).toISOString(),
   };
+}
+
+function assertSafeZapTransaction(transaction: Transaction, owner: PublicKey, position: PublicKey): void {
+  const allowedPrograms = new Set([
+    ZAP_PROGRAM_ID.toBase58(),
+    DLMM_PROGRAM_ID.toBase58(),
+    JUP_V6_PROGRAM_ID.toBase58(),
+    MEMO_PROGRAM_ID.toBase58(),
+    SystemProgram.programId.toBase58(),
+    ComputeBudgetProgram.programId.toBase58(),
+    TOKEN_PROGRAM_ID.toBase58(),
+    TOKEN_2022_PROGRAM_ID.toBase58(),
+    ASSOCIATED_TOKEN_PROGRAM_ID.toBase58(),
+  ]);
+  for (const instruction of transaction.instructions) {
+    if (!allowedPrograms.has(instruction.programId.toBase58())) {
+      throw new Error("Solana allocation contains an unreviewed program");
+    }
+    for (const key of instruction.keys) {
+      if (key.isSigner && !key.pubkey.equals(owner) && !key.pubkey.equals(position)) {
+        throw new Error("Solana allocation requests an unexpected signer");
+      }
+    }
+  }
 }

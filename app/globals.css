@@ -177,7 +177,7 @@ svg {
   margin: 0;
   font-size: clamp(58px, 6.4vw, 92px);
   line-height: .96;
-  letter-spacing: -.065em;
+  letter-spacing: -.04em;
 }
 
 .hero-copy > p {
@@ -211,7 +211,6 @@ svg {
   border: 1px solid var(--line-strong);
   border-radius: 20px;
   background: var(--surface);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, .25);
 }
 
 .action-head,
@@ -356,6 +355,18 @@ svg {
 .position-empty { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 92px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, .012); color: var(--muted); text-align: center; }
 .position-empty svg { width: 16px; }
 .position-empty p { max-width: 62ch; margin: 0; font-size: 11px; line-height: 1.5; }
+.portfolio-summary { display: grid; grid-template-columns: 1.35fr repeat(4, 1fr); overflow: hidden; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.portfolio-summary > div { display: grid; align-content: center; gap: 6px; min-height: 118px; padding: 18px; }
+.portfolio-summary > div + div { border-left: 1px solid var(--line); }
+.portfolio-summary span,
+.portfolio-summary small { color: var(--muted); font-size: 9px; font-weight: 700; line-height: 1.4; }
+.portfolio-summary strong { font-size: 22px; letter-spacing: -.035em; }
+.portfolio-summary strong small { font-size: 10px; letter-spacing: 0; }
+.coverage-stat { background: rgba(255, 111, 131, .035); }
+.coverage-stat strong { font-size: 27px; }
+.coverage-stat p { margin: 0; color: var(--ink-soft); font-size: 9px; font-weight: 700; }
+.coverage-track { width: 100%; height: 3px; overflow: hidden; border-radius: 999px; background: var(--surface-3); }
+.coverage-track i { display: block; height: 100%; border-radius: inherit; background: var(--coral); }
 .position-list { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .position-list article { display: grid; grid-template-columns: 1.35fr repeat(3, .7fr) .8fr auto; align-items: center; gap: 14px; padding: 15px 18px; }
 .position-list article + article { border-top: 1px solid var(--line); }
@@ -445,6 +456,11 @@ svg {
 
 @media (max-width: 1060px) {
   .index-hero { grid-template-columns: minmax(0, 1fr) 400px; gap: 44px; }
+  .portfolio-summary { grid-template-columns: 1.35fr repeat(2, 1fr); }
+  .portfolio-summary > div:nth-child(4) { border-left: 0; border-top: 1px solid var(--line); }
+  .portfolio-summary > div:nth-child(4),
+  .portfolio-summary > div:nth-child(5) { min-height: 92px; }
+  .portfolio-summary > div:nth-child(5) { border-top: 1px solid var(--line); }
   .position-list article { grid-template-columns: 1.2fr repeat(2, .7fr) .8fr auto; }
   .position-list article > span:nth-child(4) { display: none !important; }
 }
@@ -500,8 +516,20 @@ svg {
   .market-table:not(.is-compact) tr { grid-template-columns: repeat(4, 1fr); }
   .market-table .skeleton-row { display: block; }
   .market-table .skeleton-row td { display: block; width: 100%; }
-  .position-list article { grid-template-columns: 1fr auto; gap: 12px; }
-  .position-list article > span:not(.position-pair):not(.position-actions) { display: none !important; }
+  .position-list article { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px 16px; padding: 16px; }
+  .position-pair { grid-column: 1 / -1; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .position-list article > span:nth-child(2),
+  .position-list article > span:nth-child(3) { display: grid !important; }
+  .position-list article > span:nth-child(4) { display: none !important; }
+  .position-range { grid-column: 1 / -1; }
+  .position-actions { grid-column: 1 / -1; }
+  .position-actions button { flex: 1; min-height: 44px; }
+  .portfolio-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portfolio-summary > div { min-height: 92px; padding: 15px; }
+  .portfolio-summary > div:nth-child(3),
+  .portfolio-summary > div:nth-child(5) { border-left: 0; }
+  .portfolio-summary > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .portfolio-summary .coverage-stat { grid-column: 1 / -1; min-height: 112px; border-left: 0; }
   .position-actions { justify-content: flex-end; }
   .action-preview { grid-template-columns: 1fr; }
   .markets-view { padding-top: 44px; }

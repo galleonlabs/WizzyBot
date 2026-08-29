@@ -9,12 +9,22 @@ Una is self-custodial portfolio software. The wallet owns every LP NFT and signs
 | Concern | Authority |
 | --- | --- |
 | Curated chains, tokens, pools, weights, ranges, and product fees | `src/config/markets.json` in git |
-| Wallet, balances, LP ownership, liquidity, fees, and range state | Base and Robinhood Chain contracts/events |
+| Wallet, balances, LP ownership, liquidity, fees, and range state | Base, Robinhood Chain, and Solana contracts/events |
 | Short-lived price, liquidity, and volume context | Pool contracts and indexed market APIs, labeled with source/time window |
 | Cross-chain intent and fill status | Relay quote plus Relay intent status, tied to its request ID |
 | AI explanations and suggestions | Advisory only; never transaction authority |
 
-## Allocation paths
+## Index deposit path
+
+The public product has one fixed index. It does not expose the single-chain allocation APIs, pools, venues, weights, or ranges as consumer controls.
+
+1. The user enters one ETH amount on Base. The server validates the versioned market policy and returns short-lived plans for every active market.
+2. The first Privy approval opens the Base positions, pays the disclosed deposit fee, and funds Relay deposits for Robinhood Chain and native SOL.
+3. Una waits for Relay before asking for the Robinhood and Solana approvals. Privy keeps the EVM and Solana wallets under the same login, but each network still requires its own wallet authorization.
+4. EVM positions are minted to the user's wallet. Meteora DLMM positions are created with the user's Solana wallet as owner.
+5. Portfolio reads query the reviewed EVM position managers and configured Meteora pools directly. No shadow portfolio database is required.
+
+## Internal EVM planning paths
 
 ### One chain
 
@@ -31,6 +41,10 @@ Permissionless launch path: two confirmations from one Base funding balance.
 3. The Robinhood allocation is sized from Relay's minimum output less a gas reserve; any better fill remains in the user's wallet.
 
 A one-confirmation cross-chain call path is a later capability gate. Relay can execute destination calls with smart accounts, but preserving the user's `msg.sender`, sponsorship, and safe handling of dynamic swap leftovers must be proven with the actual Privy/Relay production configuration before Una advertises it.
+
+### Solana
+
+Relay delivers native SOL to the user's Privy Solana wallet. Una uses the pinned Meteora zap SDK to create positions only in pools from `src/config/solana-markets.json`. Position reads query those pools by owner. Withdraw and reinvest plans verify the owner, pool, position, fee, expiry, signer set, and instruction program allowlist before Privy requests signatures.
 
 ## Analytics contract
 

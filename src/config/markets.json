@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "updatedAt": "2026-08-29",
+  "version": 3,
+  "updatedAt": "2026-08-30",
   "fees": {
     "allocateBps": 15,
     "withdrawBps": 15,
@@ -30,7 +30,7 @@
           "tickSpacing": 200,
           "rangeWidthPct": 40,
           "weightBps": 3000,
-          "status": "active",
+          "status": "paused",
           "risk": "established",
           "coingeckoId": "toshi",
           "color": "#76e7cf"
@@ -50,7 +50,7 @@
           "fee": 2111,
           "tickSpacing": 200,
           "rangeWidthPct": 40,
-          "weightBps": 3000,
+          "weightBps": 7000,
           "status": "active",
           "risk": "established",
           "coingeckoId": "based-brett",
@@ -71,7 +71,7 @@
           "tickSpacing": 200,
           "rangeWidthPct": 45,
           "weightBps": 2500,
-          "status": "active",
+          "status": "paused",
           "risk": "established",
           "coingeckoId": "degen-base",
           "color": "#b99aff"
@@ -90,7 +90,7 @@
           "fee": 10000,
           "tickSpacing": 200,
           "rangeWidthPct": 60,
-          "weightBps": 1500,
+          "weightBps": 3000,
           "status": "active",
           "risk": "emerging",
           "coingeckoId": "basecat",

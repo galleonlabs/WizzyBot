@@ -28,7 +28,7 @@ describe("self-custodial position actions", () => {
 });
 
 function snapshot(): PositionSnapshot {
-  const market = activeMarkets("base")[0]!;
+  const market = activeMarkets("base").find((candidate) => candidate.protocol === "V3")!;
   const weth = addressesFor("base").weth;
   return {
     ref: { protocol: "V3", chainId: 8453, tokenId: 77n },

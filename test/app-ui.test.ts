@@ -11,14 +11,12 @@ describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
     expect(page).toContain("PortfolioApp");
     expect(portfolio).toContain("Make meme markets");
-    expect(portfolio).toContain("One deposit");
+    expect(portfolio).toContain("Deposit ETH");
     expect(portfolio).toContain("Make markets");
     expect(portfolio).toContain("Fee APR");
     expect(portfolio).toContain("24h annualized");
-    expect(portfolio).toContain("Eight markets. One index.");
-    expect(portfolio).toContain("Index coverage");
+    expect(portfolio).toContain("The index");
     expect(portfolio).toContain("Earning now");
-    expect(portfolio).toContain("Full index live");
     expect(portfolio).toContain('label: "Positions"');
     expect(portfolio).toContain('id="positions"');
     expect(portfolio).not.toContain("scrollIntoView");
@@ -46,11 +44,11 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain('brand="base"');
     expect(portfolio).toContain('brand="robinhood"');
     expect(portfolio).toContain('brand="solana"');
-    expect(portfolio).toContain('brand="uniswap"');
-    expect(portfolio).toContain('brand="aerodrome"');
-    expect(portfolio).toContain('brand="meteora"');
+    expect(portfolio).toContain('uniswap: "https://');
+    expect(portfolio).toContain('aerodrome: "https://');
+    expect(portfolio).toContain('meteora: "https://');
     expect(portfolio).toContain("Self-custodial");
-    expect(portfolio).toContain("3 wallet approvals");
+    expect(portfolio).not.toContain("3 wallet approvals");
     expect(portfolio).toContain("approvals across Base, Robinhood, and Solana");
     expect(portfolio).toContain("Each approval creates positions you own");
     expect(css).toContain(".index-hero { grid-template-columns: 1fr; gap: 48px; padding: 68px 0 64px");

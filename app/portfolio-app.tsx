@@ -36,6 +36,7 @@ type IndexMarket = {
 };
 
 const CHAIN_SHARES: Record<IndexChain, number> = { base: 6_000, robinhood: 1_500, solana: 2_500 };
+const INDEX_MARKET_COUNT = 5;
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
   robinhood: "https://assets.relay.link/icons/4663/light.png",
@@ -315,7 +316,6 @@ export function PortfolioApp() {
       authenticated={authenticated || previewMode}
       positions={positions}
       state={positionsState}
-      constituentCount={activeMarkets.length}
       stats={stats}
       onLogin={() => void login()}
       onAction={preparePositionAction}
@@ -353,12 +353,11 @@ export function PortfolioApp() {
 
       <div className="index-shell" data-view={tab}>
           {tab === "overview" ? (
-            <>
-              <section className="index-hero">
+            <section className="index-hero">
                 <div className="hero-stage">
                   <div className="hero-copy">
                     <h1>Make meme markets.</h1>
-                    <p>One deposit. Eight positions. Fees from every trade.</p>
+                    <p>Deposit ETH. Earn trading fees across Base, Robinhood, and Solana.</p>
                   </div>
                   <IndexShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
                 </div>
@@ -376,17 +375,11 @@ export function PortfolioApp() {
                   onExecute={() => void executeIndex()}
                   onCancel={() => { setPlan(null); setPlanState({ kind: "idle" }); }}
                 />
-              </section>
-              <section className="index-main">
-                <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} compact />
-                {positionLedger}
-              </section>
-            </>
+            </section>
           ) : tab === "markets" ? (
             <section className="index-main markets-view">
               <header className="index-title-row">
-                <div><h1>Eight markets. One index.</h1><p>Live pool performance across Base, Robinhood, and Solana.</p></div>
-                <button className="icon-button" type="button" onClick={() => void (previewMode ? Promise.resolve() : loadPositions())} aria-label="Refresh market data"><RefreshIcon /></button>
+                <div><h1>The index</h1><p>{activeMarkets.length || INDEX_MARKET_COUNT} markets across Base, Robinhood, and Solana.</p></div>
               </header>
               <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} />
             </section>
@@ -403,7 +396,7 @@ export function PortfolioApp() {
 function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {
   return <div className="index-showcase" aria-label="Meme market index">
     <div className={`hero-token-field ${loading ? "is-loading" : ""}`}>
-      {(loading ? Array.from({ length: 8 }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
+      {(loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
         <span className="hero-token" key={market.id} style={{ "--token-index": index } as CSSProperties}>
           <TokenIcon symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />
           {market.symbol ? <b>{market.symbol}</b> : null}
@@ -414,10 +407,6 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
       <BrandLogo brand="base" label="Base" />
       <BrandLogo brand="robinhood" label="Robinhood" />
       <BrandLogo brand="solana" label="Solana" />
-      <span className="brand-divider" aria-hidden="true" />
-      <BrandLogo brand="uniswap" label="Uniswap" />
-      <BrandLogo brand="aerodrome" label="Aerodrome" />
-      <BrandLogo brand="meteora" label="Meteora" />
     </div>
   </div>;
 }
@@ -444,16 +433,11 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, ready
         <span className="amount-input"><input inputMode="decimal" value={amount} onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" /><b>ETH</b></span>
       </label>
 
-      <div className={`market-output ${loading ? "is-loading" : ""}`} aria-label="Index positions">
-        <span><small>You get</small><b>{constituentCount || "Eight"} LP positions</b><em>Across three networks</em></span>
+      <div className={`market-output ${loading ? "is-loading" : ""}`} aria-label="Index markets">
         <span className="market-stack" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
-          {loading ? Array.from({ length: 5 }, (_, index) => <i key={index} />) : markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />)}
+          {loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />) : markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />)}
         </span>
-      </div>
-
-      <div className="action-economics">
-        <div><span>Fee APR</span><b>{formatFeeApr(feeApr)}</b></div>
-        <small>24h annualized</small>
+        <span className="action-economics"><small>Fee APR</small><b>{formatFeeApr(feeApr)}</b></span>
       </div>
 
       {state.kind !== "idle" ? <PlanPreview plan={plan} state={state} onExecute={onExecute} onCancel={onCancel} /> : (
@@ -461,7 +445,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, ready
           {!ready ? "Preparing wallets…" : "Make markets"}<ArrowIcon />
         </button>
       )}
-      <p className="action-assurance"><span>3 wallet approvals</span><span>Self-custodial</span></p>
+      <p className="action-assurance">{constituentCount || INDEX_MARKET_COUNT} markets · Self-custodial</p>
     </aside>
   );
 }
@@ -495,16 +479,15 @@ function PlanPreview({ plan, state, onExecute, onCancel }: { plan: MemeIndexPlan
   );
 }
 
-function MarketLedger({ markets, stats, state, compact = false }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error"; compact?: boolean }) {
+function MarketLedger({ markets, stats, state }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error" }) {
   return (
-    <section className={`market-ledger ${compact ? "is-compact" : ""}`}>
-      <header><h2>The index</h2><span className="market-data-note">{markets.length || 8} markets</span></header>
+    <section className="market-ledger">
       <div className="market-table-wrap">
-        <table className={`market-table ${compact ? "is-compact" : ""}`}>
-          <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>TVL</th><th>Venue</th>{compact ? null : <th>Risk</th>}</tr></thead>
+        <table className="market-table">
+          <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>TVL</th><th>Venue</th></tr></thead>
           <tbody>
-            {state === "loading" ? Array.from({ length: compact ? 5 : 8 }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={compact ? 5 : 6}><i /></td></tr>) : null}
-            {state === "error" ? <tr><td colSpan={compact ? 5 : 6} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
+            {state === "loading" ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={5}><i /></td></tr>) : null}
+            {state === "error" ? <tr><td colSpan={5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
             {state === "ready" ? markets.map(({ market, chain }) => {
               const row = stats.get(market.id);
               const quote = chain === "solana" ? "SOL" : "WETH";
@@ -514,7 +497,6 @@ function MarketLedger({ markets, stats, state, compact = false }: { markets: Ind
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><VenueTrail chain={chain} protocol={market.protocol} /></td>
-                {compact ? null : <td><span className={`risk-label is-${market.risk}`}>{market.risk === "established" ? "Established" : "Emerging"}</span></td>}
               </tr>;
             }) : null}
           </tbody>
@@ -524,11 +506,10 @@ function MarketLedger({ markets, stats, state, compact = false }: { markets: Ind
   );
 }
 
-function PositionLedger({ authenticated, positions, state, constituentCount, stats, onLogin, onAction, actionPlan, actionState, onExecute, onCancel }: {
+function PositionLedger({ authenticated, positions, state, stats, onLogin, onAction, actionPlan, actionState, onExecute, onCancel }: {
   authenticated: boolean;
   positions: PositionView[];
   state: "idle" | "loading" | "ready" | "error";
-  constituentCount: number;
   stats: Map<string, MarketStats>;
   onLogin: () => void;
   onAction: (position: PositionView, action: "compound" | "withdraw") => void;
@@ -537,7 +518,7 @@ function PositionLedger({ authenticated, positions, state, constituentCount, sta
   onExecute: () => void;
   onCancel: () => void;
 }) {
-  const summary = summarizePositions(positions, constituentCount);
+  const summary = summarizePositions(positions);
   return (
     <section className="position-ledger" id="positions">
       <header><h2>Your positions</h2>{!authenticated ? <button type="button" onClick={onLogin}>Connect</button> : null}</header>
@@ -553,12 +534,6 @@ function PositionLedger({ authenticated, positions, state, constituentCount, sta
       {authenticated && state === "error" ? <div className="position-empty"><p>We could not read your positions. Nothing has moved.</p></div> : null}
       {authenticated && state === "ready" && positions.length === 0 ? <div className="position-empty"><p>Your positions will appear here after your first deposit.</p></div> : null}
       {positions.length ? <section className="portfolio-summary" aria-label="Portfolio summary">
-        <div className="coverage-stat">
-          <span>Index coverage</span>
-          <strong>{summary.coverage}<small> of {constituentCount || 8} markets</small></strong>
-          <div className="coverage-track" role="progressbar" aria-label="Index market coverage" aria-valuemin={0} aria-valuemax={constituentCount || 8} aria-valuenow={summary.coverage}><i style={{ width: `${summary.coveragePct}%` }} /></div>
-          <p>{summary.coverage === (constituentCount || 8) ? "Full index live" : `${(constituentCount || 8) - summary.coverage} markets not found yet`}</p>
-        </div>
         <div><span>Position value</span><strong>{summary.priced ? money(summary.valueUsd) : "—"}</strong><small>{summary.priced} of {positions.length} priced</small></div>
         <div><span>Fees ready</span><strong>{summary.feesPriced ? money(summary.feesUsd) : "—"}</strong><small>Unclaimed across priced positions</small></div>
         <div><span>Earning now</span><strong>{summary.earning}</strong><small>of {positions.length} positions in range</small></div>
@@ -576,17 +551,12 @@ function PositionLedger({ authenticated, positions, state, constituentCount, sta
   );
 }
 
-function summarizePositions(positions: PositionView[], constituentCount: number) {
-  const markets = new Set(positions.map((position) => position.marketId ?? `${position.chain}:${position.pair}`));
+function summarizePositions(positions: PositionView[]) {
   const priced = positions.filter((position) => position.lpUsd !== undefined);
   const feesPriced = positions.filter((position) => position.feesUsd !== undefined);
   const aprPositions = positions.filter((position) => position.feeApr !== undefined);
   const aprWeight = aprPositions.reduce((sum, position) => sum + (position.lpUsd ?? 1), 0);
-  const total = constituentCount || 8;
-  const coverage = Math.min(total, markets.size);
   return {
-    coverage,
-    coveragePct: total ? (coverage / total) * 100 : 0,
     priced: priced.length,
     valueUsd: priced.reduce((sum, position) => sum + position.lpUsd!, 0),
     feesPriced: feesPriced.length,
@@ -629,10 +599,6 @@ function chainLabel(chain: IndexChain): string {
 
 function money(value: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
-}
-
-function signedMoney(value: number): string {
-  return `${value > 0 ? "+" : ""}${money(value)}`;
 }
 
 function compactMoney(value?: number | null): string {
@@ -684,6 +650,5 @@ function VenueTrail({ chain, protocol }: { chain: IndexChain; protocol: IndexMar
 }
 
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }
-function RefreshIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 11V5m0 6h-6"/></svg>; }
 function LockIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>; }
 function ArrowIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>; }

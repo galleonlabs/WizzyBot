@@ -52,17 +52,16 @@ describe("index curator", () => {
   });
 
   it("requires a complete proof window before a candidate becomes eligible", () => {
-    expect(evaluateMarket(history({}, 7 * 24), policy).recommendation).toBe("observe");
+    expect(evaluateMarket(history({}, 6 * 24), policy).recommendation).toBe("observe");
     const evaluation = evaluateMarket(history(), policy);
     expect(evaluation.recommendation).toBe("eligible");
-    expect(evaluation.score).toBeGreaterThanOrEqual(policy.eligibleScore);
     expect(evaluation.estimatedCapacityUsd).toBe(10_000);
   });
 
   it("does not reward a young pool for a one-day APR spike", () => {
     const evaluation = evaluateMarket(history({ poolAgeDays: 12, feeAprPct: 2_000 }), policy);
     expect(evaluation.recommendation).toBe("observe");
-    expect(evaluation.reasons.join(" ")).toContain("pool needs 30 days");
+    expect(evaluation.reasons.join(" ")).toContain("younger than 30 days");
   });
 
   it("raises an immediate pause recommendation for hard security failures", () => {
@@ -71,17 +70,18 @@ describe("index curator", () => {
     expect(evaluation.reasons).toContain("security: honeypot");
   });
 
-  it("sends sustained low-turnover incumbents to review", () => {
-    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", volume24hUsd: 10_000, feeAprPct: 4 }), policy);
+  it("reviews low-turnover incumbents immediately", () => {
+    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", volume24hUsd: 10_000, feeAprPct: 4 }, 0), policy);
     expect(evaluation.recommendation).toBe("review");
     expect(evaluation.reasons.join(" ")).toContain("daily volume");
   });
 
-  it("only proposes a same-chain replacement with a material score margin", () => {
+  it("only proposes a same-chain replacement with a material fee advantage", () => {
     const candidate = evaluateMarket(history({ marketId: "base-candidate" }), policy);
     const incumbent = evaluateMarket(history({ marketId: "base-incumbent", symbol: "OLD", incumbent: true, catalogStatus: "active", feeAprPct: 8, volume24hUsd: 55_000, liquidityUsd: 500_000 }), policy);
     const proposals = proposeReplacements([candidate, incumbent], policy);
     expect(proposals).toHaveLength(1);
     expect(proposals[0]).toMatchObject({ candidateMarketId: "base-candidate", incumbentMarketId: "base-incumbent" });
+    expect(proposals[0]!.aprMultiple).toBeGreaterThan(policy.replacementAprMultiplier);
   });
 });

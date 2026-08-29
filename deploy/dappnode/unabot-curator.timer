@@ -1,8 +1,8 @@
 [Unit]
-Description=Collect Una index evidence hourly
+Description=Collect Una index evidence every six hours
 
 [Timer]
-OnCalendar=hourly
+OnCalendar=*-*-* 00/6:00:00
 RandomizedDelaySec=10m
 Persistent=true
 Unit=unabot-curator.service

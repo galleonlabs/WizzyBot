@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "updatedAt": "2026-08-29",
+  "version": 2,
+  "updatedAt": "2026-08-30",
   "chain": {
     "slug": "solana",
     "chainId": 792703809,
@@ -21,7 +21,7 @@
         "feeBps": 20,
         "binStep": 20,
         "rangeDelta": 34,
-        "weightBps": 4000,
+        "weightBps": 6000,
         "status": "active",
         "risk": "established",
         "color": "#d9ff74"
@@ -38,7 +38,7 @@
         "feeBps": 20,
         "binStep": 20,
         "rangeDelta": 34,
-        "weightBps": 3500,
+        "weightBps": 4000,
         "status": "active",
         "risk": "emerging",
         "color": "#ffd36b"
@@ -56,7 +56,7 @@
         "binStep": 20,
         "rangeDelta": 34,
         "weightBps": 2500,
-        "status": "active",
+        "status": "paused",
         "risk": "established",
         "color": "#9dc4ff"
       }

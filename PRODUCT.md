@@ -33,7 +33,7 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 - Support Base (chain ID 8453), Robinhood Chain (chain ID 4663), and Solana mainnet (Relay chain ID 792703809) as one index.
 - Maintain an operator-controlled, code-reviewed allowlist for every asset and pool.
 - Use reviewed Uniswap v3 pools on Base and Robinhood Chain, Aerodrome Slipstream pools on Base, and Meteora DLMM pools on Solana. Venue selection is internal index policy, never a user-facing builder.
-- The initial Solana set is FARTCOIN, USELESS, and PENGU against SOL, configured in `src/config/solana-markets.json`.
+- The active Solana set is FARTCOIN and USELESS against SOL. Paused markets remain readable and withdrawable.
 - Minimize approvals and confirmations with wallet batching, Relay, Privy embedded wallets, and direct single-token liquidity zaps. Never claim one cryptographic signature when destination networks require additional approvals.
 - The consumer initiates one Una action. The review state explains that Privy will request the network approvals needed to preserve self-custody.
 - The launch fee is 0.15% of deposits, withdrawals, and rebalances, plus 2% of fees compounded. Show Una, Relay, network, and DEX costs in the relevant review or receipt before approval, not as idle-page positioning.

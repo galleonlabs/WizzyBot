@@ -7,7 +7,7 @@ import { collectCuratorObservations } from "./sources.js";
 
 export type CuratorReport = {
   version: 1;
-  role: "advisory";
+  role: "curator";
   generatedAt: string;
   configVersion: number;
   snapshotCadenceMinutes: number;
@@ -50,19 +50,18 @@ function markdown(report: CuratorReport): string {
   const rows = [...report.evaluations].sort((a, b) => {
     if (a.chain !== b.chain) return a.chain.localeCompare(b.chain);
     if (a.incumbent !== b.incumbent) return a.incumbent ? -1 : 1;
-    return (b.score ?? -1) - (a.score ?? -1);
+    return (b.summary.medianFeeAprPct ?? -1) - (a.summary.medianFeeAprPct ?? -1);
   });
   const table = rows.map((row) => {
-    const score = row.score === null ? "—" : String(row.score);
     const liquidity = row.summary.medianLiquidityUsd === null ? "—" : `$${Math.round(row.summary.medianLiquidityUsd).toLocaleString("en-US")}`;
     const volume = row.summary.medianVolume24hUsd === null ? "—" : `$${Math.round(row.summary.medianVolume24hUsd).toLocaleString("en-US")}`;
     const apr = row.summary.medianFeeAprPct === null ? "—" : `${row.summary.medianFeeAprPct.toFixed(1)}%`;
-    return `| ${row.symbol} | ${row.chain} | ${row.incumbent ? "index" : "watch"} | ${row.recommendation} | ${score} | ${liquidity} | ${volume} | ${apr} | ${row.summary.historyHours.toFixed(0)}h |`;
+    return `| ${row.symbol} | ${row.chain} | ${row.incumbent ? "index" : "watch"} | ${row.recommendation} | ${liquidity} | ${volume} | ${apr} | ${row.summary.historyHours.toFixed(0)}h |`;
   }).join("\n");
   const replacements = report.replacements.length
-    ? report.replacements.map((row) => `- ${row.chain}: study ${row.candidateSymbol} against ${row.incumbentSymbol} (${row.scoreMargin} point margin)`).join("\n")
-    : "- None. Candidates require a complete proof window and a material score margin.";
-  return `# Una index curator\n\nGenerated ${report.generatedAt}. Advisory only; catalog changes remain code-reviewed.\n\n| Market | Chain | Set | Call | Score | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|---:|\n${table}\n\n## Replacement studies\n\n${replacements}\n`;
+    ? report.replacements.map((row) => `- ${row.chain}: replace ${row.incumbentSymbol} with ${row.candidateSymbol} (${row.aprMultiple.toFixed(1)}× median fee APR)`).join("\n")
+    : "- None.";
+  return `# Una index curator\n\nGenerated ${report.generatedAt}. Catalog changes remain code-reviewed.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
 }
 
 export async function runCurator(options: { stateDir?: string; persist?: boolean; observedAt?: string } = {}): Promise<CuratorReport> {
@@ -84,7 +83,7 @@ export async function runCurator(options: { stateDir?: string; persist?: boolean
   const evaluations = [...byMarket.values()].map((rows) => evaluateMarket(rows, config.policy));
   const report: CuratorReport = {
     version: 1,
-    role: "advisory",
+    role: "curator",
     generatedAt: observedAt,
     configVersion: config.version,
     snapshotCadenceMinutes: config.policy.snapshotMinutes,

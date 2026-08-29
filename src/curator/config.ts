@@ -8,19 +8,14 @@ const Base58Address = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
 const PolicySchema = z.object({
   snapshotMinutes: z.number().int().min(15).max(1_440),
   historyDays: z.number().int().min(14).max(365),
-  minimumHistoryHours: z.number().int().min(24),
   candidateProofDays: z.number().int().min(7),
   minimumPoolAgeDays: z.number().int().min(7),
   minimumLiquidityUsd: z.number().positive(),
   incumbentLiquidityUsd: z.number().positive(),
   minimumVolume24hUsd: z.number().positive(),
-  minimumMarketCapUsd: z.number().positive(),
-  minimumHolderCount: z.number().int().positive(),
-  maximumTopHolderPct: z.number().positive().max(100),
   maximumLiquidityDrop24hPct: z.number().positive().max(100),
   maximumPoolAllocationBps: z.number().int().positive().max(1_000),
-  replacementMarginPoints: z.number().positive().max(100),
-  eligibleScore: z.number().positive().max(100),
+  replacementAprMultiplier: z.number().min(1).max(10),
 });
 
 const CandidateBase = z.object({

@@ -1,72 +1,19 @@
 {
-  "version": 1,
-  "updatedAt": "2026-08-29",
+  "version": 2,
+  "updatedAt": "2026-08-30",
   "policy": {
-    "snapshotMinutes": 60,
+    "snapshotMinutes": 360,
     "historyDays": 30,
-    "minimumHistoryHours": 168,
-    "candidateProofDays": 14,
+    "candidateProofDays": 7,
     "minimumPoolAgeDays": 30,
     "minimumLiquidityUsd": 250000,
-    "incumbentLiquidityUsd": 150000,
+    "incumbentLiquidityUsd": 100000,
     "minimumVolume24hUsd": 50000,
-    "minimumMarketCapUsd": 5000000,
-    "minimumHolderCount": 5000,
-    "maximumTopHolderPct": 20,
     "maximumLiquidityDrop24hPct": 50,
     "maximumPoolAllocationBps": 100,
-    "replacementMarginPoints": 15,
-    "eligibleScore": 70
+    "replacementAprMultiplier": 1.5
   },
   "candidates": [
-    {
-      "id": "base-doginme",
-      "chain": "base",
-      "name": "doginme",
-      "symbol": "DOGINME",
-      "token": "0x6921B130D297cc43754afba22e5EAc0FBf8Db75b",
-      "pool": "0xADE9BcD4b968EE26Bed102dd43A55f6A8c2416df",
-      "protocol": "V3",
-      "feePips": 10000,
-      "risk": "established",
-      "identity": "reviewed"
-    },
-    {
-      "id": "base-keycat",
-      "chain": "base",
-      "name": "Keyboard Cat",
-      "symbol": "KEYCAT",
-      "token": "0x9a26F5433671751C3276a065f57e5a02D2817973",
-      "pool": "0xd82403772cB858219cfb58bFab46Ba7a31073474",
-      "protocol": "V3",
-      "feePips": 10000,
-      "risk": "established",
-      "identity": "reviewed"
-    },
-    {
-      "id": "base-mochi",
-      "chain": "base",
-      "name": "Mochi",
-      "symbol": "MOCHI",
-      "token": "0xF6e932Ca12afa26665dC4dDE7e27be02A7c02e50",
-      "pool": "0xFcC89a1f250D76dE198767D33E1CA9138a7fB54B",
-      "protocol": "V3",
-      "feePips": 10000,
-      "risk": "established",
-      "identity": "reviewed"
-    },
-    {
-      "id": "base-ski",
-      "chain": "base",
-      "name": "Ski Mask Dog",
-      "symbol": "SKI",
-      "token": "0x768BE13e1680b5ebE0024C42c896E3dB59ec0149",
-      "pool": "0x0eA13439f0818BD0598C002D9337374a78D5FE47",
-      "protocol": "V3",
-      "feePips": 10000,
-      "risk": "established",
-      "identity": "reviewed"
-    },
     {
       "id": "solana-cate",
       "chain": "solana",
@@ -77,7 +24,7 @@
       "protocol": "Meteora DLMM",
       "feePips": 5000,
       "risk": "emerging",
-      "identity": "watch"
+      "identity": "reviewed"
     },
     {
       "id": "solana-ansem",

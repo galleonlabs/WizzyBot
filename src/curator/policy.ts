@@ -63,9 +63,9 @@ export type MarketEvaluation = {
   marketId: string;
   chain: CuratorChain;
   symbol: string;
+  risk: CuratorRisk;
   incumbent: boolean;
   recommendation: "hold" | "review" | "pause" | "observe" | "eligible" | "reject";
-  score: number | null;
   estimatedCapacityUsd: number | null;
   reasons: string[];
   summary: MarketHistorySummary;
@@ -77,7 +77,9 @@ export type ReplacementProposal = {
   candidateSymbol: string;
   incumbentMarketId: string;
   incumbentSymbol: string;
-  scoreMargin: number;
+  candidateFeeAprPct: number;
+  incumbentFeeAprPct: number;
+  aprMultiple: number;
 };
 
 function finite(values: Array<number | null>): number[] {
@@ -132,30 +134,6 @@ export function summarizeMarketHistory(observations: CuratorObservation[], snaps
   };
 }
 
-function logScore(value: number | null, floor: number, ceiling: number): number {
-  if (value === null || value <= floor) return 0;
-  if (value >= ceiling) return 1;
-  return (Math.log(value) - Math.log(floor)) / (Math.log(ceiling) - Math.log(floor));
-}
-
-function linearScore(value: number | null, floor: number, ceiling: number): number {
-  if (value === null || value <= floor) return 0;
-  if (value >= ceiling) return 1;
-  return (value - floor) / (ceiling - floor);
-}
-
-function scoreMarket(summary: MarketHistorySummary, policy: CuratorPolicy): number {
-  const feeEfficiency = 40 * logScore(summary.medianFeeAprPct, 5, 200);
-  const capacity = 15 * logScore(summary.medianLiquidityUsd, policy.incumbentLiquidityUsd, 5_000_000);
-  const history = 10 * linearScore(summary.historyHours, 24, policy.candidateProofDays * 24);
-  const durability = 10 * linearScore(summary.latestPoolAgeDays, policy.minimumPoolAgeDays, 365);
-  const distribution = 10 * linearScore(summary.latestHolderCount, policy.minimumHolderCount, 100_000);
-  const identity = summary.identity === "reviewed" ? 10 : 0;
-  const socials = 5 * linearScore(summary.latestSocialLinks, 0, 3);
-  const volatilityPenalty = 15 * linearScore(summary.p90AbsPriceChange24hPct, 10, 50);
-  return Math.round(Math.max(0, Math.min(100, feeEfficiency + capacity + history + durability + distribution + identity + socials - volatilityPenalty)));
-}
-
 function marketFloor(incumbent: boolean, policy: CuratorPolicy): number {
   return incumbent ? policy.incumbentLiquidityUsd : policy.minimumLiquidityUsd;
 }
@@ -168,60 +146,64 @@ export function evaluateMarket(observations: CuratorObservation[], policy: Curat
   const hardSecurityFailure = summary.securityFlags.length > 0;
   const collapsed = summary.liquidityDrop24hPct !== null && summary.liquidityDrop24hPct >= policy.maximumLiquidityDrop24hPct;
   const enoughCoverage = summary.observationCoveragePct >= 80;
-  const enoughHistory = summary.historyHours >= policy.minimumHistoryHours && enoughCoverage;
   const proofComplete = summary.historyHours >= policy.candidateProofDays * 24 && enoughCoverage;
   const liquidityPass = summary.medianLiquidityUsd !== null && summary.medianLiquidityUsd >= marketFloor(latest.incumbent, policy);
   const volumePass = summary.medianVolume24hUsd !== null && summary.medianVolume24hUsd >= policy.minimumVolume24hUsd;
   const agePass = summary.latestPoolAgeDays !== null && summary.latestPoolAgeDays >= policy.minimumPoolAgeDays;
-  const marketCapPass = summary.latestMarketCapUsd !== null && summary.latestMarketCapUsd >= policy.minimumMarketCapUsd;
-  const holdersPass = summary.latestHolderCount !== null && summary.latestHolderCount >= policy.minimumHolderCount;
-  const concentrationPass = summary.latestTopHolderPct === null || summary.latestTopHolderPct <= policy.maximumTopHolderPct;
   const identityPass = summary.identity === "reviewed";
   const securityPass = summary.latestSecurityAvailable;
-  const score = enoughHistory ? scoreMarket(summary, policy) : null;
   const estimatedCapacityUsd = summary.medianLiquidityUsd === null ? null : summary.medianLiquidityUsd * policy.maximumPoolAllocationBps / 10_000;
 
   if (hardSecurityFailure) reasons.push(`security: ${summary.securityFlags.join(", ")}`);
   if (collapsed) reasons.push(`pool liquidity fell ${summary.liquidityDrop24hPct!.toFixed(0)}% in 24h`);
-  if (!agePass) reasons.push(summary.latestPoolAgeDays === null ? `pool age unavailable; needs ${policy.minimumPoolAgeDays} tracked days` : `pool needs ${policy.minimumPoolAgeDays} days of history`);
+  if (!latest.incumbent && !agePass) reasons.push(summary.latestPoolAgeDays === null ? "pool age is unavailable" : `pool is younger than ${policy.minimumPoolAgeDays} days`);
   if (!liquidityPass) reasons.push(`median pool liquidity is below $${marketFloor(latest.incumbent, policy).toLocaleString()}`);
   if (!volumePass) reasons.push(`median daily volume is below $${policy.minimumVolume24hUsd.toLocaleString()}`);
-  if (!marketCapPass) reasons.push(`market cap is below $${policy.minimumMarketCapUsd.toLocaleString()} or unavailable`);
-  if (!holdersPass) reasons.push(`holder count is below ${policy.minimumHolderCount.toLocaleString()} or unavailable`);
-  if (!concentrationPass) reasons.push(`largest holder exceeds ${policy.maximumTopHolderPct}%`);
   if (!identityPass) reasons.push("token identity and social history still need review");
   if (!securityPass) reasons.push("security provider data is unavailable");
-  if (!enoughCoverage && summary.historyHours > 0) reasons.push("snapshot coverage is below 80%");
-  if (!enoughHistory) reasons.push(`needs ${policy.minimumHistoryHours} hours of curator history`);
-  else if (!latest.incumbent && !proofComplete) reasons.push(`candidate needs ${policy.candidateProofDays} tracked days`);
+  if (!latest.incumbent && !proofComplete) reasons.push(`candidate needs ${policy.candidateProofDays} tracked days`);
 
   let recommendation: MarketEvaluation["recommendation"];
   if (hardSecurityFailure || collapsed) recommendation = latest.incumbent ? "pause" : "reject";
-  else if (!enoughHistory) recommendation = "observe";
-  else if (latest.incumbent) recommendation = liquidityPass && volumePass && agePass && securityPass ? "hold" : "review";
-  else if (!proofComplete || !liquidityPass || !volumePass || !agePass || !marketCapPass || !holdersPass || !concentrationPass || !identityPass || !securityPass) recommendation = "observe";
-  else recommendation = score !== null && score >= policy.eligibleScore ? "eligible" : "observe";
+  else if (latest.incumbent) recommendation = liquidityPass && volumePass && securityPass ? "hold" : "review";
+  else if (!proofComplete || !liquidityPass || !volumePass || !agePass || !identityPass || !securityPass) recommendation = "observe";
+  else recommendation = "eligible";
 
   if (!reasons.length) reasons.push(latest.incumbent ? "all maintained-market gates pass" : "all candidate gates pass");
-  return { marketId: latest.marketId, chain: latest.chain, symbol: latest.symbol, incumbent: latest.incumbent, recommendation, score, estimatedCapacityUsd, reasons, summary };
+  return { marketId: latest.marketId, chain: latest.chain, symbol: latest.symbol, risk: latest.risk, incumbent: latest.incumbent, recommendation, estimatedCapacityUsd, reasons, summary };
+}
+
+function riskRank(risk: CuratorRisk): number {
+  return risk === "established" ? 0 : risk === "emerging" ? 1 : 2;
 }
 
 export function proposeReplacements(evaluations: MarketEvaluation[], policy: CuratorPolicy): ReplacementProposal[] {
   const proposals: ReplacementProposal[] = [];
-  for (const candidate of evaluations.filter((row) => !row.incumbent && row.recommendation === "eligible" && row.score !== null)) {
+  for (const candidate of evaluations.filter((row) => !row.incumbent && row.recommendation === "eligible" && row.summary.medianFeeAprPct !== null)) {
     const incumbent = evaluations
-      .filter((row) => row.incumbent && row.chain === candidate.chain && row.score !== null && row.recommendation !== "pause")
-      .sort((a, b) => a.score! - b.score!)[0];
+      .filter((row) => row.incumbent
+        && row.chain === candidate.chain
+        && row.summary.medianFeeAprPct !== null
+        && row.recommendation !== "pause"
+        && riskRank(row.risk) >= riskRank(candidate.risk))
+      .sort((a, b) => {
+        if (a.recommendation !== b.recommendation) return a.recommendation === "review" ? -1 : 1;
+        return a.summary.medianFeeAprPct! - b.summary.medianFeeAprPct!;
+      })[0];
     if (!incumbent) continue;
-    const scoreMargin = candidate.score! - incumbent.score!;
-    if (scoreMargin < policy.replacementMarginPoints) continue;
+    const candidateFeeAprPct = candidate.summary.medianFeeAprPct!;
+    const incumbentFeeAprPct = incumbent.summary.medianFeeAprPct!;
+    const aprMultiple = candidateFeeAprPct / Math.max(0.01, incumbentFeeAprPct);
+    if (incumbent.recommendation !== "review" && aprMultiple < policy.replacementAprMultiplier) continue;
     proposals.push({
       chain: candidate.chain,
       candidateMarketId: candidate.marketId,
       candidateSymbol: candidate.symbol,
       incumbentMarketId: incumbent.marketId,
       incumbentSymbol: incumbent.symbol,
-      scoreMargin,
+      candidateFeeAprPct,
+      incumbentFeeAprPct,
+      aprMultiple,
     });
   }
   return proposals;

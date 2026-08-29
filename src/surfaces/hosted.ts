@@ -16,6 +16,14 @@ import { hydrateCalldata } from "../core/hydrate.js";
 import { decideForPosition, runOnce } from "../keeper/loop.js";
 import { StdoutSink } from "../keeper/alerts.js";
 import type { ActionReceipt, PositionSnapshot } from "../types.js";
+import { recenterSameWidth } from "../core/ticks.js";
+import {
+  confirmFromMint,
+  confirmFromPosition,
+  serializeLiveView,
+  serializeMintView,
+  serializeProjectedRange,
+} from "../core/view.js";
 import {
   getPrivyAccount,
   loadPrivyEnv,
@@ -65,8 +73,19 @@ export async function connectHosted(ownerArg?: string) {
   return { env, client, owner, adapter };
 }
 
+async function liveViewFor(snap: PositionSnapshot, client: ReturnType<typeof makePublicClient>, ethUsd?: number) {
+  const prices = await usdPricesForPosition(client, snap, ethUsd);
+  let rec = getHold(snap.ref.tokenId);
+  if (!rec) rec = await importHoldForToken(client, snap.ref.tokenId, { amount0: snap.amount0, amount1: snap.amount1 });
+  const card = buildCard(snap, prices, holdAmounts(rec), rec.createdAt, undefined, {
+    source: rec.source,
+    note: formatHoldNote(rec),
+  });
+  return { card, view: serializeLiveView(card) };
+}
+
 export async function listPositions(ownerArg?: string) {
-  const { client, owner } = await connectHosted(ownerArg);
+  const { client, owner, env } = await connectHosted(ownerArg);
   const out: Record<string, unknown>[] = [];
   for (const protocol of ["V2", "V3", "V4"] as const) {
     const adapter = adapterFor(protocol, client);
@@ -79,14 +98,32 @@ export async function listPositions(ownerArg?: string) {
     for (const ref of refs) {
       try {
         const snap = await adapter.readPosition(ref.tokenId);
-        out.push({
+        const row: Record<string, unknown> = {
           protocol: ref.protocol,
           tokenId: ref.tokenId.toString(),
           pair: `${snap.token0.symbol}/${snap.token1.symbol}`,
           fee: snap.fee,
           inRange: snap.inRange,
           owner,
-        });
+        };
+        try {
+          const { view } = await liveViewFor(snap, client, env.ethUsd);
+          row.view = view;
+          row.positionUsd = view.positionUsd;
+          row.feesUsd = view.feesUsd;
+          row.feeApr = view.feeApr;
+          row.totalApr = view.totalApr;
+          row.holdUsd = view.holdUsd;
+          row.feeLabel = view.feeLabel;
+          row.status = view.status;
+          row.closed = view.closed;
+          row.fullRange = view.fullRange;
+          row.lpUsd = view.lpUsd;
+          row.holdDeltaPct = view.holdDeltaPct;
+        } catch {
+          // Light row still useful if prices / HOLD fail.
+        }
+        out.push(row);
       } catch (err) {
         out.push({
           protocol: ref.protocol,
@@ -103,14 +140,8 @@ export async function statusPosition(tokenId: string) {
   const { adapter, client, env } = connectRead();
   const id = BigInt(tokenId);
   const snap = await adapter.readPosition(id);
-  const prices = await usdPricesForPosition(client, snap, env.ethUsd);
-  let rec = getHold(id);
-  if (!rec) rec = await importHoldForToken(client, id, { amount0: snap.amount0, amount1: snap.amount1 });
-  const card = buildCard(snap, prices, holdAmounts(rec), rec.createdAt, undefined, {
-    source: rec.source,
-    note: formatHoldNote(rec),
-  });
-  return { card: formatCard(card), tokenId, owner: snap.owner };
+  const { card, view } = await liveViewFor(snap, client, env.ethUsd);
+  return jsonSafe({ card: formatCard(card), view, tokenId, owner: snap.owner });
 }
 
 async function planContext(
@@ -188,7 +219,11 @@ export async function compoundPosition(input: {
   const ctx = await planContext(snap, owner, live, "compound", input);
   const receipt = planCompound(snap, ctx);
   const executed = await maybeBroadcast(receipt, snap, owner, live);
-  return jsonSafe({ text: formatReceipt(executed), receipt: executed });
+  return jsonSafe({
+    text: formatReceipt(executed),
+    receipt: executed,
+    confirm: confirmFromPosition("compound", snap, executed, { feesUsd: ctx.feesUsd, gasUsd: ctx.gasUsd }),
+  });
 }
 
 export async function rangePosition(input: {
@@ -207,7 +242,27 @@ export async function rangePosition(input: {
   const ctx = await planContext(snap, owner, live, "rerange", input);
   const receipt = planRerange(snap, ctx, { oorPercent: input.oorPercent ?? policy.oorPercent });
   const executed = await maybeBroadcast(receipt, snap, owner, live);
-  return jsonSafe({ text: formatReceipt(executed), receipt: executed });
+  let projection;
+  try {
+    if (snap.ref.protocol !== "V2") {
+      projection = serializeProjectedRange(
+        snap,
+        recenterSameWidth(snap.tickLower, snap.tickUpper, snap.tickCurrent, snap.tickSpacing),
+      );
+    }
+  } catch {
+    projection = undefined;
+  }
+  return jsonSafe({
+    text: formatReceipt(executed),
+    receipt: executed,
+    projection,
+    confirm: confirmFromPosition("range", snap, executed, {
+      feesUsd: ctx.feesUsd,
+      gasUsd: ctx.gasUsd,
+      projection,
+    }),
+  });
 }
 
 export async function exitPosition(input: {
@@ -236,7 +291,11 @@ export async function exitPosition(input: {
           : undefined,
   });
   const executed = await maybeBroadcast(receipt, snap, owner, live);
-  return jsonSafe({ text: formatReceipt(executed), receipt: executed });
+  return jsonSafe({
+    text: formatReceipt(executed),
+    receipt: executed,
+    confirm: confirmFromPosition("exit", snap, executed, { feesUsd: ctx.feesUsd, gasUsd: ctx.gasUsd }),
+  });
 }
 
 export async function mintPosition(input: {
@@ -269,20 +328,28 @@ export async function mintPosition(input: {
     apiKey: env.uniswapApiKey,
   });
   if (!live) {
+    const view = serializeMintView(result.quote);
     return jsonSafe({
       card: result.card,
       text: formatReceipt(result.receipt),
       receipt: result.receipt,
+      view,
+      projection: view,
+      confirm: confirmFromMint(result.quote, result.receipt),
       usedLpApi: result.usedLpApi,
       simulation: result.simulation,
       note: "dry-run: no broadcast. Set live=true and confirm=true to mint. NFT stays in your wallet.",
     });
   }
   if (!privyConfigured()) {
+    const view = serializeMintView(result.quote);
     return jsonSafe({
       card: result.card,
       text: formatReceipt(result.receipt),
       receipt: result.receipt,
+      view,
+      projection: view,
+      confirm: confirmFromMint(result.quote, result.receipt),
       stubbed: true,
       note: PRIVY_STUB_MESSAGE,
     });
@@ -301,10 +368,14 @@ export async function mintPosition(input: {
     if (sent.hash) hashes.push(sent.hash);
   }
   persistMintHold(result.quote, 0n);
+  const view = serializeMintView(result.quote);
   return jsonSafe({
     card: result.card,
     text: formatReceipt(result.receipt),
     receipt: result.receipt,
+    view,
+    projection: view,
+    confirm: confirmFromMint(result.quote, { ...result.receipt, dryRun: false }),
     hashes,
     note: "Mint submitted via Privy. HOLD persists on next status once the NFT exists.",
   });

@@ -12,6 +12,7 @@ Compound, re-range, exit.
 - Never ask for or print private keys. The hosted wallet is Privy, not a raw key.
 - You keep the NFT. No vault custody.
 - Prefer tools over guessing on-chain state.
+- The hosted UI projects list / status / mint / re-range onto the right panel. Dry-run first so the user can see Projected vs Live. Live writes stop for a confirm card, then Privy signs.
 
 ## Tools
 

@@ -10,7 +10,7 @@ export default function Page() {
 
   async function emailThenChat() {
     if (!authenticated) await login();
-    router.push("/chat");
+    router.push("/app");
   }
 
   return (
@@ -31,8 +31,8 @@ export default function Page() {
         </h1>
         <p className="sub">v2, v3, and v4. You keep the position.</p>
         <div className="cta-row">
-          <Link className="btn btn-accent" href="/chat">
-            Open chat
+          <Link className="btn btn-accent" href="/app">
+            Open cockpit
           </Link>
           {ready && !authenticated ? (
             <button className="btn" type="button" onClick={() => void emailThenChat()}>

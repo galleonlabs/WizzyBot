@@ -1,5 +1,6 @@
 import { encodeFunctionData, getAddress, type Address } from "viem";
 import { ADDRESSES, DEFAULT_DEADLINE_SEC, DEFAULT_SLIPPAGE_BPS } from "../constants.js";
+import { addressesFor, slugForChainId } from "../chains.js";
 import { v2RouterAbi } from "../chain/abi.js";
 import { erc20ApproveTx } from "./calldata.js";
 import type { PlannedTx, PositionSnapshot } from "../types.js";
@@ -23,6 +24,7 @@ export function addLiquidityTx(args: {
   deadlineSec?: number;
   useNative?: boolean;
   nativeIsTokenA?: boolean;
+  chainId?: number;
 }): PlannedTx {
   const bps = args.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   const minA = slipMin(args.amountADesired, bps);
@@ -38,7 +40,7 @@ export function addLiquidityTx(args: {
     const amountTokenMin = nativeIsA ? minB : minA;
     const amountETHMin = nativeIsA ? minA : minB;
     return {
-      to: ADDRESSES.v2Router,
+      to: addressesFor(slugForChainId(args.chainId ?? 8453)).v2Router,
       data: encodeFunctionData({
         abi: v2RouterAbi,
         functionName: "addLiquidityETH",
@@ -50,7 +52,7 @@ export function addLiquidityTx(args: {
   }
 
   return {
-    to: ADDRESSES.v2Router,
+    to: addressesFor(slugForChainId(args.chainId ?? 8453)).v2Router,
     data: encodeFunctionData({
       abi: v2RouterAbi,
       functionName: "addLiquidity",
@@ -81,6 +83,7 @@ export function removeLiquidityTx(args: {
   deadlineSec?: number;
   useNative?: boolean;
   nativeIsTokenA?: boolean;
+  chainId?: number;
 }): PlannedTx {
   const bps = args.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   const minA = args.amountAMin ?? 0n;
@@ -95,7 +98,7 @@ export function removeLiquidityTx(args: {
     const amountTokenMin = nativeIsA ? minB : minA;
     const amountETHMin = nativeIsA ? minA : minB;
     return {
-      to: ADDRESSES.v2Router,
+      to: addressesFor(slugForChainId(args.chainId ?? 8453)).v2Router,
       data: encodeFunctionData({
         abi: v2RouterAbi,
         functionName: "removeLiquidityETH",
@@ -107,7 +110,7 @@ export function removeLiquidityTx(args: {
   }
 
   return {
-    to: ADDRESSES.v2Router,
+    to: addressesFor(slugForChainId(args.chainId ?? 8453)).v2Router,
     data: encodeFunctionData({
       abi: v2RouterAbi,
       functionName: "removeLiquidity",
@@ -148,6 +151,7 @@ export function v2RemoveFromPosition(
     recipient,
     useNative: native0 || native1,
     nativeIsTokenA: native0,
+    chainId: position.ref.chainId,
   });
 }
 
@@ -169,5 +173,6 @@ export function v2AddFromPosition(
     slippageBps,
     useNative: native0 || native1,
     nativeIsTokenA: native0,
+    chainId: position.ref.chainId,
   });
 }

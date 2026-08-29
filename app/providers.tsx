@@ -1,7 +1,7 @@
 "use client";
 
 import { PrivyProvider } from "@privy-io/react-auth";
-import { base } from "viem/chains";
+import { base, robinhoodChain } from "./lib/chains";
 
 /** Una Privy app (public). Secret is never shipped. */
 const DEFAULT_PRIVY_APP_ID = "cmteeqkjc03e20cjl59c9kbwu";
@@ -17,7 +17,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         appearance: { theme: "dark", accentColor: "#ff8fa3" },
         embeddedWallets: { ethereum: { createOnLogin: "users-without-wallets" } },
         defaultChain: base,
-        supportedChains: [base],
+        supportedChains: [base, robinhoodChain],
       }}
     >
       {children}

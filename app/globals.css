@@ -160,6 +160,26 @@ a:focus-visible {
   padding: 6px 10px;
 }
 
+.net select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 .ghost {
   border: 0;
   background: transparent;
@@ -1102,7 +1122,6 @@ a:focus-visible {
   .lp-grid { grid-template-columns: 1fr; }
   .topnav { padding: 0 16px; gap: 12px; grid-template-columns: auto 1fr auto; }
   .topnav-links { display: none; }
-  .net { display: none; }
   .btn-connect, .btn-new { min-height: 44px; padding: 0 16px; }
 }
 

@@ -9,6 +9,7 @@ import {
   type Hex,
 } from "viem";
 import { ADDRESSES, DEFAULT_DEADLINE_SEC, DEFAULT_SLIPPAGE_BPS } from "../constants.js";
+import { addressesFor, slugForChainId } from "../chains.js";
 import { permit2Abi, v4PositionManagerWriteAbi, type V4PoolKey } from "../chain/abi.js";
 import { tickSpacingForFee } from "../core/ticks.js";
 import type { PlannedTx, PositionSnapshot, TokenRef } from "../types.js";
@@ -90,6 +91,7 @@ function mintParams(args: {
   amount1Max: bigint;
   recipient: Address;
   hookData?: Hex;
+  chainId?: number;
 }): Hex {
   return encodeAbiParameters(
     [
@@ -169,8 +171,8 @@ function sweepParams(currency: Address, recipient: Address): Hex {
   return encodeAbiParameters([{ type: "address" }, { type: "address" }], [currency, getAddress(recipient)]);
 }
 
-function pmTx(data: Hex, value: bigint, description: string): PlannedTx {
-  return { to: ADDRESSES.v4PositionManager, data, value, description };
+function pmTx(data: Hex, value: bigint, description: string, chainId = 8453): PlannedTx {
+  return { to: addressesFor(slugForChainId(chainId)).v4PositionManager, data, value, description };
 }
 
 export function v4MintTx(args: {
@@ -184,6 +186,7 @@ export function v4MintTx(args: {
   slippageBps?: number;
   deadlineSec?: number;
   hookData?: Hex;
+  chainId?: number;
 }): PlannedTx {
   if (args.poolKey.hooks.toLowerCase() !== ADDRESSES.nativeEth.toLowerCase()) {
     throw new Error(`Refuse unknown v4 hooks ${args.poolKey.hooks}`);
@@ -214,7 +217,7 @@ export function v4MintTx(args: {
     params.push(sweepParams(ADDRESSES.nativeEth, args.recipient));
   }
   const value = native0 ? args.amount0 : native1 ? args.amount1 : 0n;
-  return pmTx(encodeModifyLiquidities(actions, params, args.deadlineSec), value, "PositionManager.modifyLiquidities mint");
+  return pmTx(encodeModifyLiquidities(actions, params, args.deadlineSec), value, "PositionManager.modifyLiquidities mint", args.chainId);
 }
 
 export function v4IncreaseTx(
@@ -233,7 +236,7 @@ export function v4IncreaseTx(
   const native0 = key.currency0.toLowerCase() === ADDRESSES.nativeEth.toLowerCase();
   const native1 = key.currency1.toLowerCase() === ADDRESSES.nativeEth.toLowerCase();
   const value = native0 ? amount0 : native1 ? amount1 : 0n;
-  return pmTx(encodeModifyLiquidities(actions, params), value, "PositionManager.modifyLiquidities increase");
+  return pmTx(encodeModifyLiquidities(actions, params), value, "PositionManager.modifyLiquidities increase", position.ref.chainId);
 }
 
 export function v4DecreaseTx(
@@ -248,7 +251,7 @@ export function v4DecreaseTx(
     decreaseParams(position.ref.tokenId, liquidity, slipMin(position.amount0, slippageBps), slipMin(position.amount1, slippageBps)),
     takePairParams(key.currency0, key.currency1, recipient),
   ];
-  return pmTx(encodeModifyLiquidities(actions, params), 0n, "PositionManager.modifyLiquidities decrease");
+  return pmTx(encodeModifyLiquidities(actions, params), 0n, "PositionManager.modifyLiquidities decrease", position.ref.chainId);
 }
 
 /** Official v4 claim: zero-liquidity decrease + TAKE_PAIR. */
@@ -259,7 +262,7 @@ export function v4ClaimFeesTx(position: PositionSnapshot, recipient: Address): P
     decreaseParams(position.ref.tokenId, 0n, 0n, 0n),
     takePairParams(key.currency0, key.currency1, recipient),
   ];
-  return pmTx(encodeModifyLiquidities(actions, params), 0n, "PositionManager.modifyLiquidities claim (0-liq decrease)");
+  return pmTx(encodeModifyLiquidities(actions, params), 0n, "PositionManager.modifyLiquidities claim (0-liq decrease)", position.ref.chainId);
 }
 
 export function v4BurnTx(position: PositionSnapshot, recipient: Address, slippageBps = DEFAULT_SLIPPAGE_BPS): PlannedTx {
@@ -269,7 +272,7 @@ export function v4BurnTx(position: PositionSnapshot, recipient: Address, slippag
     burnParams(position.ref.tokenId, slipMin(position.amount0, slippageBps), slipMin(position.amount1, slippageBps)),
     takePairParams(key.currency0, key.currency1, recipient),
   ];
-  return pmTx(encodeModifyLiquidities(actions, params), 0n, "PositionManager.modifyLiquidities burn");
+  return pmTx(encodeModifyLiquidities(actions, params), 0n, "PositionManager.modifyLiquidities burn", position.ref.chainId);
 }
 
 export function permit2ApproveTx(token: Address, spender: Address, amount: bigint, expirationSec = DEFAULT_DEADLINE_SEC): PlannedTx {

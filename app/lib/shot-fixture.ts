@@ -5,6 +5,8 @@ export const SHOT_VIEWS: PositionView[] = [
   {
     kind: "live",
     protocol: "V3",
+    chain: "base",
+    chainLabel: "Base",
     tokenId: "184291",
     pair: "WETH/USDC",
     fee: 500,
@@ -42,6 +44,8 @@ export const SHOT_VIEWS: PositionView[] = [
   {
     kind: "live",
     protocol: "V4",
+    chain: "base",
+    chainLabel: "Base",
     tokenId: "9921",
     pair: "cbBTC/USDC",
     fee: 3000,

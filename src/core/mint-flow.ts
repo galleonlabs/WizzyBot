@@ -1,5 +1,7 @@
 import { getAddress, type Address, type PublicClient } from "viem";
 import { ADDRESSES } from "../constants.js";
+import type { ChainSlug } from "../chains.js";
+import { addressesFor, chainIdOfClient, slugForChainId, slugOfClient } from "../chains.js";
 import { readTokenMeta } from "../chain/positions.js";
 import { simulateTxs } from "../chain/mint-history.js";
 import { createUniswapHttp } from "../uniswap/http.js";
@@ -46,8 +48,11 @@ export interface MintFlowResult {
 
 export async function runMintFlow(input: MintFlowInput): Promise<MintFlowResult> {
   const protocol = input.protocol ?? "V3";
-  const a = resolveMintToken(input.token0);
-  const b = resolveMintToken(input.token1);
+  const chainId = Number(input.client.chain?.id ?? 8453);
+  const slug = slugForChainId(chainId);
+  const addrs = addressesFor(slug);
+  const a = resolveMintToken(input.token0, slug);
+  const b = resolveMintToken(input.token1, slug);
   const amtA = input.amount0;
   const amtB = input.amount1;
   const rawA = { address: a.address, useNative: a.useNative, amount: amtA ?? 0n, key: "0" as const };
@@ -67,6 +72,7 @@ export async function runMintFlow(input: MintFlowInput): Promise<MintFlowResult>
     const token0 = pair.token0.toLowerCase() === meta0.address.toLowerCase() ? meta0 : meta1;
     const token1 = pair.token1.toLowerCase() === meta1.address.toLowerCase() ? meta1 : meta0;
     quote = quoteMintV2({
+      chainId,
       token0,
       token1,
       reserve0: pair.reserve0,
@@ -78,17 +84,18 @@ export async function runMintFlow(input: MintFlowInput): Promise<MintFlowResult>
       nativeIsToken0: pair.token0.toLowerCase() === t0.address.toLowerCase() ? t0.useNative : t1.useNative,
     });
   } else if (protocol === "V4") {
-    const currency0 = t0.useNative ? ADDRESSES.nativeEth : t0.address;
-    const currency1 = t1.useNative ? ADDRESSES.nativeEth : t1.address;
+    const currency0 = t0.useNative ? addrs.nativeEth : t0.address;
+    const currency1 = t1.useNative ? addrs.nativeEth : t1.address;
     const pool = await loadV4Pool(input.client, currency0, currency1, input.fee);
     quote = quoteMintFromPool({
+      chainId,
       protocol: "V4",
       token0: t0.useNative ? { ...meta0, symbol: "ETH" } : meta0,
       token1: t1.useNative ? { ...meta1, symbol: "ETH" } : meta1,
       fee: input.fee,
       sqrtPriceX96: pool.sqrtPriceX96,
       tickCurrent: pool.tick,
-      pool: ADDRESSES.v4PoolManager,
+      pool: addrs.v4PoolManager,
       widthPct: input.widthPct,
       tickLower: input.tickLower,
       tickUpper: input.tickUpper,
@@ -102,6 +109,7 @@ export async function runMintFlow(input: MintFlowInput): Promise<MintFlowResult>
   } else {
     const pool = await loadPoolForMint(input.client, t0.address, t1.address, input.fee);
     quote = quoteMintFromPool({
+      chainId,
       protocol: "V3",
       token0: meta0,
       token1: meta1,
@@ -118,12 +126,13 @@ export async function runMintFlow(input: MintFlowInput): Promise<MintFlowResult>
       nativeIsToken0: t0.useNative,
     });
   }
+  quote.chainId = chainId;
 
   let receipt = planMint(quote, input.owner, input.dryRun);
   let usedLpApi = false;
 
   if (input.apiKey) {
-    const apiTxs = await tryLpApi(input.apiKey, quote, input.owner);
+    const apiTxs = await tryLpApi(input.apiKey, quote, input.owner, chainId);
     if (apiTxs && apiTxs.length > 0) {
       usedLpApi = true;
       receipt = {
@@ -147,7 +156,7 @@ export async function runMintFlow(input: MintFlowInput): Promise<MintFlowResult>
   };
 }
 
-async function tryLpApi(apiKey: string, quote: MintQuote, owner: Address): Promise<PlannedTx[] | undefined> {
+async function tryLpApi(apiKey: string, quote: MintQuote, owner: Address, chainId: number): Promise<PlannedTx[] | undefined> {
   try {
     const lp = new LpApi(createUniswapHttp(apiKey));
     const independent = quote.amount0 > 0n
@@ -160,7 +169,7 @@ async function tryLpApi(apiKey: string, quote: MintQuote, owner: Address): Promi
         poolParameters: {
           token0Address: quote.token0,
           token1Address: quote.token1,
-          chainId: 8453,
+          chainId,
         },
         independentToken: independent,
         simulateTransaction: true,
@@ -172,7 +181,7 @@ async function tryLpApi(apiKey: string, quote: MintQuote, owner: Address): Promi
     const created = await lp.create({
       walletAddress: owner,
       protocol: quote.protocol === "V4" ? "V4" : "V3",
-      chainId: 8453,
+      chainId,
       existingPool: {
         token0Address: quote.token0,
         token1Address: quote.token1,
@@ -195,7 +204,9 @@ export function persistMintHold(quote: MintQuote, tokenId: bigint, path?: string
 }
 
 export function extraAllowForMint(quote: MintQuote): Address[] {
-  return [quote.token0, quote.token1, ADDRESSES.weth, ADDRESSES.v2Router, ADDRESSES.v4PositionManager, ADDRESSES.permit2];
+  const slug = slugForChainId(quote.chainId ?? 8453);
+  const a = addressesFor(slug);
+  return [quote.token0, quote.token1, a.weth, a.v2Router, a.v4PositionManager, a.permit2];
 }
 
 export async function tryLpWrite(args: {
@@ -208,15 +219,17 @@ export async function tryLpWrite(args: {
   tokenId: bigint;
   independent?: { tokenAddress: string; amount: string };
   pct?: number;
+  chain?: ChainSlug;
 }): Promise<PlannedTx | undefined> {
   const lp = new LpApi(createUniswapHttp(args.apiKey));
+  const chainId = args.chain === "robinhood" ? 4663 : 8453;
   try {
     if (args.action === "claim") {
       if (args.protocol === "V2") return undefined;
       const res = await lp.claimFees({
         protocol: args.protocol,
         walletAddress: args.owner,
-        chainId: 8453,
+        chainId,
         tokenId: args.tokenId.toString(),
         simulateTransaction: true,
       });
@@ -225,7 +238,7 @@ export async function tryLpWrite(args: {
     if (args.action === "increase") {
       const res = await lp.increase({
         walletAddress: args.owner,
-        chainId: 8453,
+        chainId,
         protocol: args.protocol,
         token0Address: args.token0,
         token1Address: args.token1,
@@ -237,7 +250,7 @@ export async function tryLpWrite(args: {
     }
     const res = await lp.decrease({
       walletAddress: args.owner,
-      chainId: 8453,
+      chainId,
       protocol: args.protocol,
       token0Address: args.token0,
       token1Address: args.token1,

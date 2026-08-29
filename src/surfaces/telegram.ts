@@ -45,7 +45,7 @@ export function planTelegramReply(text: string, live: boolean): TelegramReply {
 
 export function formatIntentPreview(intent: Intent, live: boolean): string {
   const dry = live ? "live" : "dry-run";
-  const proto = ` protocol=${protocolOf(intent).toLowerCase()}`;
+  const proto = ` protocol=${protocolOf(intent).toLowerCase()} chain=base`;
   switch (intent.verb) {
     case "help":
       return planTelegramReply("help", live).text;

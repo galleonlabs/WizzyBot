@@ -7,6 +7,7 @@ import { isPositionView, type PositionView } from "./lib/cards";
 import { applyListPayload, applyStatusView, applyToolOutput, emptyPanel, type PanelState } from "./lib/panel";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { LpPanel } from "./lp-panel";
+import { parseChainSlug, type ChainSlug } from "./lib/chains";
 import { TopNav } from "./top-nav";
 
 export function Cockpit() {
@@ -15,6 +16,7 @@ export function Cockpit() {
   const [tab, setTab] = useState<"positions" | "agent">("positions");
   const [sheet, setSheet] = useState(false);
   const [shot, setShot] = useState(false);
+  const [chain, setChain] = useState<ChainSlug>("base");
   const address = user?.wallet?.address;
   const account = user?.email?.address ?? (address ? short(address) : null);
 
@@ -22,6 +24,11 @@ export function Cockpit() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("tab") === "agent") {
       setTab("agent");
+    }
+    try {
+      setChain(parseChainSlug(params.get("chain")));
+    } catch {
+      setChain("base");
     }
     if (isShotQuery()) {
       setShot(true);
@@ -42,7 +49,7 @@ export function Cockpit() {
       return;
     }
     let cancelled = false;
-    fetch(`/api/positions?owner=${encodeURIComponent(address)}`)
+    fetch(`/api/positions?owner=${encodeURIComponent(address)}&chain=${chain}`)
       .then((r) => r.json())
       .then((payload: unknown) => {
         if (!cancelled) setPanel((prev) => applyListPayload(prev, payload));
@@ -58,7 +65,7 @@ export function Cockpit() {
     return () => {
       cancelled = true;
     };
-  }, [authenticated, address, shot]);
+  }, [authenticated, address, shot, chain]);
 
   const onToolOutput = useCallback((toolName: string | undefined, output: unknown) => {
     setPanel((prev) => {
@@ -75,7 +82,7 @@ export function Cockpit() {
     setSheet(true);
     setTab("positions");
     if (!view.tokenId) return;
-    fetch(`/api/positions/${encodeURIComponent(view.tokenId)}`)
+    fetch(`/api/positions/${encodeURIComponent(view.tokenId)}?chain=${chain}`)
       .then((r) => r.json())
       .then((payload: unknown) => {
         if (payload && typeof payload === "object" && "view" in payload) {
@@ -86,7 +93,7 @@ export function Cockpit() {
       .catch(() => {
         /* list row is enough */
       });
-  }, []);
+  }, [chain]);
 
   function onTab(next: "positions" | "agent") {
     setTab(next);
@@ -107,9 +114,16 @@ export function Cockpit() {
         account={account}
         ready={ready}
         authenticated={authenticated}
+        chain={chain}
         onLogin={() => void login()}
         onLogout={() => void logout()}
         onTab={onTab}
+        onChain={(next) => {
+          setChain(next);
+          const url = new URL(window.location.href);
+          url.searchParams.set("chain", next);
+          window.history.replaceState(null, "", url);
+        }}
       />
 
       <Chat

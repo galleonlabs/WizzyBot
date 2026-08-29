@@ -2,6 +2,8 @@ import { Token } from "@uniswap/sdk-core";
 import { Pool, Position } from "@uniswap/v3-sdk";
 import { getAddress, type Address, type PublicClient } from "viem";
 import { ADDRESSES, CHAIN_ID } from "../constants.js";
+import type { ChainSlug } from "../chains.js";
+import { addressesFor, slugForChainId } from "../chains.js";
 import { factoryAbi, poolAbi, v2FactoryAbi, v2PairAbi } from "../chain/abi.js";
 import { erc20ApproveTx, mintCalldata } from "../uniswap/calldata.js";
 import { addLiquidityTx } from "../uniswap/v2-calldata.js";
@@ -12,6 +14,7 @@ import type { ActionReceipt, PlannedAction, PlannedTx, PositionSnapshot, Protoco
 
 export interface MintQuote {
   protocol: Protocol;
+  chainId: number;
   token0: Address;
   token1: Address;
   symbol0: string;
@@ -30,17 +33,26 @@ export interface MintQuote {
   singleSided: boolean;
   useNative: boolean;
   nativeIsToken0: boolean;
+  chainId?: number;
   poolId?: `0x${string}`;
   hooks?: Address;
 }
 
-export function resolveMintToken(input: string): { address: Address; useNative: boolean } {
+export function resolveMintToken(input: string, chain: ChainSlug = "base"): { address: Address; useNative: boolean } {
+  const addrs = addressesFor(chain);
   const trimmed = input.trim();
-  if (/^ETH$/i.test(trimmed) || trimmed.toLowerCase() === ADDRESSES.nativeEth.toLowerCase()) {
-    return { address: ADDRESSES.weth, useNative: true };
+  if (/^ETH$/i.test(trimmed) || trimmed.toLowerCase() === addrs.nativeEth.toLowerCase()) {
+    return { address: addrs.weth, useNative: true };
   }
-  if (/^WETH$/i.test(trimmed)) return { address: ADDRESSES.weth, useNative: false };
-  if (/^USDC$/i.test(trimmed)) return { address: ADDRESSES.usdc, useNative: false };
+  if (/^WETH$/i.test(trimmed)) return { address: addrs.weth, useNative: false };
+  if (/^USDG$/i.test(trimmed)) {
+    if (!addrs.usdg) throw new Error("USDG is not listed on this chain.");
+    return { address: addrs.usdg, useNative: false };
+  }
+  if (/^USDC$/i.test(trimmed)) {
+    if (!addrs.usdc) throw new Error("No USDC on Robinhood. Use USDG.");
+    return { address: addrs.usdc, useNative: false };
+  }
   return { address: getAddress(trimmed), useNative: false };
 }
 
@@ -52,6 +64,7 @@ export function sortPoolPair(
 }
 
 export function quoteMintFromPool(args: {
+  chainId?: number;
   protocol?: Protocol;
   token0: TokenRef;
   token1: TokenRef;
@@ -83,8 +96,8 @@ export function quoteMintFromPool(args: {
     throw new Error("mint requires --amount0 and/or --amount1 in raw units");
   }
 
-  const t0 = new Token(CHAIN_ID, args.token0.address, args.token0.decimals, args.token0.symbol);
-  const t1 = new Token(CHAIN_ID, args.token1.address, args.token1.decimals, args.token1.symbol);
+  const t0 = new Token(args.chainId ?? CHAIN_ID, args.token0.address, args.token0.decimals, args.token0.symbol);
+  const t1 = new Token(args.chainId ?? CHAIN_ID, args.token1.address, args.token1.decimals, args.token1.symbol);
   const pool = new Pool(t0, t1, args.fee, args.sqrtPriceX96.toString(), "0", args.tickCurrent);
 
   let pos: Position;
@@ -116,6 +129,7 @@ export function quoteMintFromPool(args: {
 
   return {
     protocol: args.protocol ?? "V3",
+    chainId: args.chainId ?? CHAIN_ID,
     token0: args.token0.address,
     token1: args.token1.address,
     symbol0: args.token0.symbol,
@@ -139,7 +153,7 @@ export function quoteMintFromPool(args: {
 
 export function snapshotFromQuote(quote: MintQuote, owner: Address): PositionSnapshot {
   return {
-    ref: { protocol: quote.protocol, chainId: CHAIN_ID, tokenId: 0n },
+    ref: { protocol: quote.protocol, chainId: quote.chainId ?? CHAIN_ID, tokenId: 0n },
     owner,
     token0: { address: quote.token0, symbol: quote.symbol0, decimals: quote.decimals0 },
     token1: { address: quote.token1, symbol: quote.symbol1, decimals: quote.decimals1 },
@@ -194,7 +208,7 @@ function planMintV3(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `approve NFPM for ${quote.symbol0}`,
       tokenIn: quote.token0,
       amountIn: quote.amount0,
-      tx: erc20ApproveTx(quote.token0, ADDRESSES.nfpm, quote.amount0),
+      tx: erc20ApproveTx(quote.token0, addressesFor(slugForChainId(quote.chainId)).nfpm, quote.amount0),
     });
   }
   if (needApprove1) {
@@ -203,7 +217,7 @@ function planMintV3(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `approve NFPM for ${quote.symbol1}`,
       tokenIn: quote.token1,
       amountIn: quote.amount1,
-      tx: erc20ApproveTx(quote.token1, ADDRESSES.nfpm, quote.amount1),
+      tx: erc20ApproveTx(quote.token1, addressesFor(slugForChainId(quote.chainId)).nfpm, quote.amount1),
     });
   }
 
@@ -225,7 +239,7 @@ function planMintV3(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
     }),
   });
 
-  return mintReceipt(quote, owner, dryRun, actions, ADDRESSES.nfpm);
+  return mintReceipt(quote, owner, dryRun, actions, addressesFor(slugForChainId(quote.chainId)).nfpm);
 }
 
 function planMintV2(quote: MintQuote, owner: Address, dryRun: boolean): ActionReceipt {
@@ -238,7 +252,7 @@ function planMintV2(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `approve Router02 for ${quote.symbol0}`,
       tokenIn: quote.token0,
       amountIn: quote.amount0,
-      tx: erc20ApproveTx(quote.token0, ADDRESSES.v2Router, quote.amount0),
+      tx: erc20ApproveTx(quote.token0, addressesFor(slugForChainId(quote.chainId)).v2Router, quote.amount0),
     });
   }
   if (needApprove1) {
@@ -247,7 +261,7 @@ function planMintV2(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `approve Router02 for ${quote.symbol1}`,
       tokenIn: quote.token1,
       amountIn: quote.amount1,
-      tx: erc20ApproveTx(quote.token1, ADDRESSES.v2Router, quote.amount1),
+      tx: erc20ApproveTx(quote.token1, addressesFor(slugForChainId(quote.chainId)).v2Router, quote.amount1),
     });
   }
   actions.push({
@@ -264,9 +278,10 @@ function planMintV2(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       recipient: owner,
       useNative: quote.useNative,
       nativeIsTokenA: quote.nativeIsToken0,
+      chainId: quote.chainId,
     }),
   });
-  return mintReceipt(quote, owner, dryRun, actions, ADDRESSES.v2Router);
+  return mintReceipt(quote, owner, dryRun, actions, addressesFor(slugForChainId(quote.chainId)).v2Router);
 }
 
 function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionReceipt {
@@ -290,7 +305,7 @@ function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `Permit2.approve PositionManager for ${quote.symbol0}`,
       tokenIn: quote.token0,
       amountIn: quote.amount0,
-      tx: permit2ApproveTx(quote.token0, ADDRESSES.v4PositionManager, quote.amount0),
+      tx: permit2ApproveTx(quote.token0, addressesFor(slugForChainId(quote.chainId)).v4PositionManager, quote.amount0),
     });
   }
   if (needApprove1) {
@@ -306,7 +321,7 @@ function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `Permit2.approve PositionManager for ${quote.symbol1}`,
       tokenIn: quote.token1,
       amountIn: quote.amount1,
-      tx: permit2ApproveTx(quote.token1, ADDRESSES.v4PositionManager, quote.amount1),
+      tx: permit2ApproveTx(quote.token1, addressesFor(slugForChainId(quote.chainId)).v4PositionManager, quote.amount1),
     });
   }
   const currency0 = quote.useNative && quote.nativeIsToken0 ? ADDRESSES.nativeEth : quote.token0;
@@ -332,9 +347,10 @@ function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       amount0: quote.amount0,
       amount1: quote.amount1,
       recipient: owner,
+      chainId: quote.chainId,
     }),
   });
-  return mintReceipt(quote, owner, dryRun, actions, ADDRESSES.v4PositionManager);
+  return mintReceipt(quote, owner, dryRun, actions, addressesFor(slugForChainId(quote.chainId)).v4PositionManager);
 }
 
 function mintReceipt(
@@ -375,14 +391,15 @@ export async function loadPoolForMint(
   tokenB: Address,
   fee: number,
 ): Promise<{ pool: Address; sqrtPriceX96: bigint; tick: number }> {
+  const a = addressesFor(slugOfClient(client));
   const pool = await client.readContract({
-    address: ADDRESSES.factory,
+    address: a.factory,
     abi: factoryAbi,
     functionName: "getPool",
     args: [tokenA, tokenB, fee],
   });
-  if (pool === ADDRESSES.nativeEth) {
-    throw new Error(`no v3 pool for ${tokenA}/${tokenB} fee=${fee} on Base`);
+  if (pool === a.nativeEth) {
+    throw new Error(`no v3 pool for ${tokenA}/${tokenB} fee=${fee}`);
   }
   const slot0 = await client.readContract({ address: pool, abi: poolAbi, functionName: "slot0" });
   return { pool, sqrtPriceX96: slot0[0], tick: slot0[1] };
@@ -393,14 +410,15 @@ export async function loadV2Pair(
   tokenA: Address,
   tokenB: Address,
 ): Promise<{ pool: Address; reserve0: bigint; reserve1: bigint; token0: Address; token1: Address }> {
+  const a = addressesFor(slugOfClient(client));
   const pair = await client.readContract({
-    address: ADDRESSES.v2Factory,
+    address: a.v2Factory,
     abi: v2FactoryAbi,
     functionName: "getPair",
     args: [tokenA, tokenB],
   });
-  if (pair === ADDRESSES.nativeEth) {
-    throw new Error(`no v2 pair for ${tokenA}/${tokenB} on Base`);
+  if (pair === a.nativeEth) {
+    throw new Error(`no v2 pair for ${tokenA}/${tokenB}`);
   }
   const [token0, token1, reserves] = await Promise.all([
     client.readContract({ address: pair, abi: v2PairAbi, functionName: "token0" }),
@@ -411,6 +429,7 @@ export async function loadV2Pair(
 }
 
 export function quoteMintV2(args: {
+  chainId?: number;
   token0: TokenRef;
   token1: TokenRef;
   reserve0: bigint;
@@ -437,6 +456,7 @@ export function quoteMintV2(args: {
   }
   return {
     protocol: "V2",
+    chainId: args.chainId ?? CHAIN_ID,
     token0: args.token0.address,
     token1: args.token1.address,
     symbol0: args.token0.symbol,

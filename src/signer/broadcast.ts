@@ -10,6 +10,7 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { assertAllowedTarget } from "./allowlist.js";
+import { viemChainFor, type ChainSlug } from "../chains.js";
 import type { PlannedTx } from "../types.js";
 
 export function makePublicClient(rpcUrl: string, chain: Chain = base) {
@@ -31,15 +32,17 @@ export async function sendPlannedTx(args: {
   tx: PlannedTx;
   extraAllow: Address[];
   live?: boolean;
+  chain?: ChainSlug;
 }): Promise<{ hash?: Hash; dryRun: true } | { hash: Hash; dryRun: false }> {
-  assertAllowedTarget(args.tx.to, args.extraAllow);
+  const chain = args.chain ?? "base";
+  assertAllowedTarget(args.tx.to, args.extraAllow, chain);
   if (!args.live) {
     return { dryRun: true };
   }
   if (isPlaceholderTx(args.tx)) {
     throw new Error(`Refusing broadcast of empty calldata to ${args.tx.to} (${args.tx.description})`);
   }
-  const wallet = makeWalletClient(args.rpcUrl, args.account);
+  const wallet = makeWalletClient(args.rpcUrl, args.account, viemChainFor(chain));
   const hash = await wallet.sendTransaction({
     to: args.tx.to,
     data: args.tx.data as Hex,

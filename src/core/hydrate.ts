@@ -1,4 +1,5 @@
 import type { Address } from "viem";
+import { slugForChainId } from "../chains.js";
 import { Token } from "@uniswap/sdk-core";
 import { Pool, Position } from "@uniswap/v3-sdk";
 import { TREASURY, CHAIN_ID } from "../constants.js";
@@ -151,6 +152,7 @@ export async function hydrateCalldataMaybeApi(
           token0: position.token0.address,
           token1: position.token1.address,
           tokenId: position.ref.tokenId,
+          chain: slugForChainId(position.ref.chainId),
         });
         actions.push(tx ? { ...action, tx } : action);
         continue;
@@ -167,6 +169,7 @@ export async function hydrateCalldataMaybeApi(
           token0: position.token0.address,
           token1: position.token1.address,
           tokenId: position.ref.tokenId,
+          chain: slugForChainId(position.ref.chainId),
           independent,
         });
         actions.push(tx ? { ...action, tx } : action);
@@ -181,6 +184,7 @@ export async function hydrateCalldataMaybeApi(
           token0: position.token0.address,
           token1: position.token1.address,
           tokenId: position.ref.tokenId,
+          chain: slugForChainId(position.ref.chainId),
           pct: 100,
         });
         actions.push(tx ? { ...action, tx } : action);

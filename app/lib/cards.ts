@@ -10,6 +10,8 @@ export const MAX_TICK = 887272;
 export type PositionView = {
   kind: PositionKind;
   protocol: Protocol;
+  chain?: "base" | "robinhood";
+  chainLabel?: string;
   tokenId?: string;
   pair: string;
   fee: number;
@@ -175,6 +177,8 @@ export function lightRowToView(row: Record<string, unknown>): PositionView | nul
   return {
     kind: "live",
     protocol,
+    chain: row.chain === "robinhood" ? "robinhood" : "base",
+    chainLabel: typeof row.chainLabel === "string" ? row.chainLabel : (row.chain === "robinhood" ? "Robinhood" : "Base"),
     tokenId: row.tokenId != null ? String(row.tokenId) : undefined,
     pair: row.pair,
     fee,

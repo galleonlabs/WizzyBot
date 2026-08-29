@@ -1,5 +1,6 @@
 import { encodeAbiParameters, getAddress, keccak256, padHex, toHex, type Address, type Hex, type PublicClient } from "viem";
 import { ADDRESSES } from "../constants.js";
+import { addressesFor, slugOfClient } from "../chains.js";
 import { v4StateViewAbi, type V4PoolKey } from "./abi.js";
 import { tickSpacingForFee } from "../core/ticks.js";
 
@@ -73,13 +74,13 @@ export async function loadV4Pool(
   const poolId = v4PoolId(key);
   const [slot0, liquidity] = await Promise.all([
     client.readContract({
-      address: ADDRESSES.v4StateView,
+      address: addressesFor(slugOfClient(client)).v4StateView,
       abi: v4StateViewAbi,
       functionName: "getSlot0",
       args: [poolId],
     }),
     client.readContract({
-      address: ADDRESSES.v4StateView,
+      address: addressesFor(slugOfClient(client)).v4StateView,
       abi: v4StateViewAbi,
       functionName: "getLiquidity",
       args: [poolId],

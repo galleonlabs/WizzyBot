@@ -2,6 +2,7 @@ import { Percent, Token, CurrencyAmount, Ether } from "@uniswap/sdk-core";
 import { NonfungiblePositionManager, Pool, Position } from "@uniswap/v3-sdk";
 import { encodeFunctionData, getAddress, type Address, type Hex } from "viem";
 import { ADDRESSES, CHAIN_ID, DEFAULT_DEADLINE_SEC, DEFAULT_SLIPPAGE_BPS } from "../constants.js";
+import { addressesFor, slugForChainId } from "../chains.js";
 import { erc20Abi, wethAbi } from "../chain/abi.js";
 import type { PlannedTx, PositionSnapshot } from "../types.js";
 
@@ -10,8 +11,8 @@ function slippage(bps: number): Percent {
 }
 
 function sdkPool(position: PositionSnapshot): Pool {
-  const t0 = new Token(CHAIN_ID, position.token0.address, position.token0.decimals, position.token0.symbol);
-  const t1 = new Token(CHAIN_ID, position.token1.address, position.token1.decimals, position.token1.symbol);
+  const t0 = new Token(position.ref.chainId ?? CHAIN_ID, position.token0.address, position.token0.decimals, position.token0.symbol);
+  const t1 = new Token(position.ref.chainId ?? CHAIN_ID, position.token1.address, position.token1.decimals, position.token1.symbol);
   return new Pool(
     t0,
     t1,
@@ -52,7 +53,7 @@ export function collectCalldata(
   });
   void slippageBps;
   return {
-    to: ADDRESSES.nfpm,
+    to: addressesFor(slugForChainId(position.ref.chainId)).nfpm,
     data: calldata as Hex,
     value: BigInt(value),
     description: "NFPM.collect",
@@ -81,7 +82,7 @@ export function increaseCalldata(
     deadline: Math.floor(Date.now() / 1000) + deadlineSec,
   });
   return {
-    to: ADDRESSES.nfpm,
+    to: addressesFor(slugForChainId(position.ref.chainId)).nfpm,
     data: calldata as Hex,
     value: BigInt(value),
     description: "NFPM.increaseLiquidity",
@@ -112,10 +113,10 @@ export function mintCalldata(args: {
     recipient: args.recipient,
     slippageTolerance: slippage(args.slippageBps ?? DEFAULT_SLIPPAGE_BPS),
     deadline: Math.floor(Date.now() / 1000) + (args.deadlineSec ?? DEFAULT_DEADLINE_SEC),
-    useNative: args.useNative ? Ether.onChain(CHAIN_ID) : undefined,
+    useNative: args.useNative ? Ether.onChain(args.position.ref.chainId ?? CHAIN_ID) : undefined,
   });
   return {
-    to: ADDRESSES.nfpm,
+    to: addressesFor(slugForChainId(args.position.ref.chainId)).nfpm,
     data: calldata as Hex,
     value: BigInt(value),
     description: "NFPM.mint",
@@ -142,7 +143,7 @@ export function decreaseCalldata(
     },
   });
   return {
-    to: ADDRESSES.nfpm,
+    to: addressesFor(slugForChainId(position.ref.chainId)).nfpm,
     data: calldata as Hex,
     value: BigInt(value),
     description: `NFPM.decreaseLiquidity ${pct}%`,

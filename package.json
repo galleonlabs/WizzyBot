@@ -1,0 +1,38 @@
+{
+  "name": "unabot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent-first Uniswap v3 LP automation for Base. User keeps the NFT.",
+  "license": "UNLICENSED",
+  "bin": {
+    "unabot": "./bin/unabot.mjs"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/bundle-cli.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "unabot": "node ./bin/unabot.mjs",
+    "mcp": "node ./bin/unabot.mjs mcp"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@uniswap/sdk-core": "^7.7.2",
+    "@uniswap/v3-sdk": "^3.25.2",
+    "commander": "^12.1.0",
+    "viem": "^2.31.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4",
+    "esbuild": "^0.25.0"
+  }
+}

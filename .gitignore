@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+*.pem
+*.key
+.DS_Store
+.unabot-cache/

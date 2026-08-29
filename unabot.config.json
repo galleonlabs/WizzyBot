@@ -1,0 +1,16 @@
+{
+  "defaults": {
+    "minFeeUsd": 1,
+    "minPositionUsd": 50,
+    "maxPriceImpactBps": 50,
+    "cooldownSec": 3600,
+    "spendCapUsd": 10000,
+    "oorPercent": 0,
+    "compound": true,
+    "autoRange": true,
+    "autoExit": false,
+    "feeSource": "fees",
+    "noFee": false
+  },
+  "positions": {}
+}

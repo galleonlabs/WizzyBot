@@ -16,3 +16,5 @@ export { hydrateCalldata } from "./core/hydrate.js";
 export { planMint, quoteMintFromPool, resolveMintToken } from "./core/mint.js";
 export { getHold, rememberHold, HOLD_LIMITATION } from "./core/hold.js";
 export { telegramBootMessage, planTelegramReply } from "./surfaces/telegram.js";
+export { listPositions, statusPosition, compoundPosition, rangePosition, exitPosition, mintPosition, runKeeperScan, assertWriteAllowed } from "./surfaces/hosted.js";
+export { loadPrivyEnv, createPrivyClient, privyConfigured, DEFAULT_PRIVY_APP_ID } from "./signer/privy.js";

@@ -7,3 +7,7 @@ coverage/
 *.key
 .DS_Store
 .unabot-cache/
+.eve/
+.next/
+.vercel/
+.output/

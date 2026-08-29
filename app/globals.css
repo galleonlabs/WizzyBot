@@ -1,0 +1,11 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0d10;
+  --fg: #f4f1ea;
+  --muted: #9aa3ad;
+  --line: #232830;
+  --accent: #c8f542;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, sans-serif; }
+button, input { font: inherit; }

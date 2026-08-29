@@ -6,7 +6,7 @@ import { useEveAgent } from "eve/react";
 export function Chat() {
   const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
   const agent = useEveAgent({
-    headers: async () => {
+    headers: async (): Promise<Record<string, string>> => {
       const token = await getAccessToken();
       return token ? { authorization: `Bearer ${token}` } : {};
     },

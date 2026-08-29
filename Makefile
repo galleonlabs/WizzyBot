@@ -7,7 +7,7 @@ build:
 	npx tsc -p tsconfig.build.json && node scripts/bundle-cli.mjs
 
 typecheck:
-	npx tsc --noEmit -p tsconfig.json
+	npx tsc --noEmit -p tsconfig.node.json
 
 ci:
 	bash scripts/ci.sh

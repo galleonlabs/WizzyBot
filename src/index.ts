@@ -8,7 +8,11 @@ export { planCompound, planRerange, planExit, formatReceipt } from "./core/actio
 export { buildCard, formatCard } from "./core/card.js";
 export { loadEnv } from "./config/env.js";
 export { loadConfig, policyFor } from "./config/policy.js";
-export { V3Adapter, v4AdapterStub } from "./chain/positions.js";
-export { startMcpStdio, MCP_TOOLS } from "./mcp/server.js";
+export { V3Adapter, readTokenMeta } from "./chain/positions.js";
+export { V3Protocol, V4Protocol, v4AdapterStub, adapterFor, V4_NEXT } from "./core/protocols.js";
+export { startMcpStdio, MCP_TOOLS, listMcpTools, callTool, createMcpServer } from "./mcp/server.js";
 export { parseIntent } from "./agent/nlp.js";
 export { hydrateCalldata } from "./core/hydrate.js";
+export { planMint, quoteMintFromPool, resolveMintToken } from "./core/mint.js";
+export { getHold, rememberHold, HOLD_LIMITATION } from "./core/hold.js";
+export { telegramBootMessage, planTelegramReply } from "./surfaces/telegram.js";

@@ -1,7 +1,6 @@
 import type { Address, Hash, Hex } from "viem";
 
-/** v1 implements V3. V4 is reserved so call sites stay protocol-aware. */
-export type Protocol = "V3" | "V4";
+export type Protocol = "V2" | "V3" | "V4";
 
 export type FeeSource = "fees" | "notional";
 
@@ -118,6 +117,8 @@ export interface PositionCard extends PositionSnapshot {
   holdUsd: number;
   divergence: number;
   ageDays: number;
+  holdSource?: string;
+  holdNote?: string;
 }
 
 export interface EconomicsInput {

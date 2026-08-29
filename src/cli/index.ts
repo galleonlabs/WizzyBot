@@ -12,6 +12,10 @@ import { V3Adapter } from "../chain/positions.js";
 import { snapshotUsd, usdPricesForPosition } from "../chain/prices.js";
 import { buildCard, formatCard } from "../core/card.js";
 import { formatReceipt, planCompound, planExit, planRerange, type PlanContext } from "../core/actions.js";
+import { extraAllowForMint, persistMintHold, runMintFlow } from "../core/mint-flow.js";
+import { formatHoldNote, getHold, holdAmounts } from "../core/hold.js";
+import { importHoldForToken } from "../chain/mint-history.js";
+import { runTelegramLoop } from "../surfaces/telegram.js";
 import { COMPOUND_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
 import { rangeFromWidthPct, snapRange, tickSpacingForFee } from "../core/ticks.js";
 import { parseIntent, confirmPhrase, isWrite, type Intent } from "../agent/nlp.js";
@@ -24,11 +28,11 @@ const program = new Command();
 
 program
   .name("unabot")
-  .description("Agent-first Uniswap v3 LP automation on Base. You keep the NFT.")
+  .description("Uniswap LP on autopilot. v2, v3, and v4. You keep the position.")
   .version("1.0.0")
   .argument("[utterance...]", "natural-language command, e.g. unabot \"status 12345\"")
   .option("--live", "broadcast transactions (default is dry-run)", false)
-  .option("--no-fee", "owner self-compound / self-manage: skip treasury take", false)
+  .option("--no-fee", "skip the take", false)
   .option("--fee-source <source>", "fees | notional", "fees")
   .option("--config <path>", "policy file (merged over ~/.unabot/config.json)")
   .action(async (utterance: string[], opts) => {
@@ -58,19 +62,31 @@ function feeSourceFlag(opts: { feeSource?: string }): "fees" | "notional" {
 
 program
   .command("list")
-  .description("List Uniswap v3 NFTs owned by a wallet")
+  .description("List LP positions (v2, v3, v4)")
   .option("--owner <address>", "wallet to inspect (default: signer)")
   .action(async (opts) => {
-    const { adapter, owner } = await connect(opts.owner);
-    const refs = await adapter.listPositions(owner);
-    if (refs.length === 0) {
-      console.log(`No v3 NFTs on Base NFPM for ${owner}`);
-      return;
+    const { client, owner } = await connect(opts.owner);
+    const { adapterFor } = await import("../core/protocols.js");
+    let any = false;
+    for (const protocol of ["V2", "V3", "V4"] as const) {
+      const adapter = adapterFor(protocol, client);
+      let refs: { protocol: string; tokenId: bigint }[] = [];
+      try {
+        refs = await adapter.listPositions(owner);
+      } catch {
+        refs = [];
+      }
+      for (const ref of refs) {
+        any = true;
+        try {
+          const snap = await adapter.readPosition(ref.tokenId);
+          console.log(`${ref.protocol} ${ref.tokenId}  ${snap.token0.symbol}/${snap.token1.symbol}  fee=${snap.fee}  ${snap.inRange ? "in-range" : "OOR"}`);
+        } catch (err) {
+          console.log(`${ref.protocol} ${ref.tokenId}  (${err instanceof Error ? err.message : err})`);
+        }
+      }
     }
-    for (const ref of refs) {
-      const snap = await adapter.readPosition(ref.tokenId);
-      console.log(`${ref.tokenId}  ${snap.token0.symbol}/${snap.token1.symbol}  fee=${snap.fee}  ${snap.inRange ? "in-range" : "OOR"}`);
-    }
+    if (!any) console.log(`No positions for ${owner}`);
   });
 
 program
@@ -84,7 +100,13 @@ program
     const logged = await adapter.importViaLogs(owner, opts.fromBlock ? BigInt(opts.fromBlock) : undefined);
     const ids = new Set([...indexed.map((r) => r.tokenId), ...logged]);
     console.log(`owner=${owner} indexed=${indexed.length} logs=${logged.length} unique=${ids.size} rpc=${client.chain?.id ?? CHAIN_ID}`);
-    for (const id of ids) console.log(String(id));
+    for (const id of ids) {
+      const snap = await adapter.readPosition(id);
+      const rec = await importHoldForToken(client, id, { amount0: snap.amount0, amount1: snap.amount1 }, {
+        fromBlock: opts.fromBlock ? BigInt(opts.fromBlock) : undefined,
+      });
+      console.log(`${id} HOLD source=${rec.source} hold0=${rec.hold0} hold1=${rec.hold1}`);
+    }
   });
 
 program
@@ -93,21 +115,29 @@ program
   .description("Position card: range, amounts, fees, APR, HOLD, divergence")
   .argument("<tokenId>", "NFPM tokenId")
   .action(async (tokenId: string) => {
-    const { adapter, env, client } = await connect();
-    const snap = await adapter.readPosition(BigInt(tokenId));
+    const { adapter, env, client } = await connectRead();
+    const id = BigInt(tokenId);
+    const snap = await adapter.readPosition(id);
     const prices = await usdPricesForPosition(client, snap, env.ethUsd);
-    const card = buildCard(snap, prices, { hold0: snap.amount0, hold1: snap.amount1 }, snap.createdAt);
+    let rec = getHold(id);
+    if (!rec) {
+      rec = await importHoldForToken(client, id, { amount0: snap.amount0, amount1: snap.amount1 });
+    }
+    const card = buildCard(snap, prices, holdAmounts(rec), rec.createdAt, undefined, {
+      source: rec.source,
+      note: formatHoldNote(rec),
+    });
     console.log(formatCard(card));
   });
 
 program
   .command("pool")
-  .description("Pool info for a Base v3 pair")
+  .description("Pool info")
   .requiredOption("--token0 <address>")
   .requiredOption("--token1 <address>")
   .requiredOption("--fee <fee>", "100 | 500 | 3000 | 10000")
   .action(async (opts) => {
-    const { client } = await connect();
+    const { client } = await connectRead();
     const { factoryAbi, poolAbi } = await import("../chain/abi.js");
     const pool = await client.readContract({
       address: ADDRESSES.factory,
@@ -125,7 +155,7 @@ program
 
 program
   .command("mint")
-  .description("Mint a v3 position (tick snap). Dry-run by default.")
+  .description("Mint a position. Dry-run by default.")
   .requiredOption("--token0 <address>")
   .requiredOption("--token1 <address>")
   .requiredOption("--fee <fee>")
@@ -134,22 +164,41 @@ program
   .option("--tick-upper <n>")
   .option("--amount0 <raw>")
   .option("--amount1 <raw>")
+  .option("--owner <address>", "recipient / signer override (dry-run may omit key)")
   .action(async (opts, cmd) => {
     const live = liveFlag(cmd.optsWithGlobals(), cmd);
-    if (live) await confirmOrThrow("Broadcast mint?");
-    console.log(JSON.stringify({
-      dryRun: !live,
+    const { client, owner, env, account } = await connect(opts.owner, { optional: !live });
+    const result = await runMintFlow({
+      client,
+      owner,
       token0: opts.token0,
       token1: opts.token1,
       fee: Number(opts.fee),
-      width: opts.width,
-      tickLower: opts.tickLower,
-      tickUpper: opts.tickUpper,
-      amount0: opts.amount0,
-      amount1: opts.amount1,
-      treasury: TREASURY,
-      note: "Calldata assembled via v3-sdk / LP API. NFT stays in your wallet.",
-    }, null, 2));
+      widthPct: opts.width ? Number(opts.width) : undefined,
+      tickLower: opts.tickLower ? Number(opts.tickLower) : undefined,
+      tickUpper: opts.tickUpper ? Number(opts.tickUpper) : undefined,
+      amount0: opts.amount0 ? BigInt(opts.amount0) : undefined,
+      amount1: opts.amount1 ? BigInt(opts.amount1) : undefined,
+      dryRun: !live,
+      apiKey: env.uniswapApiKey,
+    });
+    console.log(result.card);
+    console.log(formatReceipt(result.receipt));
+    console.log(`lpApi=${result.usedLpApi} simulate=${JSON.stringify(result.simulation)}`);
+    if (!live) {
+      console.log("dry-run: no broadcast. Pass --live and type yes to send allowlisted mint txs.");
+      return;
+    }
+    await confirmOrThrow("Broadcast mint? NFT stays in your wallet.");
+    if (!account) throw new Error("UNABOT_PRIVATE_KEY required for --live mint");
+    const { sendPlannedTx } = await import("../signer/broadcast.js");
+    const extra = extraAllowForMint(result.quote);
+    for (const tx of result.receipt.txs) {
+      const sent = await sendPlannedTx({ rpcUrl: env.rpcUrl, account, tx, extraAllow: extra, live: true });
+      console.log(tx.description, "hash" in sent ? sent.hash : "dry-run");
+    }
+    persistMintHold(result.quote, 0n);
+    console.log("HOLD for the new tokenId is persisted on next import/status once the NFT exists.");
   });
 
 program
@@ -240,7 +289,7 @@ program
 
 program
   .command("chat")
-  .description("Interactive Bankr-style chat. Live writes require confirmation.")
+  .description("Chat. Live writes require confirmation.")
   .action(async (_opts, cmd) => {
     const rl = createInterface({ input, output });
     console.log("UnaBot chat. You keep the NFT. Dry-run unless --live. Type help or quit.");
@@ -264,21 +313,51 @@ program
   });
 
 program
+  .command("telegram")
+  .description("Telegram. Confirm before live.")
+  .action(async (_opts, cmd) => {
+    const env = loadEnv();
+    const live = liveFlag(cmd.optsWithGlobals(), cmd);
+    await runTelegramLoop({
+      token: env.telegramBotToken,
+      live,
+      execute: async (text) => {
+        const prev = console.log;
+        const chunks: string[] = [];
+        console.log = (...a: unknown[]) => {
+          chunks.push(a.map(String).join(" "));
+        };
+        try {
+          await runChat(text, { live });
+        } finally {
+          console.log = prev;
+        }
+        return chunks.join("\n") || "ok";
+      },
+    });
+  });
+
+program
   .command("config")
   .description("Print merged policy (cwd + ~/.unabot/config.json)")
   .action(() => {
     console.log(JSON.stringify(loadConfig(), null, 2));
   });
 
-async function connect(ownerArg?: string) {
+async function connectRead() {
   const env = loadEnv();
   const client = makePublicClient(env.rpcUrl);
+  return { env, client, adapter: new V3Adapter(client) };
+}
+
+async function connect(ownerArg?: string, opts: { optional?: boolean } = {}) {
+  const { env, client, adapter } = await connectRead();
   const account = loadAccount(env);
   const owner = ownerArg
     ? getAddress(ownerArg)
-    : account?.address;
+    : account?.address ?? (opts.optional ? getAddress("0x0000000000000000000000000000000000000001") : undefined);
   if (!owner) throw new Error("Pass --owner or set UNABOT_PRIVATE_KEY");
-  return { env, client, account, owner, adapter: new V3Adapter(client) };
+  return { env, client, account, owner, adapter };
 }
 
 async function planFor(

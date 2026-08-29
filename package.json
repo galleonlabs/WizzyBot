@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Agent-first Uniswap v3 LP automation for Base. User keeps the NFT.",
+  "description": "Uniswap LP on autopilot. v2, v3, and v4. You keep the position.",
   "license": "UNLICENSED",
   "bin": {
     "unabot": "./bin/unabot.mjs"
@@ -17,12 +17,14 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "unabot": "node ./bin/unabot.mjs",
-    "mcp": "node ./bin/unabot.mjs mcp"
+    "mcp": "node ./bin/unabot.mjs mcp",
+    "ci": "bash scripts/ci.sh"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.17.5",
     "@uniswap/sdk-core": "^7.7.2",
     "@uniswap/v3-sdk": "^3.25.2",
     "commander": "^12.1.0",

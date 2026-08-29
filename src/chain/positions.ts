@@ -107,8 +107,8 @@ export class V3Adapter implements ProtocolAdapter {
         this.client.readContract({ address: poolAddr, abi: poolAbi, functionName: "feeGrowthGlobal1X128" }),
         this.client.readContract({ address: poolAddr, abi: poolAbi, functionName: "ticks", args: [tickLower] }),
         this.client.readContract({ address: poolAddr, abi: poolAbi, functionName: "ticks", args: [tickUpper] }),
-        readToken(this.client, token0Addr),
-        readToken(this.client, token1Addr),
+        readTokenMeta(this.client, token0Addr),
+        readTokenMeta(this.client, token1Addr),
       ]);
 
     const [sqrtPriceX96, tickCurrent] = slot0;
@@ -173,7 +173,7 @@ export class V3Adapter implements ProtocolAdapter {
   }
 }
 
-async function readToken(client: PublicClient, address: Address): Promise<TokenRef> {
+export async function readTokenMeta(client: PublicClient, address: Address): Promise<TokenRef> {
   const [decimals, symbol] = await Promise.all([
     client.readContract({ address, abi: erc20Abi, functionName: "decimals" }),
     client.readContract({ address, abi: erc20Abi, functionName: "symbol" }),
@@ -207,14 +207,3 @@ export function amountsForPosition(args: {
   };
 }
 
-export function v4AdapterStub(): ProtocolAdapter {
-  return {
-    protocol: "V4",
-    async listPositions(): Promise<PositionRef[]> {
-      throw new Error("Uniswap v4 is not implemented in UnaBot v1 (Base v3 only)");
-    },
-    async readPosition(): Promise<PositionSnapshot> {
-      throw new Error("Uniswap v4 is not implemented in UnaBot v1 (Base v3 only)");
-    },
-  };
-}

@@ -17,6 +17,7 @@ export function buildCard(
   hold: { hold0: bigint; hold1: bigint },
   createdAtSec?: number,
   nowSec?: number,
+  holdMeta?: { source?: string; note?: string },
 ): PositionCard {
   const input: HoldInput = {
     hold0: hold.hold0,
@@ -47,6 +48,8 @@ export function buildCard(
     holdUsd: holdValue,
     divergence: divergence(input),
     ageDays: age,
+    holdSource: holdMeta?.source,
+    holdNote: holdMeta?.note,
   };
 }
 
@@ -59,8 +62,10 @@ export function formatCard(card: PositionCard): string {
     `amounts ${fmt(card.amount0, card.token0)} + ${fmt(card.amount1, card.token1)}  ($${card.positionUsd.toFixed(2)})`,
     `uncollected ${fmt(card.uncollected0, card.token0)} + ${fmt(card.uncollected1, card.token1)}  ($${card.feesUsd.toFixed(2)})`,
     `fee APR ${pct(card.feeApr)}  total APR vs HOLD ${pct(card.totalApr)}  divergence ${pct(card.divergence)}`,
-    `HOLD $${card.holdUsd.toFixed(2)}  age ${card.ageDays.toFixed(2)}d  liquidity ${card.liquidity}`,
-  ].join("\n");
+    `HOLD $${card.holdUsd.toFixed(2)}  age ${card.ageDays.toFixed(2)}d  liquidity ${card.liquidity}` +
+      (card.holdSource ? `  source=${card.holdSource}` : ""),
+    card.holdNote ? `HOLD note: ${card.holdNote}` : undefined,
+  ].filter(Boolean).join("\n");
 }
 
 function fmt(raw: bigint, token: { symbol: string; decimals: number }): string {

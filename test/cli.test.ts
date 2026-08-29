@@ -22,6 +22,7 @@ describe("CLI --help smoke", () => {
       "mcp",
       "config",
       "pool",
+      "telegram",
     ]) {
       expect(help).toContain(verb);
     }

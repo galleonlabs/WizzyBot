@@ -1,8 +1,8 @@
-import { Percent, Token, CurrencyAmount } from "@uniswap/sdk-core";
+import { Percent, Token, CurrencyAmount, Ether } from "@uniswap/sdk-core";
 import { NonfungiblePositionManager, Pool, Position } from "@uniswap/v3-sdk";
 import { encodeFunctionData, getAddress, type Address, type Hex } from "viem";
 import { ADDRESSES, CHAIN_ID, DEFAULT_DEADLINE_SEC, DEFAULT_SLIPPAGE_BPS } from "../constants.js";
-import { erc20Abi } from "../chain/abi.js";
+import { erc20Abi, wethAbi } from "../chain/abi.js";
 import type { PlannedTx, PositionSnapshot } from "../types.js";
 
 function slippage(bps: number): Percent {
@@ -97,6 +97,7 @@ export function mintCalldata(args: {
   recipient: Address;
   slippageBps?: number;
   deadlineSec?: number;
+  useNative?: boolean;
 }): PlannedTx {
   const pool = sdkPool(args.position);
   const minted = Position.fromAmounts({
@@ -111,6 +112,7 @@ export function mintCalldata(args: {
     recipient: args.recipient,
     slippageTolerance: slippage(args.slippageBps ?? DEFAULT_SLIPPAGE_BPS),
     deadline: Math.floor(Date.now() / 1000) + (args.deadlineSec ?? DEFAULT_DEADLINE_SEC),
+    useNative: args.useNative ? Ether.onChain(CHAIN_ID) : undefined,
   });
   return {
     to: ADDRESSES.nfpm,
@@ -170,5 +172,30 @@ export function erc20ApproveTx(token: Address, spender: Address, amount: bigint)
     }),
     value: 0n,
     description: `ERC20.approve ${spender}`,
+  };
+}
+
+export function wrapEthTx(amount: bigint): PlannedTx {
+  return {
+    to: ADDRESSES.weth,
+    data: encodeFunctionData({
+      abi: wethAbi,
+      functionName: "deposit",
+    }),
+    value: amount,
+    description: `WETH.deposit ${amount}`,
+  };
+}
+
+export function unwrapEthTx(amount: bigint): PlannedTx {
+  return {
+    to: ADDRESSES.weth,
+    data: encodeFunctionData({
+      abi: wethAbi,
+      functionName: "withdraw",
+      args: [amount],
+    }),
+    value: 0n,
+    description: `WETH.withdraw ${amount}`,
   };
 }

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Uniswap LP on autopilot. v2, v3, and v4. You keep the position.",
+  "description": "Liquidity, as an agent. v2, v3, and v4. You hold the NFT.",
   "license": "UNLICENSED",
   "bin": {
     "unabot": "./bin/unabot.mjs"

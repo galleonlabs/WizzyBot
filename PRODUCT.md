@@ -23,7 +23,7 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 - Privy creates and manages the user's self-custodial EVM and Solana wallets under one identity.
 - There is no public allocation builder, chain selector, pool selector, range editor, bridge picker, or portfolio-split control.
 - Una publishes one managed index. Its versioned chain and constituent weights are product policy, not user input.
-- Relay moves the Base deposit to Robinhood Chain and Solana. Uniswap concentrated-liquidity paths create EVM positions; Meteora DLMM zap paths create Solana positions.
+- Relay moves the Base deposit to Robinhood Chain and Solana. Una selects reviewed Uniswap v3 or Aerodrome Slipstream concentrated-liquidity venues on EVM; Meteora DLMM zap paths create Solana positions.
 - The product vocabulary is deposit, earn fees, your liquidity, collect, and withdraw. Protocol mechanics belong in receipts and disclosures, not the primary action.
 - Portfolio state should be derived from wallets, LP positions, chain events, and live market data. Avoid a database where onchain or version-controlled state is authoritative.
 - Una may explain the index, surface risk, and prepare actions. Deterministic transaction and risk rules remain authoritative.
@@ -32,7 +32,7 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 
 - Support Base (chain ID 8453), Robinhood Chain (chain ID 4663), and Solana mainnet (Relay chain ID 792703809) as one index.
 - Maintain an operator-controlled, code-reviewed allowlist for every asset and pool.
-- Use Uniswap v3 launch pools on EVM and Meteora DLMM pools on Solana.
+- Use reviewed Uniswap v3 pools on Base and Robinhood Chain, Aerodrome Slipstream pools on Base, and Meteora DLMM pools on Solana. Venue selection is internal index policy, never a user-facing builder.
 - The initial Solana set is FARTCOIN, USELESS, and PENGU against SOL, configured in `src/config/solana-markets.json`.
 - Minimize approvals and confirmations with wallet batching, Relay, Privy embedded wallets, and direct single-token liquidity zaps. Never claim one cryptographic signature when destination networks require additional approvals.
 - The consumer initiates one Una action. The review state explains that Privy will request the network approvals needed to preserve self-custody.
@@ -60,7 +60,7 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 
 ## Evidence on Hand
 
-- The repository contains Base and Robinhood definitions, Uniswap planning and calldata, Privy authentication/signing, Relay routing, treasury fee logic, position hydration, agent tools, and tests.
+- The repository contains Base and Robinhood definitions, Uniswap and Aerodrome Slipstream planning and calldata, Privy authentication/signing, Relay routing, treasury fee logic, position hydration, agent tools, and tests.
 - The Solana path uses Privy Solana wallets, Relay native SOL delivery, and Meteora's maintained DLMM zap SDK.
 - No audited proprietary contracts, verified performance history, testimonials, legal opinion, or third-party endorsements are present. Future work must not fabricate them.
 

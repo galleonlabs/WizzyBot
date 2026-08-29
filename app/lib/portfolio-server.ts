@@ -28,6 +28,8 @@ type HostedPortfolioSurface = {
     chain: "base" | "robinhood";
     tokenId: bigint;
     action: "compound" | "withdraw";
+    venue?: "uniswap-v3" | "aerodrome-slipstream";
+    positionManager?: string;
   }) => Promise<unknown>;
   quoteBaseToRobinhoodEth: (input: { owner: string; amountInWei: bigint }) => Promise<unknown>;
   relayIntentStatus: (requestId: string) => Promise<unknown>;

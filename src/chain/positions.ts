@@ -6,7 +6,7 @@ import { addressesFor, chainIdOfClient, slugOfClient } from "../chains.js";
 import { factoryAbi, nfpmAbi, poolAbi, erc20Abi } from "./abi.js";
 import { feeGrowthInside, uncollectedFees } from "./fees-onchain.js";
 import { isInRange, percentThroughRange } from "../core/range.js";
-import { tickSpacingForFee } from "../core/ticks.js";
+import { sdkFeeForTickSpacing, tickSpacingForFee } from "../core/ticks.js";
 import type { PositionRef, PositionSnapshot, ProtocolAdapter, TokenRef } from "../types.js";
 
 export class V3Adapter implements ProtocolAdapter {
@@ -193,6 +193,7 @@ export function amountsForPosition(args: {
   token0: TokenRef;
   token1: TokenRef;
   fee: number;
+  tickSpacing?: number;
   sqrtPriceX96: bigint;
   tickCurrent: number;
   tickLower: number;
@@ -203,7 +204,14 @@ export function amountsForPosition(args: {
   const chainId = args.chainId ?? CHAIN_ID;
   const t0 = new Token(chainId, args.token0.address, args.token0.decimals, args.token0.symbol);
   const t1 = new Token(chainId, args.token1.address, args.token1.decimals, args.token1.symbol);
-  const pool = new Pool(t0, t1, args.fee, args.sqrtPriceX96.toString(), "0", args.tickCurrent);
+  const pool = new Pool(
+    t0,
+    t1,
+    sdkFeeForTickSpacing(args.tickSpacing ?? tickSpacingForFee(args.fee)),
+    args.sqrtPriceX96.toString(),
+    "0",
+    args.tickCurrent,
+  );
   const position = new SdkPosition({
     pool,
     liquidity: args.liquidity.toString(),

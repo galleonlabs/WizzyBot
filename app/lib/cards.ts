@@ -3,6 +3,7 @@
 export type Protocol = "V2" | "V3" | "V4";
 export type PositionKind = "live" | "projected";
 export type RangeStatus = "in-range" | "oor" | "closed";
+export type PositionVenue = "uniswap-v3" | "aerodrome-slipstream";
 
 export const MIN_TICK = -887272;
 export const MAX_TICK = 887272;
@@ -12,6 +13,9 @@ export type PositionView = {
   protocol: Protocol;
   chain?: "base" | "robinhood";
   chainLabel?: string;
+  venue?: PositionVenue;
+  venueLabel?: string;
+  positionManager?: string;
   tokenId?: string;
   pair: string;
   fee: number;
@@ -179,6 +183,9 @@ export function lightRowToView(row: Record<string, unknown>): PositionView | nul
     protocol,
     chain: row.chain === "robinhood" ? "robinhood" : "base",
     chainLabel: typeof row.chainLabel === "string" ? row.chainLabel : (row.chain === "robinhood" ? "Robinhood" : "Base"),
+    venue: row.venue === "aerodrome-slipstream" ? "aerodrome-slipstream" : row.venue === "uniswap-v3" ? "uniswap-v3" : undefined,
+    venueLabel: typeof row.venueLabel === "string" ? row.venueLabel : undefined,
+    positionManager: typeof row.positionManager === "string" ? row.positionManager : undefined,
     tokenId: row.tokenId != null ? String(row.tokenId) : undefined,
     pair: row.pair,
     fee,

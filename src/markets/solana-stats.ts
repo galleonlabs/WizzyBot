@@ -34,6 +34,7 @@ export function deriveSolanaMarketStats(market: SolanaMarket, pair: DexPair | un
       : "illustrative";
   return {
     marketId: market.id,
+    feePips: market.feeBps * 100,
     priceUsd,
     priceChange24h,
     liquidityUsd,

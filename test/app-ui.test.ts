@@ -30,6 +30,7 @@ describe("meme index product UI", () => {
 
   it("keeps the tri-chain index, custody, and responsive navigation explicit", () => {
     expect(portfolio).toContain("Base · Robinhood · Solana");
+    expect(portfolio).toContain("Base · Aero");
     expect(portfolio).toContain("1</b> index");
     expect(portfolio).toContain("You own every position");
     expect(portfolio).toContain("wallet approvals: Base, Robinhood, and one Solana review");

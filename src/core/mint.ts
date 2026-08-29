@@ -8,7 +8,7 @@ import { factoryAbi, poolAbi, v2FactoryAbi, v2PairAbi } from "../chain/abi.js";
 import { erc20ApproveTx, mintCalldata } from "../uniswap/calldata.js";
 import { addLiquidityTx } from "../uniswap/v2-calldata.js";
 import { permit2ApproveTx, v4MintTx } from "../uniswap/v4-calldata.js";
-import { rangeFromWidthPct, snapRange, tickSpacingForFee } from "./ticks.js";
+import { rangeFromWidthPct, sdkFeeForTickSpacing, snapRange, tickSpacingForFee } from "./ticks.js";
 import { isInRange, percentThroughRange } from "./range.js";
 import type { ActionReceipt, PlannedAction, PlannedTx, PositionSnapshot, Protocol, TokenRef } from "../types.js";
 
@@ -22,6 +22,7 @@ export interface MintQuote {
   decimals0: number;
   decimals1: number;
   fee: number;
+  tickSpacing?: number;
   pool: Address;
   tickCurrent: number;
   tickLower: number;
@@ -68,6 +69,7 @@ export function quoteMintFromPool(args: {
   token0: TokenRef;
   token1: TokenRef;
   fee: number;
+  tickSpacing?: number;
   sqrtPriceX96: bigint;
   tickCurrent: number;
   pool: Address;
@@ -79,7 +81,7 @@ export function quoteMintFromPool(args: {
   useNative?: boolean;
   nativeIsToken0?: boolean;
 }): MintQuote {
-  const spacing = tickSpacingForFee(args.fee);
+  const spacing = args.tickSpacing ?? tickSpacingForFee(args.fee);
   let range: { tickLower: number; tickUpper: number };
   if (args.tickLower !== undefined && args.tickUpper !== undefined) {
     range = snapRange(args.tickLower, args.tickUpper, spacing);
@@ -97,7 +99,7 @@ export function quoteMintFromPool(args: {
 
   const t0 = new Token(args.chainId ?? CHAIN_ID, args.token0.address, args.token0.decimals, args.token0.symbol);
   const t1 = new Token(args.chainId ?? CHAIN_ID, args.token1.address, args.token1.decimals, args.token1.symbol);
-  const pool = new Pool(t0, t1, args.fee, args.sqrtPriceX96.toString(), "0", args.tickCurrent);
+  const pool = new Pool(t0, t1, sdkFeeForTickSpacing(spacing), args.sqrtPriceX96.toString(), "0", args.tickCurrent);
 
   let pos: Position;
   if (a0 > 0n && a1 === 0n) {
@@ -136,6 +138,7 @@ export function quoteMintFromPool(args: {
     decimals0: args.token0.decimals,
     decimals1: args.token1.decimals,
     fee: args.fee,
+    tickSpacing: spacing,
     pool: args.pool,
     tickCurrent: args.tickCurrent,
     tickLower: range.tickLower,
@@ -157,7 +160,7 @@ export function snapshotFromQuote(quote: MintQuote, owner: Address): PositionSna
     token0: { address: quote.token0, symbol: quote.symbol0, decimals: quote.decimals0 },
     token1: { address: quote.token1, symbol: quote.symbol1, decimals: quote.decimals1 },
     fee: quote.fee,
-    tickSpacing: tickSpacingForFee(quote.fee),
+    tickSpacing: quote.tickSpacing ?? tickSpacingForFee(quote.fee),
     tickLower: quote.tickLower,
     tickUpper: quote.tickUpper,
     tickCurrent: quote.tickCurrent,

@@ -14,7 +14,8 @@ const MarketSchema = z.object({
   quoteToken: AddressSchema,
   quoteSymbol: z.string().min(1),
   quoteDecimals: z.number().int().min(0).max(36),
-  protocol: z.literal("V3"),
+  protocol: z.enum(["V3", "AERODROME_SLIPSTREAM"]),
+  aerodromeDeployment: z.enum(["legacy", "min-unstake"]).optional(),
   pool: AddressSchema,
   fee: z.number().int().positive(),
   tickSpacing: z.number().int().positive(),
@@ -62,6 +63,15 @@ const CatalogSchema = z.object({
       ids.add(market.id);
       if (market.token.toLowerCase() === market.quoteToken.toLowerCase()) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} token pair must be distinct` });
+      }
+      if (market.protocol === "AERODROME_SLIPSTREAM" && chain.slug !== "base") {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} Aerodrome venue must be on Base` });
+      }
+      if (market.protocol === "AERODROME_SLIPSTREAM" && !market.aerodromeDeployment) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} requires an Aerodrome deployment` });
+      }
+      if (market.protocol === "V3" && market.aerodromeDeployment) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} has an unused Aerodrome deployment` });
       }
     }
   }

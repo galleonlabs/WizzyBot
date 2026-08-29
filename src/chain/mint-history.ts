@@ -44,8 +44,9 @@ export async function fetchIncreaseLiquidity(
   client: PublicClient,
   tokenId: bigint,
   fromBlock?: bigint,
+  positionManager?: Address,
 ): Promise<MintHistory | undefined> {
-  const nfpm = addressesFor(slugOfClient(client)).nfpm;
+  const nfpm = positionManager ?? addressesFor(slugOfClient(client)).nfpm;
   const latest = await latestBlock(client);
   if (latest === undefined) return undefined;
   const { start, chunks } = windowFor(latest, fromBlock);
@@ -89,8 +90,9 @@ export async function fetchMintTransfer(
   client: PublicClient,
   tokenId: bigint,
   fromBlock?: bigint,
+  positionManager?: Address,
 ): Promise<{ to: Address; createdAt: number } | undefined> {
-  const nfpm = addressesFor(slugOfClient(client)).nfpm;
+  const nfpm = positionManager ?? addressesFor(slugOfClient(client)).nfpm;
   const latest = await latestBlock(client);
   if (latest === undefined) return undefined;
   const { start, chunks } = windowFor(latest, fromBlock);
@@ -168,17 +170,17 @@ export async function importHoldForToken(
   client: PublicClient,
   tokenId: bigint,
   current: { amount0: bigint; amount1: bigint },
-  opts: { path?: string; fromBlock?: bigint } = {},
+  opts: { path?: string; fromBlock?: bigint; positionManager?: Address } = {},
 ): Promise<HoldRecord> {
-  const history = await fetchIncreaseLiquidity(client, tokenId, opts.fromBlock);
+  const history = await fetchIncreaseLiquidity(client, tokenId, opts.fromBlock, opts.positionManager);
   if (history) {
     return rememberHold(tokenId, history.amount0, history.amount1, history.source, {
       createdAt: history.createdAt,
       path: opts.path,
     }).record;
   }
-  await fetchHoldFromSubgraph(tokenId);
-  const transfer = await fetchMintTransfer(client, tokenId, opts.fromBlock);
+  if (!opts.positionManager) await fetchHoldFromSubgraph(tokenId);
+  const transfer = await fetchMintTransfer(client, tokenId, opts.fromBlock, opts.positionManager);
   return rememberHold(tokenId, current.amount0, current.amount1, "first-seen-import", {
     createdAt: transfer?.createdAt,
     path: opts.path,
@@ -191,9 +193,9 @@ export async function readHoldBaseline(
   client: PublicClient,
   tokenId: bigint,
   current: { amount0: bigint; amount1: bigint },
-  opts: { fromBlock?: bigint } = {},
+  opts: { fromBlock?: bigint; positionManager?: Address } = {},
 ): Promise<HoldRecord> {
-  const history = await fetchIncreaseLiquidity(client, tokenId, opts.fromBlock);
+  const history = await fetchIncreaseLiquidity(client, tokenId, opts.fromBlock, opts.positionManager);
   if (history) {
     return {
       tokenId: tokenId.toString(),
@@ -203,7 +205,7 @@ export async function readHoldBaseline(
       source: history.source,
     };
   }
-  const transfer = await fetchMintTransfer(client, tokenId, opts.fromBlock);
+  const transfer = await fetchMintTransfer(client, tokenId, opts.fromBlock, opts.positionManager);
   return {
     tokenId: tokenId.toString(),
     hold0: current.amount0.toString(),

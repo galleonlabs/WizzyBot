@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "updatedAt": "2026-08-29",
   "fees": {
     "allocateBps": 15,
@@ -44,9 +44,10 @@
           "quoteToken": "0x4200000000000000000000000000000000000006",
           "quoteSymbol": "WETH",
           "quoteDecimals": 18,
-          "protocol": "V3",
-          "pool": "0xba3f945812a83471d709bce9c3ca699a19fb46f7",
-          "fee": 10000,
+          "protocol": "AERODROME_SLIPSTREAM",
+          "aerodromeDeployment": "legacy",
+          "pool": "0x4e829F8A5213c42535AB84AA40BD4aDCCE9cBa02",
+          "fee": 2111,
           "tickSpacing": 200,
           "rangeWidthPct": 40,
           "weightBps": 3000,

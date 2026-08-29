@@ -17,6 +17,9 @@ import { erc20ApproveTx, mintCalldata, nativeTransferTx, wrapEthTx } from "../un
 import { exactInV3Tx } from "../uniswap/router.js";
 import { permit2ApproveTx } from "../uniswap/v4-calldata.js";
 import { activeMarkets, chainCatalog, getMarketCatalog, type CuratedMarket } from "../markets/catalog.js";
+import { slipstreamPoolAbi, slipstreamQuoterV2Abi } from "../aerodrome/abi.js";
+import { exactInSlipstreamTx, mintSlipstreamTx } from "../aerodrome/calldata.js";
+import { aerodromeDeployment } from "../aerodrome/deployments.js";
 
 const BPS = 10_000n;
 const SWAP_SHARE_BPS = 5_000n;
@@ -34,6 +37,8 @@ export type AllocationMarketPlan = {
   marketId: string;
   symbol: string;
   pool: Address;
+  venue: "uniswap-v3" | "aerodrome-slipstream";
+  positionManager: Address;
   weightBps: number;
   budgetWei: string;
   swapInWei: string;
@@ -72,6 +77,8 @@ type MarketQuote = {
   marketPlan: AllocationMarketPlan;
   swap: PlannedTx;
   mint: PlannedTx;
+  swapSpender: Address;
+  positionManager: Address;
   mintWeth: bigint;
   mintMeme: bigint;
 };
@@ -109,30 +116,43 @@ export async function planAllocation(input: {
   }
 
   const addresses = addressesFor(input.chain);
-  const swapWeth = quotes.reduce((sum, quote) => sum + BigInt(quote.marketPlan.swapInWei), 0n);
-  const mintWeth = quotes.reduce((sum, quote) => sum + quote.mintWeth, 0n);
   const transactions: PlannedTx[] = [wrapEthTx(net, chain.id)];
-  if (swapWeth > 0n) {
+  const uniswapQuotes = quotes.filter((quote) => quote.marketPlan.venue === "uniswap-v3");
+  const uniswapSwapWeth = uniswapQuotes.reduce((sum, quote) => sum + BigInt(quote.marketPlan.swapInWei), 0n);
+  if (uniswapSwapWeth > 0n) {
     transactions.push(
-      erc20ApproveTx(addresses.weth, addresses.permit2, swapWeth),
-      permit2ApproveTx(addresses.weth, addresses.universalRouter, swapWeth, 20 * 60),
-      ...quotes.map((quote) => quote.swap),
+      erc20ApproveTx(addresses.weth, addresses.permit2, uniswapSwapWeth),
+      permit2ApproveTx(addresses.weth, addresses.universalRouter, uniswapSwapWeth, 20 * 60),
+      ...uniswapQuotes.map((quote) => quote.swap),
     );
   }
-  if (mintWeth > 0n) transactions.push(erc20ApproveTx(addresses.weth, addresses.nfpm, mintWeth));
+  for (const [router, routerQuotes] of groupedByAddress(
+    quotes.filter((quote) => quote.marketPlan.venue === "aerodrome-slipstream"),
+    (quote) => quote.swapSpender,
+  )) {
+    const amount = routerQuotes.reduce((sum, quote) => sum + BigInt(quote.marketPlan.swapInWei), 0n);
+    if (amount > 0n) transactions.push(erc20ApproveTx(addresses.weth, router, amount), ...routerQuotes.map((quote) => quote.swap));
+  }
+  for (const [manager, managerQuotes] of groupedByAddress(quotes, (quote) => quote.positionManager)) {
+    const amount = managerQuotes.reduce((sum, quote) => sum + quote.mintWeth, 0n);
+    const aerodrome = managerQuotes.some((quote) => quote.marketPlan.venue === "aerodrome-slipstream");
+    if (amount > 0n) transactions.push(erc20ApproveTx(addresses.weth, manager, aerodrome ? amount + 1n : amount));
+  }
   for (const quote of quotes) {
-    if (quote.mintMeme > 0n) transactions.push(erc20ApproveTx(quote.market.token, addresses.nfpm, quote.mintMeme));
+    if (quote.mintMeme > 0n) {
+      const amount = quote.marketPlan.venue === "aerodrome-slipstream" ? quote.mintMeme + 1n : quote.mintMeme;
+      transactions.push(erc20ApproveTx(quote.market.token, quote.positionManager, amount));
+    }
   }
   transactions.push(...quotes.map((quote) => quote.mint));
   if (serviceFee > 0n) transactions.push(nativeTransferTx(env.treasury ?? TREASURY, serviceFee));
 
   const allowedTargets = uniqueAddresses([
     addresses.weth,
-    addresses.permit2,
-    addresses.universalRouter,
-    addresses.nfpm,
     env.treasury ?? TREASURY,
     ...markets.map((market) => market.token),
+    ...quotes.flatMap((quote) => [quote.swapSpender, quote.positionManager]),
+    ...(uniswapQuotes.length ? [addresses.permit2, addresses.universalRouter] : []),
   ]);
   assertAllowedTransactions(transactions, allowedTargets);
 
@@ -158,6 +178,7 @@ export async function planAllocation(input: {
       "Every LP NFT is minted directly to your wallet.",
       "One atomic wallet batch is requested on this chain; if any call fails, the entire batch reverts.",
       "Quoted outputs and ranges expire. Re-plan instead of signing an expired batch.",
+      "Una selects the reviewed Uniswap or Aerodrome venue for each market; there is no pool builder to configure.",
       "Any unused WETH or meme tokens remain in your wallet.",
     ],
   };
@@ -177,6 +198,18 @@ export function weightedBudgets(total: bigint, weights: readonly number[]): bigi
 }
 
 async function quoteMarket(
+  client: PublicClient,
+  owner: Address,
+  chainId: number,
+  market: CuratedMarket,
+  budget: bigint,
+): Promise<MarketQuote> {
+  return market.protocol === "AERODROME_SLIPSTREAM"
+    ? quoteAerodromeMarket(client, owner, chainId, market, budget)
+    : quoteUniswapMarket(client, owner, chainId, market, budget);
+}
+
+async function quoteUniswapMarket(
   client: PublicClient,
   owner: Address,
   chainId: number,
@@ -228,6 +261,7 @@ async function quoteMarket(
     token0,
     token1,
     fee: market.fee,
+    tickSpacing: market.tickSpacing,
     sqrtPriceX96: slot0[0],
     tickCurrent: slot0[1],
     pool: market.pool,
@@ -265,6 +299,8 @@ async function quoteMarket(
       marketId: market.id,
       symbol: market.symbol,
       pool: market.pool,
+      venue: "uniswap-v3",
+      positionManager: addressesFor(chainId === 4663 ? "robinhood" : "base").nfpm,
       weightBps: market.weightBps,
       budgetWei: budget.toString(),
       swapInWei: swapIn.toString(),
@@ -279,6 +315,126 @@ async function quoteMarket(
     },
     swap,
     mint,
+    swapSpender: addressesFor(chainId === 4663 ? "robinhood" : "base").universalRouter,
+    positionManager: addressesFor(chainId === 4663 ? "robinhood" : "base").nfpm,
+    mintWeth,
+    mintMeme,
+  };
+}
+
+async function quoteAerodromeMarket(
+  client: PublicClient,
+  owner: Address,
+  chainId: number,
+  market: CuratedMarket,
+  budget: bigint,
+): Promise<MarketQuote> {
+  if (chainId !== 8453 || !market.aerodromeDeployment) throw new Error(`${market.id} has no supported Aerodrome deployment`);
+  const deployment = aerodromeDeployment(market.aerodromeDeployment);
+  const swapIn = (budget * SWAP_SHARE_BPS) / BPS;
+  const wethForMint = budget - swapIn;
+  if (swapIn <= 0n || wethForMint <= 0n) throw new Error(`${market.id} allocation is too small`);
+  const [slot0, token0Address, token1Address, factory, nft, liveFee, tickSpacing, quoteResult] = await Promise.all([
+    client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "slot0" }),
+    client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "token0" }),
+    client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "token1" }),
+    client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "factory" }),
+    client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "nft" }),
+    client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "fee" }),
+    client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "tickSpacing" }),
+    client.simulateContract({
+      address: deployment.quoter,
+      abi: slipstreamQuoterV2Abi,
+      functionName: "quoteExactInputSingle",
+      args: [{
+        tokenIn: market.quoteToken,
+        tokenOut: market.token,
+        amountIn: swapIn,
+        tickSpacing: market.tickSpacing,
+        sqrtPriceLimitX96: 0n,
+      }],
+    }),
+  ]);
+  const pair = new Set([token0Address.toLowerCase(), token1Address.toLowerCase()]);
+  if (!pair.has(market.token.toLowerCase()) || !pair.has(market.quoteToken.toLowerCase())) {
+    throw new Error(`${market.id} pool tokens do not match the curated pair`);
+  }
+  if (factory.toLowerCase() !== deployment.factory.toLowerCase()) throw new Error(`${market.id} uses an unexpected Aerodrome factory`);
+  if (nft.toLowerCase() !== deployment.positionManager.toLowerCase()) throw new Error(`${market.id} uses an unexpected Aerodrome position manager`);
+  if (tickSpacing !== market.tickSpacing) throw new Error(`${market.id} Aerodrome tick spacing changed`);
+  const quotedMemeOut = quoteResult.result[0];
+  if (quotedMemeOut <= 0n) throw new Error(`${market.id} returned no swap output`);
+  const minimumMemeOut = (quotedMemeOut * (BPS - SWAP_SLIPPAGE_BPS)) / BPS;
+  const quoteToken: TokenRef = { address: market.quoteToken, symbol: market.quoteSymbol, decimals: market.quoteDecimals };
+  const memeToken: TokenRef = { address: market.token, symbol: market.symbol, decimals: market.tokenDecimals };
+  const quoteIsToken0 = token0Address.toLowerCase() === market.quoteToken.toLowerCase();
+  const token0 = quoteIsToken0 ? quoteToken : memeToken;
+  const token1 = quoteIsToken0 ? memeToken : quoteToken;
+  const amount0Desired = quoteIsToken0 ? wethForMint : minimumMemeOut;
+  const amount1Desired = quoteIsToken0 ? minimumMemeOut : wethForMint;
+  const mintQuote = quoteMintFromPool({
+    chainId,
+    protocol: "V3",
+    token0,
+    token1,
+    fee: liveFee,
+    tickSpacing,
+    sqrtPriceX96: slot0[0],
+    tickCurrent: slot0[1],
+    pool: market.pool,
+    widthPct: market.rangeWidthPct,
+    amount0Desired,
+    amount1Desired,
+  });
+  const mintWeth = quoteIsToken0 ? mintQuote.amount0 : mintQuote.amount1;
+  const mintMeme = quoteIsToken0 ? mintQuote.amount1 : mintQuote.amount0;
+  const swap = exactInSlipstreamTx({
+    router: deployment.swapRouter,
+    tokenIn: market.quoteToken,
+    tokenOut: market.token,
+    tickSpacing,
+    amountIn: swapIn,
+    amountOutMin: minimumMemeOut,
+    recipient: owner,
+    deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+  });
+  const mint = mintSlipstreamTx({
+    positionManager: deployment.positionManager,
+    token0: mintQuote.token0,
+    token1: mintQuote.token1,
+    tickSpacing,
+    tickLower: mintQuote.tickLower,
+    tickUpper: mintQuote.tickUpper,
+    amount0: mintQuote.amount0,
+    amount1: mintQuote.amount1,
+    recipient: owner,
+    slippageBps: Number(SWAP_SLIPPAGE_BPS),
+    deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+  });
+  return {
+    market,
+    marketPlan: {
+      marketId: market.id,
+      symbol: market.symbol,
+      pool: market.pool,
+      venue: "aerodrome-slipstream",
+      positionManager: deployment.positionManager,
+      weightBps: market.weightBps,
+      budgetWei: budget.toString(),
+      swapInWei: swapIn.toString(),
+      quotedMemeOut: quotedMemeOut.toString(),
+      minimumMemeOut: minimumMemeOut.toString(),
+      mintWeth: mintWeth.toString(),
+      mintMeme: mintMeme.toString(),
+      tickLower: mintQuote.tickLower,
+      tickUpper: mintQuote.tickUpper,
+      leftoverWeth: (wethForMint - mintWeth).toString(),
+      leftoverMeme: (minimumMemeOut - mintMeme).toString(),
+    },
+    swap,
+    mint,
+    swapSpender: deployment.swapRouter,
+    positionManager: deployment.positionManager,
     mintWeth,
     mintMeme,
   };
@@ -292,6 +448,18 @@ function uniqueAddresses(addresses: readonly Address[]): Address[] {
   const out = new Map<string, Address>();
   for (const address of addresses) out.set(address.toLowerCase(), getAddress(address));
   return [...out.values()];
+}
+
+function groupedByAddress<T>(items: readonly T[], addressOf: (item: T) => Address): Array<[Address, T[]]> {
+  const groups = new Map<string, [Address, T[]]>();
+  for (const item of items) {
+    const address = getAddress(addressOf(item));
+    const key = address.toLowerCase();
+    const group = groups.get(key) ?? [address, []];
+    group[1].push(item);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
 }
 
 function assertAllowedTransactions(transactions: readonly PlannedTx[], allowedTargets: readonly Address[]): void {

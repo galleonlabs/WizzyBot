@@ -9,6 +9,16 @@ export function tickSpacingForFee(fee: number): number {
   return spacing;
 }
 
+/**
+ * Uniswap's v3 SDK derives tick spacing from a fixed fee-tier table. Slipstream
+ * has dynamic fees, so use the matching SDK fee solely for liquidity math.
+ */
+export function sdkFeeForTickSpacing(spacing: number): number {
+  const fee = Object.entries(FEE_AMOUNT_TICK_SPACING).find(([, value]) => value === spacing)?.[0];
+  if (fee === undefined) throw new Error(`Unsupported concentrated-liquidity tick spacing: ${spacing}`);
+  return Number(fee);
+}
+
 export function snapTick(tick: number, spacing: number): number {
   if (!Number.isInteger(tick) || !Number.isInteger(spacing) || spacing <= 0) {
     throw new Error("tick must be an integer; spacing must be a positive integer");

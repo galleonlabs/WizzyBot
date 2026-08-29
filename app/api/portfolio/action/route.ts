@@ -9,6 +9,8 @@ const Body = z.object({
   chain: z.enum(["base", "robinhood"]),
   tokenId: z.string().regex(/^\d+$/),
   action: z.enum(["compound", "withdraw"]),
+  venue: z.enum(["uniswap-v3", "aerodrome-slipstream"]).optional(),
+  positionManager: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -19,6 +21,8 @@ export async function POST(request: Request) {
       chain: body.chain,
       tokenId: BigInt(body.tokenId),
       action: body.action,
+      venue: body.venue,
+      positionManager: body.positionManager,
     });
     return NextResponse.json({ plan });
   } catch (error) {

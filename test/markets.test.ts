@@ -11,6 +11,7 @@ describe("curated meme markets", () => {
       expect(activeMarkets(chain.slug).reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
     }
     expect(chainCatalog("base").markets.map((market) => market.symbol)).toEqual(["TOSHI", "BRETT", "DEGEN", "BASECAT"]);
+    expect(chainCatalog("base").markets.find((market) => market.symbol === "BRETT")?.protocol).toBe("AERODROME_SLIPSTREAM");
     expect(chainCatalog("robinhood").markets.map((market) => market.symbol)).toEqual(["CASHCAT"]);
   });
 
@@ -44,6 +45,17 @@ describe("curated meme markets", () => {
     expect(stats.projectedMonthlyFeesPer1000Usd).toBeCloseTo(30.4167, 3);
     expect(stats.projectionConfidence).toBe("illustrative");
     expect(stats.sourceUrl).toContain("dexscreener.com");
+  });
+
+  it("uses a live Slipstream fee for Aerodrome fee pace", () => {
+    const market = activeMarkets("base").find((candidate) => candidate.symbol === "BRETT")!;
+    const stats = deriveMarketStats(market, {
+      liquidity: { usd: 1_000_000 },
+      volume: { h24: 100_000 },
+      pairCreatedAt: Date.parse("2025-01-01T00:00:00.000Z"),
+    }, "2026-08-29T00:00:00.000Z", 2_500);
+    expect(stats.feePips).toBe(2_500);
+    expect(stats.dailyFeesPer1000Usd).toBe(0.25);
   });
 
   it("withholds monthly extrapolation when one-day turnover is unstable", () => {

@@ -3,6 +3,7 @@ import { loadEnv } from "../config/env.js";
 import { loadConfig, policyFor } from "../config/policy.js";
 import { makePublicClient } from "../signer/broadcast.js";
 import { V3Adapter } from "../chain/positions.js";
+import { AerodromeSlipstreamAdapter } from "../aerodrome/positions.js";
 import { snapshotUsd, usdPricesForPosition } from "../chain/prices.js";
 import { adapterFor } from "../core/protocols.js";
 import { formatReceipt, planCompound, planExit, planRerange, type PlanContext } from "../core/actions.js";
@@ -30,6 +31,7 @@ import {
 } from "../signer/privy.js";
 import { parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
 import { scoutMarkets as getMarketScout } from "../markets/scout.js";
+import { chainCatalog } from "../markets/catalog.js";
 
 export type WriteFlags = {
   live?: boolean;
@@ -75,7 +77,9 @@ export async function connectHosted(ownerArg?: string, chain: ChainSlug | string
 
 async function liveViewFor(snap: PositionSnapshot, client: ReturnType<typeof makePublicClient>, ethUsd?: number) {
   const prices = await usdPricesForPosition(client, snap, ethUsd);
-  const rec = await readHoldBaseline(client, snap.ref.tokenId, { amount0: snap.amount0, amount1: snap.amount1 });
+  const rec = await readHoldBaseline(client, snap.ref.tokenId, { amount0: snap.amount0, amount1: snap.amount1 }, {
+    positionManager: snap.positionManager,
+  });
   const card = buildCard(snap, prices, holdAmounts(rec), rec.createdAt, undefined, {
     source: rec.source,
     note: formatHoldNote(rec),
@@ -87,8 +91,22 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
   const slug = slugOf(chain);
   const { client, owner, env } = await connectHosted(ownerArg, slug);
   const out: Record<string, unknown>[] = [];
-  for (const protocol of ["V2", "V3", "V4"] as const) {
-    const adapter = adapterFor(protocol, client);
+  const adapters: Array<{ adapter: ReturnType<typeof adapterFor> | AerodromeSlipstreamAdapter; venue?: "aerodrome-slipstream" }> = [
+    ...(["V2", "V3", "V4"] as const).map((protocol) => ({ adapter: adapterFor(protocol, client) })),
+  ];
+  if (slug === "base") {
+    const deployments = new Set(chainCatalog("base").markets
+      .filter((market) => market.status === "active" && market.protocol === "AERODROME_SLIPSTREAM" && market.aerodromeDeployment)
+      .map((market) => market.aerodromeDeployment!));
+    for (const deployment of deployments) {
+      adapters.push({ adapter: new AerodromeSlipstreamAdapter(client, deployment), venue: "aerodrome-slipstream" });
+    }
+  }
+  const curatedAerodromePools = new Set(chainCatalog(slug).markets
+    .filter((market) => market.protocol === "AERODROME_SLIPSTREAM")
+    .map((market) => market.pool.toLowerCase()));
+  for (const descriptor of adapters) {
+    const { adapter } = descriptor;
     let refs: { protocol: string; tokenId: bigint }[] = [];
     try {
       refs = await adapter.listPositions(owner);
@@ -98,6 +116,7 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
     for (const ref of refs) {
       try {
         const snap = await adapter.readPosition(ref.tokenId);
+        if (descriptor.venue === "aerodrome-slipstream" && !curatedAerodromePools.has(snap.pool.toLowerCase())) continue;
         const row: Record<string, unknown> = {
           protocol: ref.protocol,
           tokenId: ref.tokenId.toString(),
@@ -107,6 +126,9 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
           owner,
           chain: slug,
           chainId: snap.ref.chainId,
+          venue: snap.venue ?? snap.ref.venue,
+          venueLabel: (snap.venue ?? snap.ref.venue) === "aerodrome-slipstream" ? "Aerodrome" : undefined,
+          positionManager: snap.positionManager ?? snap.ref.positionManager,
         };
         try {
           const { view } = await liveViewFor(snap, client, env.ethUsd);

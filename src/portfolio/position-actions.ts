@@ -1,6 +1,14 @@
 import { getAddress, isAddress, type Address } from "viem";
 import { addressesFor, chainOf, type ChainSlug } from "../chains.js";
 import { V3Adapter } from "../chain/positions.js";
+import { AerodromeSlipstreamAdapter } from "../aerodrome/positions.js";
+import { aerodromeDeployment } from "../aerodrome/deployments.js";
+import {
+  burnSlipstreamTx,
+  collectSlipstreamTx,
+  decreaseSlipstreamTx,
+  increaseSlipstreamTx,
+} from "../aerodrome/calldata.js";
 import { loadEnv } from "../config/env.js";
 import { bpsOf } from "../core/fees.js";
 import { chainCatalog, getMarketCatalog } from "../markets/catalog.js";
@@ -43,16 +51,32 @@ export async function planPositionAction(input: {
   chain: ChainSlug;
   tokenId: bigint;
   action: "compound" | "withdraw";
+  venue?: "uniswap-v3" | "aerodrome-slipstream";
+  positionManager?: string;
 }): Promise<PositionActionPlan> {
   if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
   const owner = getAddress(input.owner);
   const chain = chainOf(input.chain);
   const env = loadEnv();
   const client = makePublicClient(env.rpcByChain[input.chain], chain.viem);
-  const snapshot = await new V3Adapter(client).readPosition(input.tokenId);
+  let snapshot: PositionSnapshot;
+  if (input.venue === "aerodrome-slipstream") {
+    if (input.chain !== "base" || !input.positionManager || !isAddress(input.positionManager)) {
+      throw new Error("Aerodrome position manager is missing or invalid");
+    }
+    const deploymentId = chainCatalog("base").markets
+      .filter((market) => market.protocol === "AERODROME_SLIPSTREAM" && market.aerodromeDeployment)
+      .map((market) => market.aerodromeDeployment!)
+      .find((id) => aerodromeDeployment(id).positionManager.toLowerCase() === input.positionManager!.toLowerCase());
+    if (!deploymentId) throw new Error("position manager is not in Una's curated Aerodrome catalog");
+    snapshot = await new AerodromeSlipstreamAdapter(client, deploymentId).readPosition(input.tokenId);
+  } else {
+    snapshot = await new V3Adapter(client).readPosition(input.tokenId);
+  }
   if (snapshot.owner.toLowerCase() !== owner.toLowerCase()) throw new Error("wallet does not own this position");
-  const configured = chainCatalog(input.chain).markets.some(
-    (market) => market.pool.toLowerCase() === snapshot.pool.toLowerCase(),
+  const configured = chainCatalog(input.chain).markets.some((market) =>
+    market.pool.toLowerCase() === snapshot.pool.toLowerCase()
+    && (snapshot.venue === "aerodrome-slipstream") === (market.protocol === "AERODROME_SLIPSTREAM"),
   );
   if (!configured) throw new Error("position pool is not in Una's curated market catalog");
   return buildPositionActionPlan(snapshot, owner, input.chain, input.action, env.treasury);
@@ -65,7 +89,7 @@ export function buildPositionActionPlan(
   action: "compound" | "withdraw",
   treasury: Address,
 ): PositionActionPlan {
-  if (snapshot.ref.protocol !== "V3") throw new Error("launch portfolio actions support Uniswap v3 positions");
+  if (snapshot.ref.protocol !== "V3") throw new Error("launch portfolio actions support concentrated-liquidity positions");
   if (snapshot.ref.chainId !== chainOf(chain).id) throw new Error("position chain mismatch");
   if (snapshot.owner.toLowerCase() !== owner.toLowerCase()) throw new Error("wallet does not own this position");
 
@@ -83,8 +107,8 @@ export function buildPositionActionPlan(
   const transactions = action === "compound"
     ? compoundTransactions(snapshot, owner, treasury, fee0, fee1)
     : withdrawTransactions(snapshot, owner, treasury, fee0, fee1);
-  const addresses = addressesFor(chain);
-  const allowedTargets = uniqueAddresses([addresses.nfpm, snapshot.token0.address, snapshot.token1.address, treasury]);
+  const positionManager = managerFor(snapshot, chain);
+  const allowedTargets = uniqueAddresses([positionManager, snapshot.token0.address, snapshot.token1.address, treasury]);
   assertAllowed(transactions, allowedTargets);
 
   const now = new Date();
@@ -109,7 +133,7 @@ export function buildPositionActionPlan(
     expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString(),
     notices: action === "compound"
       ? [
-          "Fees are collected to your wallet, Una's disclosed fee is transferred, and the remainder is added to the same NFT.",
+          "Fees are collected to your wallet, Una's disclosed fee is transferred, and the remainder is added to the same self-custodied NFT.",
           "No swap is forced: any token amount that does not fit the current range ratio remains in your wallet.",
         ]
       : [
@@ -130,13 +154,25 @@ function compoundTransactions(
   const add0 = snapshot.uncollected0 - fee0;
   const add1 = snapshot.uncollected1 - fee1;
   if (add0 <= 0n && add1 <= 0n) throw new Error("no uncollected fees to compound");
-  const nfpm = addressesFor(snapshot.ref.chainId === 4663 ? "robinhood" : "base").nfpm;
-  const txs: PlannedTx[] = [collectCalldata(snapshot, owner)];
+  const nfpm = managerFor(snapshot);
+  const aerodrome = snapshot.venue === "aerodrome-slipstream";
+  const txs: PlannedTx[] = [aerodrome
+    ? collectSlipstreamTx(nfpm, snapshot.ref.tokenId, owner)
+    : collectCalldata(snapshot, owner)];
   if (fee0 > 0n) txs.push(erc20TransferTx(snapshot.token0.address, treasury, fee0));
   if (fee1 > 0n) txs.push(erc20TransferTx(snapshot.token1.address, treasury, fee1));
-  if (add0 > 0n) txs.push(erc20ApproveTx(snapshot.token0.address, nfpm, add0));
-  if (add1 > 0n) txs.push(erc20ApproveTx(snapshot.token1.address, nfpm, add1));
-  txs.push(increaseCalldata(snapshot, add0, add1, 150, Math.floor(PLAN_TTL_MS / 1_000)));
+  if (add0 > 0n) txs.push(erc20ApproveTx(snapshot.token0.address, nfpm, aerodrome ? add0 + 1n : add0));
+  if (add1 > 0n) txs.push(erc20ApproveTx(snapshot.token1.address, nfpm, aerodrome ? add1 + 1n : add1));
+  txs.push(aerodrome
+    ? increaseSlipstreamTx({
+        positionManager: nfpm,
+        tokenId: snapshot.ref.tokenId,
+        amount0: add0,
+        amount1: add1,
+        slippageBps: 150,
+        deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+      })
+    : increaseCalldata(snapshot, add0, add1, 150, Math.floor(PLAN_TTL_MS / 1_000)));
   return txs;
 }
 
@@ -148,12 +184,33 @@ function withdrawTransactions(
   fee1: bigint,
 ): PlannedTx[] {
   if (snapshot.liquidity <= 0n) throw new Error("position is already closed");
-  const txs: PlannedTx[] = [
-    decreaseCalldata(snapshot, 100, owner, 150, Math.floor(PLAN_TTL_MS / 1_000), true),
-  ];
+  const manager = managerFor(snapshot);
+  const txs: PlannedTx[] = snapshot.venue === "aerodrome-slipstream"
+    ? [
+        decreaseSlipstreamTx({
+          positionManager: manager,
+          tokenId: snapshot.ref.tokenId,
+          liquidity: snapshot.liquidity,
+          amount0Min: (snapshot.amount0 * 9_850n) / BPS,
+          amount1Min: (snapshot.amount1 * 9_850n) / BPS,
+          deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+        }),
+        collectSlipstreamTx(manager, snapshot.ref.tokenId, owner),
+      ]
+    : [decreaseCalldata(snapshot, 100, owner, 150, Math.floor(PLAN_TTL_MS / 1_000), true)];
   if (fee0 > 0n) txs.push(erc20TransferTx(snapshot.token0.address, treasury, fee0));
   if (fee1 > 0n) txs.push(erc20TransferTx(snapshot.token1.address, treasury, fee1));
+  if (snapshot.venue === "aerodrome-slipstream") txs.push(burnSlipstreamTx(manager, snapshot.ref.tokenId));
   return txs;
+}
+
+function managerFor(snapshot: PositionSnapshot, chain?: ChainSlug): Address {
+  if (snapshot.venue === "aerodrome-slipstream") {
+    if (!snapshot.positionManager) throw new Error("Aerodrome position manager is missing");
+    return snapshot.positionManager;
+  }
+  const slug = chain ?? (snapshot.ref.chainId === 4663 ? "robinhood" : "base");
+  return addressesFor(slug).nfpm;
 }
 
 function serialize(tx: PlannedTx): SerializableTx {

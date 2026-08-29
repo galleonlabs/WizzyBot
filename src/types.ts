@@ -1,6 +1,7 @@
 import type { Address, Hash, Hex } from "viem";
 
 export type Protocol = "V2" | "V3" | "V4";
+export type PositionVenue = "uniswap-v3" | "aerodrome-slipstream";
 
 export type FeeSource = "fees" | "notional";
 
@@ -20,6 +21,8 @@ export interface PositionRef {
   protocol: Protocol;
   chainId: number;
   tokenId: bigint;
+  venue?: PositionVenue;
+  positionManager?: Address;
 }
 
 export interface TickRange {
@@ -105,6 +108,9 @@ export interface PositionSnapshot {
   inRange: boolean;
   percentThroughRange: number;
   pool: Address;
+  venue?: PositionVenue;
+  positionManager?: Address;
+  factory?: Address;
   createdAt?: number;
 }
 

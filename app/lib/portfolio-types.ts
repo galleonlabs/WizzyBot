@@ -11,7 +11,8 @@ export type CuratedMarket = {
   symbol: string;
   token: `0x${string}`;
   quoteSymbol: string;
-  protocol: "V3";
+  protocol: "V3" | "AERODROME_SLIPSTREAM";
+  aerodromeDeployment?: "legacy" | "min-unstake";
   pool: `0x${string}`;
   fee: number;
   rangeWidthPct: number;
@@ -44,6 +45,7 @@ export type MarketCatalog = {
 
 export type MarketStats = {
   marketId: string;
+  feePips: number;
   priceUsd: number | null;
   priceChange24h: number | null;
   liquidityUsd: number | null;
@@ -97,6 +99,8 @@ export type SolanaChainCatalog = {
 export type AllocationMarketPlan = {
   marketId: string;
   symbol: string;
+  venue: "uniswap-v3" | "aerodrome-slipstream";
+  positionManager: `0x${string}`;
   weightBps: number;
   budgetWei: string;
 };

@@ -238,7 +238,14 @@ export function PortfolioApp() {
       const response = await fetch("/api/portfolio/action", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ owner: address, chain: position.chain, tokenId: position.tokenId, action }),
+        body: JSON.stringify({
+          owner: address,
+          chain: position.chain,
+          tokenId: position.tokenId,
+          action,
+          venue: position.venue,
+          positionManager: position.positionManager,
+        }),
       });
       const payload = await response.json() as { plan?: PositionActionPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? `Could not prepare ${action}`);
@@ -477,7 +484,7 @@ function MarketLedger({ markets, stats, state, compact = false }: { markets: Ind
               return <tr key={market.id}>
                 <td><span className="pair-cell"><i style={{ background: market.color }}>{market.symbol.slice(0, 1)}</i><span><b>{market.symbol}/{quote}</b><small>{market.name}</small></span></span></td>
                 <td><b className="fee-pace">{row?.dailyFeesPer1000Usd == null ? "—" : `$${row.dailyFeesPer1000Usd.toFixed(2)}`}</b><small className="cell-note">per $1k</small></td>
-                <td><span className={`chain-pill is-${chain}`}><i />{chainLabel(chain)}</span></td>
+                <td><span className={`chain-pill is-${chain}`}><i />{market.protocol === "AERODROME_SLIPSTREAM" ? "Base · Aero" : chainLabel(chain)}</span></td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className={`risk-pill is-${market.risk}`}>{market.risk}</span></td>
               </tr>;
@@ -514,8 +521,8 @@ function PositionLedger({ authenticated, positions, state, onLogin, onAction, ac
       {authenticated && state === "loading" ? <div className="position-empty"><p>Reading your positions…</p></div> : null}
       {authenticated && state === "error" ? <div className="position-empty"><p>Your positions could not be loaded. Your wallets are unaffected.</p></div> : null}
       {authenticated && state === "ready" && positions.length === 0 ? <div className="position-empty"><p>No Una liquidity in this wallet yet.</p></div> : null}
-      {positions.length ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.tokenId}`}>
-        <span className="position-pair"><i>{position.symbol0.slice(0, 1)}</i><span><b>{position.pair}</b><small>{position.chainLabel}</small></span></span>
+      {positions.length ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
+        <span className="position-pair"><i>{position.symbol0.slice(0, 1)}</i><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
         <span><small>Value</small><b>{money(position.lpUsd ?? 0)}</b></span>
         <span><small>Fees</small><b>{money(position.feesUsd ?? 0)}</b></span>
         <span><small>vs HOLD</small><b className={(position.holdDeltaUsd ?? 0) >= 0 ? "positive" : "negative"}>{signedMoney(position.holdDeltaUsd ?? 0)}</b></span>

@@ -1,4 +1,4 @@
-import type { ActionReceipt, PositionCard, PositionSnapshot, Protocol } from "../types.js";
+import type { ActionReceipt, PositionCard, PositionSnapshot, PositionVenue, Protocol } from "../types.js";
 import { labelForChainId, slugForChainId, type ChainSlug } from "../chains.js";
 import { percentThroughRange } from "./range.js";
 
@@ -15,6 +15,9 @@ export type PositionView = {
   protocol: Protocol;
   chain: ChainSlug;
   chainLabel: string;
+  venue?: PositionVenue;
+  venueLabel?: string;
+  positionManager?: string;
   tokenId?: string;
   pair: string;
   fee: number;
@@ -184,6 +187,9 @@ export function serializeLiveView(card: PositionCard): PositionView {
       protocol: card.ref.protocol,
       chain: slugForChainId(card.ref.chainId),
       chainLabel: labelForChainId(card.ref.chainId),
+      venue: card.venue ?? card.ref.venue,
+      venueLabel: (card.venue ?? card.ref.venue) === "aerodrome-slipstream" ? "Aerodrome" : undefined,
+      positionManager: card.positionManager ?? card.ref.positionManager,
       tokenId: card.ref.tokenId.toString(),
       pair: `${card.token0.symbol}/${card.token1.symbol}`,
       fee: card.fee,

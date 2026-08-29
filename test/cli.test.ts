@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Command } from "commander";
-import { buildProgram, feeSourceFlag, liveFlag, noFeeFlag, PRODUCT_LINE } from "../src/cli/index.js";
+import { buildProgram, feeSourceFlag, liveFlag, noFeeFlag, protocolFlag, PRODUCT_LINE } from "../src/cli/index.js";
 import { MCP_TOOLS } from "../src/mcp/server.js";
 import { PRODUCT_VERBS } from "../src/copy.js";
 
@@ -58,6 +58,16 @@ describe("CLI --help smoke", () => {
     expect(feeSourceFlag({ feeSource: "fees" })).toBe("fees");
     expect(feeSourceFlag({ feeSource: "notional" })).toBe("notional");
     expect(() => feeSourceFlag({ feeSource: "bogus" })).toThrow(/fees\|notional/);
+  });
+
+  it("parses --protocol v2|v3|v4 and defaults to v3", () => {
+    expect(protocolFlag({})).toBe("V3");
+    expect(protocolFlag({ protocol: "v3" })).toBe("V3");
+    expect(protocolFlag({ protocol: "v2" })).toBe("V2");
+    expect(protocolFlag({ protocol: "v4" })).toBe("V4");
+    expect(() => protocolFlag({ protocol: "v5" })).toThrow(/v2\|v3\|v4/);
+    const simulate = buildProgram().commands.find((c) => c.name() === "simulate");
+    expect(simulate?.helpInformation()).toMatch(/--protocol/);
   });
 
   it("documents --protocol on write verbs", async () => {

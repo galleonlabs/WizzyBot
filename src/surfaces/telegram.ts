@@ -1,4 +1,4 @@
-import { parseIntent, confirmPhrase, isWrite, type Intent } from "../agent/nlp.js";
+import { parseIntent, confirmPhrase, isWrite, protocolOf, type Intent } from "../agent/nlp.js";
 import { PRODUCT_HELP, PRODUCT_LINE } from "../copy.js";
 
 export const TELEGRAM_TOKEN_HELP =
@@ -33,7 +33,7 @@ export function planTelegramReply(text: string, live: boolean): TelegramReply {
       awaitConfirm: false,
     };
   }
-  const intent = parseIntent(trimmed);
+  const intent = parseIntent(trimmed.replace(/^\/(?=\w)/, ""));
   if (intent.verb === "unknown") {
     return { text: `Could not parse: ${intent.text}`, awaitConfirm: false };
   }
@@ -45,25 +45,26 @@ export function planTelegramReply(text: string, live: boolean): TelegramReply {
 
 export function formatIntentPreview(intent: Intent, live: boolean): string {
   const dry = live ? "live" : "dry-run";
+  const proto = ` protocol=${protocolOf(intent).toLowerCase()}`;
   switch (intent.verb) {
     case "help":
       return planTelegramReply("help", live).text;
     case "list":
-      return `${dry} list${intent.owner ? ` owner=${intent.owner}` : ""}`;
+      return `${dry} list${intent.owner ? ` owner=${intent.owner}` : ""}${proto}`;
     case "status":
-      return intent.tokenId === undefined ? `${dry} list` : `${dry} status tokenId=${intent.tokenId}`;
+      return intent.tokenId === undefined ? `${dry} list${proto}` : `${dry} status tokenId=${intent.tokenId}${proto}`;
     case "mint":
-      return `${dry} mint ${intent.token0 ?? "?"}/${intent.token1 ?? "?"} fee=${intent.fee ?? "?"} width=${intent.widthPct ?? "?"}`;
+      return `${dry} mint ${intent.token0 ?? "?"}/${intent.token1 ?? "?"} fee=${intent.fee ?? "?"} width=${intent.widthPct ?? "?"}${proto}`;
     case "compound":
-      return `${dry} compound tokenId=${intent.tokenId}`;
+      return `${dry} compound tokenId=${intent.tokenId}${proto}`;
     case "rerange":
-      return `${dry} range tokenId=${intent.tokenId}`;
+      return `${dry} range tokenId=${intent.tokenId}${proto}`;
     case "exit":
-      return `${dry} exit tokenId=${intent.tokenId}`;
+      return `${dry} exit tokenId=${intent.tokenId}${proto}`;
     case "simulate":
-      return `${dry} simulate ${intent.action ?? "?"} tokenId=${intent.tokenId ?? "?"}`;
+      return `${dry} simulate ${intent.action ?? "?"} tokenId=${intent.tokenId ?? "?"}${proto}`;
     default:
-      return `${dry} ${intent.verb}`;
+      return `${dry} ${intent.verb}${proto}`;
   }
 }
 

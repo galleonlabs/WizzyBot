@@ -2,6 +2,8 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ADDRESSES, CHAIN_ID, TREASURY } from "../constants.js";
+import { parseProtocol, parseTokenId } from "../core/protocol.js";
+import type { Protocol } from "../types.js";
 
 const str = z.string();
 const opt = z.string().optional();
@@ -49,17 +51,18 @@ const mintFields = {
   amount1: opt,
   owner: opt,
   live: opt,
+  protocol: opt.describe("v2 | v3 | v4 (default v3)"),
 };
 
-function schemaFor(name: string): z.ZodRawShape {
+export function schemaFor(name: string): z.ZodRawShape {
   name = MCP_NAME_ALIAS[name] ?? name;
   switch (name) {
     case "pool_info":
-      return { token0: str, token1: str, fee: str };
+      return { token0: str, token1: str, fee: str, protocol: opt };
     case "position_list":
-      return { owner: str };
+      return { owner: str, protocol: opt };
     case "position_pnl":
-      return { tokenId: str };
+      return { tokenId: str, protocol: opt };
     case "quote_mint":
     case "create":
       return mintFields;
@@ -69,12 +72,18 @@ function schemaFor(name: string): z.ZodRawShape {
     case "compound":
     case "rebalance":
     case "exit":
-      return { tokenId: str, owner: opt, live: opt, noFee: opt, feeSource: opt, pct: opt, swapTo: opt, oorPercent: opt };
+      return { tokenId: str, owner: opt, live: opt, noFee: opt, feeSource: opt, pct: opt, swapTo: opt, oorPercent: opt, protocol: opt };
     case "simulate":
-      return { action: str, tokenId: opt, token0: opt, token1: opt, fee: opt, widthPct: opt, amount0: opt, amount1: opt };
+      return { action: str, tokenId: opt, token0: opt, token1: opt, fee: opt, widthPct: opt, amount0: opt, amount1: opt, protocol: opt };
     default:
       return {};
   }
+}
+
+
+export function protocolFromArgs(args: Record<string, unknown> = {}): Protocol {
+  if (args.protocol === undefined || args.protocol === null || args.protocol === "") return parseProtocol("v3");
+  return parseProtocol(String(args.protocol));
 }
 
 export function createMcpServer(): McpServer {
@@ -117,16 +126,16 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
   name = MCP_NAME_ALIAS[name] ?? name;
   const { loadEnv } = await import("../config/env.js");
   const { makePublicClient } = await import("../signer/broadcast.js");
-  const { V3Adapter } = await import("../chain/positions.js");
   const { planCompound, planExit, planRerange, formatReceipt } = await import("../core/actions.js");
   const { usdPricesForPosition, snapshotUsd } = await import("../chain/prices.js");
   const { buildCard, formatCard } = await import("../core/card.js");
   const { getHold, holdAmounts, formatHoldNote } = await import("../core/hold.js");
   const { importHoldForToken } = await import("../chain/mint-history.js");
-  const { quoteMintFromPool, planMint, formatMintQuote, loadPoolForMint, resolveMintToken, sortPoolPair } = await import("../core/mint.js");
+  const { adapterFor } = await import("../core/protocols.js");
   const env = loadEnv();
   const client = makePublicClient(env.rpcUrl);
-  const adapter = new V3Adapter(client);
+  const protocol = protocolFromArgs(args);
+  const adapter = adapterFor(protocol, client);
 
   if (name === "pool_info") {
     const { factoryAbi, poolAbi } = await import("../chain/abi.js");
@@ -143,12 +152,13 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
   }
 
   if (name === "position_list") {
+    adapter.bindOwner?.(args.owner as `0x${string}`);
     const refs = await adapter.listPositions(args.owner as `0x${string}`);
-    return JSON.stringify(refs.map((r) => r.tokenId.toString()));
+    return JSON.stringify(refs.map((r) => ({ tokenId: r.tokenId.toString(), protocol: r.protocol })));
   }
 
   if (name === "position_pnl") {
-    const tokenId = BigInt(String(args.tokenId));
+    const tokenId = parseTokenId(String(args.tokenId), protocol);
     const snap = await adapter.readPosition(tokenId);
     let rec = getHold(tokenId);
     if (!rec) rec = await importHoldForToken(client, tokenId, { amount0: snap.amount0, amount1: snap.amount1 });
@@ -163,11 +173,12 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
   }
 
   const owner = (args.owner as `0x${string}`) ?? "0x0000000000000000000000000000000000000001";
+  adapter.bindOwner?.(owner);
   if (["increase", "decrease", "claim", "compound", "rebalance", "exit", "simulate"].includes(name)) {
     if (name === "simulate" && (String(args.action) === "mint" || String(args.action) === "create")) {
       return quoteOrCreate("quote_mint", args, { client, env, live: false });
     }
-    const snap = await adapter.readPosition(BigInt(String(args.tokenId)));
+    const snap = await adapter.readPosition(parseTokenId(String(args.tokenId), protocol));
     const px = await usdPricesForPosition(client, snap, env.ethUsd);
     const usd = snapshotUsd(snap, px.price0Usd, px.price1Usd);
     const ctx = {
@@ -201,38 +212,29 @@ async function quoteOrCreate(
   ctx: { client: import("viem").PublicClient; env: { uniswapApiKey?: string }; live: boolean },
 ): Promise<string> {
   const { getAddress } = await import("viem");
-  const { quoteMintFromPool, planMint, formatMintQuote, loadPoolForMint, resolveMintToken, sortPoolPair } = await import("../core/mint.js");
-  const a = resolveMintToken(String(args.token0));
-  const b = resolveMintToken(String(args.token1));
-  const [t0, t1] = sortPoolPair(
-    { address: a.address, useNative: a.useNative, amount: args.amount0 ? BigInt(String(args.amount0)) : 0n },
-    { address: b.address, useNative: b.useNative, amount: args.amount1 ? BigInt(String(args.amount1)) : 0n },
-  );
-  const fee = Number(args.fee);
-  const pool = await loadPoolForMint(ctx.client, t0.address, t1.address, fee);
-  const { readTokenMeta } = await import("../chain/positions.js");
-  const token0 = await readTokenMeta(ctx.client, t0.address);
-  const token1 = await readTokenMeta(ctx.client, t1.address);
-  const quote = quoteMintFromPool({
-    token0,
-    token1,
-    fee,
-    sqrtPriceX96: pool.sqrtPriceX96,
-    tickCurrent: pool.tick,
-    pool: pool.pool,
+  const { runMintFlow } = await import("../core/mint-flow.js");
+  const protocol = protocolFromArgs(args);
+  const owner = args.owner ? getAddress(String(args.owner)) : "0x0000000000000000000000000000000000000001";
+  const result = await runMintFlow({
+    client: ctx.client,
+    owner,
+    token0: String(args.token0),
+    token1: String(args.token1),
+    fee: Number(args.fee),
+    protocol,
     widthPct: args.widthPct !== undefined ? Number(args.widthPct) : undefined,
     tickLower: args.tickLower !== undefined ? Number(args.tickLower) : undefined,
     tickUpper: args.tickUpper !== undefined ? Number(args.tickUpper) : undefined,
-    amount0Desired: t0.amount,
-    amount1Desired: t1.amount,
-    useNative: t0.useNative || t1.useNative,
-    nativeIsToken0: t0.useNative,
+    amount0: args.amount0 !== undefined ? BigInt(String(args.amount0)) : undefined,
+    amount1: args.amount1 !== undefined ? BigInt(String(args.amount1)) : undefined,
+    dryRun: !ctx.live,
+    apiKey: ctx.env.uniswapApiKey,
   });
-  const owner = args.owner ? getAddress(String(args.owner)) : "0x0000000000000000000000000000000000000001";
-  const receipt = planMint(quote, owner, !ctx.live);
+  const quote = result.quote;
   return JSON.stringify(
     {
       tool: name,
+      protocol: protocol.toLowerCase(),
       dryRun: !ctx.live,
       chainId: CHAIN_ID,
       treasury: TREASURY,
@@ -243,11 +245,11 @@ async function quoteOrCreate(
         sqrtPriceX96: quote.sqrtPriceX96.toString(),
       },
       receipt: {
-        action: receipt.action,
-        skipped: receipt.skipped,
-        actions: receipt.actions.map((x) => x.description),
+        action: result.receipt.action,
+        skipped: result.receipt.skipped,
+        actions: result.receipt.actions.map((x) => x.description),
       },
-      card: formatMintQuote(quote),
+      card: result.card,
       note: "NFT minted to the user wallet. No vault custody. create === mint.",
     },
     null,

@@ -43,6 +43,7 @@ describe("HOLD persistence", () => {
     const path = tmpPath();
     persistMintHold(
       {
+        protocol: "V3",
         token0: ADDRESSES.weth,
         token1: ADDRESSES.usdc,
         symbol0: "WETH",

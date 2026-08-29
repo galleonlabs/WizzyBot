@@ -17,6 +17,7 @@ function privyAuth(): AuthFn<Request> {
         principalId: claims.userId,
         principalType: "user",
         issuer: "privy",
+        attributes: {},
       };
     } catch {
       return null;

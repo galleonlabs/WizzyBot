@@ -20,7 +20,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         appearance: { theme: "dark", accentColor: "#ff8fa3" },
         embeddedWallets: {
           ethereum: { createOnLogin: "users-without-wallets" },
-          solana: { createOnLogin: "users-without-wallets" },
+          solana: { createOnLogin: "all-users" },
         },
         solana: {
           rpcs: {

@@ -5,6 +5,7 @@ const page = readFileSync("app/page.tsx", "utf8");
 const portfolio = readFileSync("app/portfolio-app.tsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
+const providers = readFileSync("app/providers.tsx", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
@@ -42,5 +43,11 @@ describe("meme index product UI", () => {
     expect(css).toContain(".index-hero { grid-template-columns: 1fr");
     expect(css).toContain("min-height: 44px");
     expect(css).not.toContain("position: fixed");
+  });
+
+  it("provisions a Privy Solana wallet for new and existing email users", () => {
+    expect(providers).toContain('loginMethods: ["email"]');
+    expect(providers).toContain('solana: { createOnLogin: "all-users" }');
+    expect(providers).toContain('"solana:mainnet"');
   });
 });

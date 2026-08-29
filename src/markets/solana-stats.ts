@@ -3,6 +3,7 @@ import type { MarketStats } from "./stats.js";
 
 type DexPair = {
   url?: string;
+  info?: { imageUrl?: string };
   priceUsd?: string;
   priceChange?: { h24?: number };
   liquidity?: { usd?: number };
@@ -34,6 +35,7 @@ export function deriveSolanaMarketStats(market: SolanaMarket, pair: DexPair | un
       : "illustrative";
   return {
     marketId: market.id,
+    tokenImageUrl: pair?.info?.imageUrl ?? null,
     feePips: market.feeBps * 100,
     priceUsd,
     priceChange24h,

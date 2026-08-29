@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import {
   useSignTransaction,
@@ -9,7 +9,6 @@ import {
 } from "@privy-io/react-auth/solana";
 import { Keypair } from "@solana/web3.js";
 import { formatEther, parseEther } from "viem";
-import { Chat } from "./chat";
 import { lightRowToView, type PositionView } from "./lib/cards";
 import { type ChainSlug } from "./lib/chains";
 import {
@@ -26,7 +25,7 @@ import { type SolanaZapPlan } from "./lib/solana-zap-server";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { relaySucceeded, sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
 
-type ViewTab = "overview" | "markets" | "agent";
+type ViewTab = "overview" | "markets";
 type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" | "submitted" | "error"; message?: string };
 type AnyPositionActionPlan = PositionActionPlan | SolanaPositionActionPlan;
 type IndexChain = ChainSlug | "solana";
@@ -37,6 +36,14 @@ type IndexMarket = {
 };
 
 const CHAIN_SHARES: Record<IndexChain, number> = { base: 6_000, robinhood: 1_500, solana: 2_500 };
+const BRAND_ASSETS = {
+  base: "https://avatars.githubusercontent.com/u/108554348?v=4",
+  robinhood: "https://cdn.robinhood.com/assets/generated_assets/hoodchain_docsite/feather-light.svg",
+  solana: "https://avatars.githubusercontent.com/u/35608259?v=4",
+  uniswap: "https://avatars.githubusercontent.com/u/36115574?v=4",
+  aerodrome: "https://avatars.githubusercontent.com/u/139490796?v=4",
+  meteora: "https://avatars.githubusercontent.com/u/126859799?v=4",
+} as const;
 
 const EMPTY_MARKETS: MarketsPayload = {
   catalog: { version: 1, updatedAt: "", fees: { allocateBps: 15, withdrawBps: 15, rebalanceBps: 15, compoundBps: 200 }, chains: [] },
@@ -114,7 +121,7 @@ export function PortfolioApp() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("view");
-    if (requested === "markets" || requested === "agent") setTab(requested);
+    if (requested === "markets") setTab(requested);
     if (isShotQuery()) {
       setPreviewMode(true);
       setPositions(SHOT_VIEWS);
@@ -149,7 +156,7 @@ export function PortfolioApp() {
     return [...evm, ...solana];
   }, [markets]);
   const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
-  const feePace = weightedFeePace(activeMarkets, stats);
+  const feeApr = weightedFeeApr(activeMarkets, stats);
 
   function changeTab(next: ViewTab) {
     setTab(next);
@@ -311,8 +318,8 @@ export function PortfolioApp() {
           <span>Una</span>
         </button>
         <nav aria-label="Primary navigation">
-          {(["overview", "markets", "agent"] as const).map((item) => (
-            <button key={item} type="button" className={tab === item ? "is-active" : ""} onClick={() => changeTab(item)}>{item === "overview" ? "Make" : item === "markets" ? "Index" : "Ask"}</button>
+          {(["overview", "markets"] as const).map((item) => (
+            <button key={item} type="button" className={tab === item ? "is-active" : ""} onClick={() => changeTab(item)}>{item === "overview" ? "Make" : "Index"}</button>
           ))}
         </nav>
         <div className="nav-actions">
@@ -328,24 +335,24 @@ export function PortfolioApp() {
 
       {previewMode ? <div className="preview-banner">Illustrative preview · development only</div> : null}
 
-      {tab === "agent" ? (
-        <AgentWorkspace authenticated={authenticated} onLogin={() => void login()} />
-      ) : (
-        <div className="index-shell" data-view={tab}>
+      <div className="index-shell" data-view={tab}>
           {tab === "overview" ? (
             <>
               <section className="index-hero">
-                <div className="hero-copy">
-                  <h1>Make meme markets.</h1>
-                  <p>One ETH deposit. Eight positions across Base, Robinhood, and Solana.</p>
+                <div className="hero-stage">
+                  <div className="hero-copy">
+                    <h1>Make meme markets.</h1>
+                    <p>One deposit. Eight positions. Fees from every trade.</p>
+                  </div>
+                  <IndexShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
                 </div>
                 <MarketAction
                   amount={amount}
                   onAmount={setAmount}
                   markets={activeMarkets}
+                  stats={stats}
                   loading={marketsState === "loading"}
-                  feePace={feePace}
-                  feeBps={markets.catalog.fees.allocateBps}
+                  feeApr={feeApr}
                   ready={ready && solanaReady}
                   onPrepare={() => void prepareIndex()}
                   plan={plan}
@@ -361,6 +368,7 @@ export function PortfolioApp() {
                   positions={positions}
                   state={positionsState}
                   constituentCount={activeMarkets.length}
+                  stats={stats}
                   onLogin={() => void login()}
                   onAction={preparePositionAction}
                   actionPlan={actionPlan}
@@ -373,26 +381,47 @@ export function PortfolioApp() {
           ) : (
             <section className="index-main markets-view">
               <header className="index-title-row">
-                <div><h1>Eight markets. One index.</h1><p>Reviewed markets across three networks.</p></div>
+                <div><h1>Eight markets. One index.</h1><p>Live pool performance across Base, Robinhood, and Solana.</p></div>
                 <button className="icon-button" type="button" onClick={() => void (previewMode ? Promise.resolve() : loadPositions())} aria-label="Refresh market data"><RefreshIcon /></button>
               </header>
               <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} />
             </section>
           )}
-        </div>
-      )}
+      </div>
       <footer className="index-footer">Una is independent and is not affiliated with the networks, venues, or tokens shown.</footer>
     </main>
   );
 }
 
-function MarketAction({ amount, onAmount, markets, loading, feePace, feeBps, ready, onPrepare, plan, state, onExecute, onCancel }: {
+function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {
+  return <div className="index-showcase" aria-label="Meme market index">
+    <div className={`hero-token-field ${loading ? "is-loading" : ""}`}>
+      {(loading ? Array.from({ length: 8 }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
+        <span className="hero-token" key={market.id} style={{ "--token-index": index } as CSSProperties}>
+          <TokenIcon symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />
+          {market.symbol ? <b>{market.symbol}</b> : null}
+        </span>
+      ))}
+    </div>
+    <div className="brand-rail" aria-label="Networks and venues">
+      <BrandLogo brand="base" label="Base" />
+      <BrandLogo brand="robinhood" label="Robinhood" />
+      <BrandLogo brand="solana" label="Solana" />
+      <span className="brand-divider" aria-hidden="true" />
+      <BrandLogo brand="uniswap" label="Uniswap" />
+      <BrandLogo brand="aerodrome" label="Aerodrome" />
+      <BrandLogo brand="meteora" label="Meteora" />
+    </div>
+  </div>;
+}
+
+function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, ready, onPrepare, plan, state, onExecute, onCancel }: {
   amount: string;
   onAmount: (amount: string) => void;
   markets: IndexMarket[];
+  stats: Map<string, MarketStats>;
   loading: boolean;
-  feePace: number | null;
-  feeBps: number;
+  feeApr: number | null;
   ready: boolean;
   onPrepare: () => void;
   plan: MemeIndexPlan | null;
@@ -409,15 +438,15 @@ function MarketAction({ amount, onAmount, markets, loading, feePace, feeBps, rea
       </label>
 
       <div className={`market-output ${loading ? "is-loading" : ""}`} aria-label="Index positions">
-        <span><small>Una makes</small><b>{constituentCount || "Eight"} positions</b><em>Base · Robinhood · Solana</em></span>
+        <span><small>You get</small><b>{constituentCount || "Eight"} LP positions</b><em>Across three networks</em></span>
         <span className="market-stack" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
-          {loading ? Array.from({ length: 5 }, (_, index) => <i key={index} />) : markets.map(({ market }) => <i key={market.id} style={{ background: market.color }}>{market.symbol.slice(0, 1)}</i>)}
+          {loading ? Array.from({ length: 5 }, (_, index) => <i key={index} />) : markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />)}
         </span>
       </div>
 
       <div className="action-economics">
-        <div><span>24h pool fees</span><b>{feePace === null ? "Unavailable" : `$${feePace.toFixed(2)} / $1k`}</b><small>Observed, not forecast</small></div>
-        <div><span>Una fee</span><b>{(feeBps / 100).toFixed(2)}%</b><small>On deposit</small></div>
+        <div><span>Fee APR</span><b>{formatFeeApr(feeApr)}</b></div>
+        <small>24h annualized</small>
       </div>
 
       {state.kind !== "idle" ? <PlanPreview plan={plan} state={state} onExecute={onExecute} onCancel={onCancel} /> : (
@@ -425,7 +454,7 @@ function MarketAction({ amount, onAmount, markets, loading, feePace, feeBps, rea
           {!ready ? "Preparing wallets…" : "Make markets"}<ArrowIcon />
         </button>
       )}
-      <p className="action-assurance"><span>3 wallet approvals</span><span>Positions stay yours</span></p>
+      <p className="action-assurance"><span>3 wallet approvals</span><span>Self-custodial</span></p>
     </aside>
   );
 }
@@ -465,19 +494,20 @@ function MarketLedger({ markets, stats, state, compact = false }: { markets: Ind
       <header><h2>The index</h2><span className="market-data-note">{markets.length || 8} markets</span></header>
       <div className="market-table-wrap">
         <table className={`market-table ${compact ? "is-compact" : ""}`}>
-          <thead><tr><th>Market</th><th>24h fees</th><th>Network</th><th>Liquidity</th>{compact ? null : <th>Risk</th>}</tr></thead>
+          <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>TVL</th><th>Venue</th>{compact ? null : <th>Risk</th>}</tr></thead>
           <tbody>
-            {state === "loading" ? Array.from({ length: compact ? 5 : 8 }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={compact ? 4 : 5}><i /></td></tr>) : null}
-            {state === "error" ? <tr><td colSpan={compact ? 4 : 5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
+            {state === "loading" ? Array.from({ length: compact ? 5 : 8 }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={compact ? 5 : 6}><i /></td></tr>) : null}
+            {state === "error" ? <tr><td colSpan={compact ? 5 : 6} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
             {state === "ready" ? markets.map(({ market, chain }) => {
               const row = stats.get(market.id);
               const quote = chain === "solana" ? "SOL" : "WETH";
               return <tr key={market.id}>
-                <td><span className="pair-cell"><i style={{ background: market.color }}>{market.symbol.slice(0, 1)}</i><span><b>{market.symbol}/{quote}</b><small>{market.name}</small></span></span></td>
-                <td><b className="fee-pace">{row?.dailyFeesPer1000Usd == null ? "—" : `$${row.dailyFeesPer1000Usd.toFixed(2)}`}</b><small className="cell-note">per $1,000</small></td>
-                <td><span className={`chain-pill is-${chain}`}><i />{market.protocol === "AERODROME_SLIPSTREAM" ? "Base · Aero" : chainLabel(chain)}</span></td>
+                <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/{quote}</b><small>{market.name}</small></span></span></td>
+                <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b><small className="cell-note">24h annualized</small></td>
+                <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
-                {compact ? null : <td><span className={`risk-label is-${market.risk}`}><i />{market.risk === "established" ? "Established" : "Emerging"}</span></td>}
+                <td><VenueTrail chain={chain} protocol={market.protocol} /></td>
+                {compact ? null : <td><span className={`risk-label is-${market.risk}`}>{market.risk === "established" ? "Established" : "Emerging"}</span></td>}
               </tr>;
             }) : null}
           </tbody>
@@ -487,11 +517,12 @@ function MarketLedger({ markets, stats, state, compact = false }: { markets: Ind
   );
 }
 
-function PositionLedger({ authenticated, positions, state, constituentCount, onLogin, onAction, actionPlan, actionState, onExecute, onCancel }: {
+function PositionLedger({ authenticated, positions, state, constituentCount, stats, onLogin, onAction, actionPlan, actionState, onExecute, onCancel }: {
   authenticated: boolean;
   positions: PositionView[];
   state: "idle" | "loading" | "ready" | "error";
   constituentCount: number;
+  stats: Map<string, MarketStats>;
   onLogin: () => void;
   onAction: (position: PositionView, action: "compound" | "withdraw") => void;
   actionPlan: AnyPositionActionPlan | null;
@@ -524,15 +555,15 @@ function PositionLedger({ authenticated, positions, state, constituentCount, onL
         <div><span>Position value</span><strong>{summary.priced ? money(summary.valueUsd) : "—"}</strong><small>{summary.priced} of {positions.length} priced</small></div>
         <div><span>Fees ready</span><strong>{summary.feesPriced ? money(summary.feesUsd) : "—"}</strong><small>Unclaimed across priced positions</small></div>
         <div><span>Earning now</span><strong>{summary.earning}</strong><small>of {positions.length} positions in range</small></div>
-        <div><span>Networks</span><strong>{summary.networks}</strong><small>of 3 networks found</small></div>
+        <div><span>Fee APR</span><strong>{formatFeeAprFraction(summary.feeApr)}</strong><small>Across priced positions</small></div>
       </section> : null}
       {positions.length ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
-        <span className="position-pair"><i>{position.symbol0.slice(0, 1)}</i><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
+        <span className="position-pair"><TokenIcon symbol={position.symbol0} src={position.marketId ? stats.get(position.marketId)?.tokenImageUrl : undefined} /><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
         <span><small>Value</small><b>{position.lpUsd === undefined ? "—" : money(position.lpUsd)}</b></span>
         <span><small>Fees</small><b>{position.feesUsd === undefined ? "—" : money(position.feesUsd)}</b></span>
-        <span><small>vs HOLD</small><b className={position.holdDeltaUsd === undefined ? "" : position.holdDeltaUsd >= 0 ? "positive" : "negative"}>{position.holdDeltaUsd === undefined ? "—" : signedMoney(position.holdDeltaUsd)}</b></span>
-        <span className={`position-range is-${position.status}`}><i />{position.status === "in-range" ? "Earning fees" : position.status === "oor" ? "Needs attention" : "Closed"}</span>
-        <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed}>Reinvest fees</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>Withdraw</button></span>
+        <span><small>Fee APR</small><b>{formatFeeAprFraction(position.feeApr ?? null)}</b></span>
+        <span className={`position-range is-${position.status}`}>{position.status === "in-range" ? "In range" : position.status === "oor" ? "Out of range" : "Closed"}</span>
+        <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed || !position.inRange} title={!position.inRange ? "Rebalancing is required before compounding" : undefined}>Compound</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>Withdraw</button></span>
       </article>)}</div> : null}
     </section>
   );
@@ -542,6 +573,8 @@ function summarizePositions(positions: PositionView[], constituentCount: number)
   const markets = new Set(positions.map((position) => position.marketId ?? `${position.chain}:${position.pair}`));
   const priced = positions.filter((position) => position.lpUsd !== undefined);
   const feesPriced = positions.filter((position) => position.feesUsd !== undefined);
+  const aprPositions = positions.filter((position) => position.feeApr !== undefined);
+  const aprWeight = aprPositions.reduce((sum, position) => sum + (position.lpUsd ?? 1), 0);
   const total = constituentCount || 8;
   const coverage = Math.min(total, markets.size);
   return {
@@ -552,22 +585,15 @@ function summarizePositions(positions: PositionView[], constituentCount: number)
     feesPriced: feesPriced.length,
     feesUsd: feesPriced.reduce((sum, position) => sum + position.feesUsd!, 0),
     earning: positions.filter((position) => position.status === "in-range").length,
-    networks: new Set(positions.map((position) => position.chain)).size,
+    feeApr: aprWeight ? aprPositions.reduce((sum, position) => sum + position.feeApr! * (position.lpUsd ?? 1), 0) / aprWeight : null,
   };
 }
 
-function AgentWorkspace({ authenticated, onLogin }: { authenticated: boolean; onLogin: () => void }) {
-  return <div className="agent-workspace">
-    <aside><h1>Ask Una.</h1><p>Fees, risk, withdrawals, or a transaction.</p><span><LockIcon />Nothing moves without your approval.</span></aside>
-    <Chat authenticated={authenticated} onLogin={onLogin} />
-  </div>;
-}
-
-function weightedFeePace(markets: IndexMarket[], stats: Map<string, MarketStats>): number | null {
-  const available = markets.filter(({ market }) => stats.get(market.id)?.dailyFeesPer1000Usd != null);
+function weightedFeeApr(markets: IndexMarket[], stats: Map<string, MarketStats>): number | null {
+  const available = markets.filter(({ market }) => stats.get(market.id)?.trailingFeeAprPct != null);
   if (!available.length) return null;
   const weight = available.reduce((sum, row) => sum + row.indexWeightBps, 0);
-  return available.reduce((sum, row) => sum + (stats.get(row.market.id)!.dailyFeesPer1000Usd! * row.indexWeightBps) / weight, 0);
+  return available.reduce((sum, row) => sum + (stats.get(row.market.id)!.trailingFeeAprPct! * row.indexWeightBps) / weight, 0);
 }
 
 async function waitForRelay(statusPath: string): Promise<void> {
@@ -607,6 +633,16 @@ function compactMoney(value?: number | null): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
+function formatFeeApr(value?: number | null): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${value.toFixed(value >= 100 ? 0 : 1)}%`;
+}
+
+function formatFeeAprFraction(value?: number | null): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return formatFeeApr(value * 100);
+}
+
 function trimEth(value: bigint): string {
   const formatted = formatEther(value);
   const [whole, fraction = ""] = formatted.split(".");
@@ -615,6 +651,29 @@ function trimEth(value: bigint): string {
 
 function short(value: string): string {
   return value.startsWith("0x") && value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
+}
+
+function TokenIcon({ symbol, src, color }: { symbol: string; src?: string | null; color?: string }) {
+  return <span className="token-icon" style={{ backgroundColor: color ?? "var(--surface-3)" }} aria-hidden="true">
+    {src ? <img src={src} alt="" /> : <b>{symbol.slice(0, 1)}</b>}
+  </span>;
+}
+
+function BrandLogo({ brand, label, compact = false }: { brand: keyof typeof BRAND_ASSETS; label: string; compact?: boolean }) {
+  return <span className={`brand-logo is-${brand} ${compact ? "is-compact" : ""}`}>
+    <img src={BRAND_ASSETS[brand]} alt="" aria-hidden="true" />
+    {compact ? null : <span>{label}</span>}
+  </span>;
+}
+
+function VenueTrail({ chain, protocol }: { chain: IndexChain; protocol: IndexMarket["market"]["protocol"] }) {
+  const venue = chain === "solana" ? "meteora" : protocol === "AERODROME_SLIPSTREAM" ? "aerodrome" : "uniswap";
+  const venueLabel = venue === "meteora" ? "Meteora" : venue === "aerodrome" ? "Aerodrome" : "Uniswap";
+  return <span className="venue-trail">
+    <BrandLogo brand={chain} label={chainLabel(chain)} compact />
+    <BrandLogo brand={venue} label={venueLabel} compact />
+    <span>{venueLabel}</span>
+  </span>;
 }
 
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }

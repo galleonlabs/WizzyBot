@@ -45,6 +45,7 @@ export type MarketCatalog = {
 
 export type MarketStats = {
   marketId: string;
+  tokenImageUrl: string | null;
   feePips: number;
   priceUsd: number | null;
   priceChange24h: number | null;

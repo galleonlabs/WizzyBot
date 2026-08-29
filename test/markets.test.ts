@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { activeMarkets, chainCatalog, getMarketCatalog } from "../src/markets/catalog.js";
 import { deriveMarketStats } from "../src/markets/stats.js";
 import { activeSolanaMarkets, getSolanaMarketCatalog } from "../src/markets/solana-catalog.js";
+import { deriveSolanaMarketStats } from "../src/markets/solana-stats.js";
 import { weightedBudgets } from "../src/portfolio/allocation.js";
 
 describe("curated meme markets", () => {
@@ -28,6 +29,7 @@ describe("curated meme markets", () => {
     expect(markets.map((market) => market.symbol)).toEqual(["FARTCOIN", "USELESS", "PENGU"]);
     expect(markets.reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
     expect(markets.every((market) => market.protocol === "Meteora DLMM" && market.pool.length >= 32)).toBe(true);
+    expect(deriveSolanaMarketStats(markets[0]!, { info: { imageUrl: "https://cdn.example/solana.png" } }).tokenImageUrl).toBe("https://cdn.example/solana.png");
   });
 
   it("labels market returns as trailing estimates derived from live activity", () => {
@@ -40,11 +42,13 @@ describe("curated meme markets", () => {
       marketCap: 50_000_000,
       pairCreatedAt: Date.parse("2025-01-01T00:00:00.000Z"),
       url: "https://dexscreener.com/base/example",
+      info: { imageUrl: "https://cdn.example/toshi.png" },
     }, "2026-08-29T00:00:00.000Z");
     expect(stats.trailingFeeAprPct).toBeCloseTo(36.5);
     expect(stats.projectedMonthlyFeesPer1000Usd).toBeCloseTo(30.4167, 3);
     expect(stats.projectionConfidence).toBe("illustrative");
     expect(stats.sourceUrl).toContain("dexscreener.com");
+    expect(stats.tokenImageUrl).toBe("https://cdn.example/toshi.png");
   });
 
   it("uses a live Slipstream fee for Aerodrome fee pace", () => {

@@ -7,6 +7,7 @@ import { viemChainFor } from "../chains.js";
 
 type DexPair = {
   url?: string;
+  info?: { imageUrl?: string };
   priceUsd?: string;
   priceChange?: { h24?: number };
   liquidity?: { usd?: number };
@@ -18,6 +19,7 @@ type DexPair = {
 
 export type MarketStats = {
   marketId: string;
+  tokenImageUrl: string | null;
   feePips: number;
   priceUsd: number | null;
   priceChange24h: number | null;
@@ -75,6 +77,7 @@ export function deriveMarketStats(
     : Math.max(0, Math.min(100, Math.round(25 * Math.log10(1 + activity * 100) + (liquidityUsd! >= 1_000_000 ? 25 : 10))));
   return {
     marketId: market.id,
+    tokenImageUrl: pair?.info?.imageUrl ?? null,
     feePips,
     priceUsd,
     priceChange24h,

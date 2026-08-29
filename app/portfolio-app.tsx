@@ -25,7 +25,7 @@ import { type SolanaZapPlan } from "./lib/solana-zap-server";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { relaySucceeded, sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
 
-type ViewTab = "overview" | "markets";
+type ViewTab = "overview" | "markets" | "positions";
 type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" | "submitted" | "error"; message?: string };
 type AnyPositionActionPlan = PositionActionPlan | SolanaPositionActionPlan;
 type IndexChain = ChainSlug | "solana";
@@ -121,7 +121,7 @@ export function PortfolioApp() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("view");
-    if (requested === "markets") setTab(requested);
+    if (requested === "markets" || requested === "positions") setTab(requested);
     if (isShotQuery()) {
       setPreviewMode(true);
       setPositions(SHOT_VIEWS);
@@ -140,6 +140,17 @@ export function PortfolioApp() {
   useEffect(() => {
     if (!previewMode && !isShotQuery()) void loadPositions();
   }, [loadPositions, previewMode]);
+
+  useEffect(() => {
+    if (tab !== "positions") return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("positions")?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [marketsState, tab]);
 
   useEffect(() => {
     setPlan(null);
@@ -318,8 +329,8 @@ export function PortfolioApp() {
           <span>Una</span>
         </button>
         <nav aria-label="Primary navigation">
-          {(["overview", "markets"] as const).map((item) => (
-            <button key={item} type="button" className={tab === item ? "is-active" : ""} onClick={() => changeTab(item)}>{item === "overview" ? "Make" : "Index"}</button>
+          {([{ id: "overview", label: "Make" }, { id: "markets", label: "Index" }, { id: "positions", label: "Positions" }] as const).map((item) => (
+            <button key={item.id} type="button" className={tab === item.id ? "is-active" : ""} onClick={() => changeTab(item.id)}>{item.label}</button>
           ))}
         </nav>
         <div className="nav-actions">
@@ -336,7 +347,7 @@ export function PortfolioApp() {
       {previewMode ? <div className="preview-banner">Illustrative preview · development only</div> : null}
 
       <div className="index-shell" data-view={tab}>
-          {tab === "overview" ? (
+          {tab !== "markets" ? (
             <>
               <section className="index-hero">
                 <div className="hero-stage">
@@ -388,7 +399,6 @@ export function PortfolioApp() {
             </section>
           )}
       </div>
-      <footer className="index-footer">Una is independent and is not affiliated with the networks, venues, or tokens shown.</footer>
     </main>
   );
 }
@@ -532,7 +542,7 @@ function PositionLedger({ authenticated, positions, state, constituentCount, sta
 }) {
   const summary = summarizePositions(positions, constituentCount);
   return (
-    <section className="position-ledger">
+    <section className="position-ledger" id="positions">
       <header><h2>Your positions</h2>{!authenticated ? <button type="button" onClick={onLogin}>Connect</button> : null}</header>
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">

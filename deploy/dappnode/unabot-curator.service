@@ -1,0 +1,26 @@
+[Unit]
+Description=Una meme index curator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/personal/UnaBot
+Environment=NODE_ENV=production
+Environment=UNABOT_CURATOR_STATE_DIR=%S/unabot-curator
+ExecStart=%h/.bun/bin/bun run curate:index
+UMask=0077
+StateDirectory=unabot-curator
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=default.target

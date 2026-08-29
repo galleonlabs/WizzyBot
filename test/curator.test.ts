@@ -1,0 +1,74 @@
+import { describe, expect, it } from "vitest";
+import { getCuratorConfig } from "../src/curator/config.js";
+import { evaluateMarket, proposeReplacements, type CuratorObservation } from "../src/curator/policy.js";
+
+const policy = getCuratorConfig().policy;
+
+function history(overrides: Partial<CuratorObservation> = {}, hours = 14 * 24): CuratorObservation[] {
+  const start = Date.parse("2026-08-01T00:00:00.000Z");
+  return Array.from({ length: hours + 1 }, (_, index): CuratorObservation => ({
+    marketId: "base-example",
+    chain: "base",
+    name: "Example",
+    symbol: "MEME",
+    token: "0x0000000000000000000000000000000000000001",
+    pool: "0x0000000000000000000000000000000000000002",
+    protocol: "V3",
+    incumbent: false,
+    catalogStatus: "watch",
+    risk: "established",
+    identity: "reviewed",
+    liquidityUsd: 1_000_000,
+    volume24hUsd: 500_000,
+    fees24hUsd: 5_000,
+    feeAprPct: 182.5,
+    priceUsd: 0.01,
+    priceChange24hPct: 8,
+    marketCapUsd: 50_000_000,
+    poolAgeDays: 180 + index / 24,
+    holderCount: 50_000,
+    topHolderPct: 5,
+    socialLinks: 3,
+    securityAvailable: true,
+    securityFlags: [],
+    sourceUrl: "https://dexscreener.com/base/example",
+    observedAt: new Date(start + index * 3_600_000).toISOString(),
+    ...overrides,
+  }));
+}
+
+describe("index curator", () => {
+  it("requires a complete proof window before a candidate becomes eligible", () => {
+    expect(evaluateMarket(history({}, 7 * 24), policy).recommendation).toBe("observe");
+    const evaluation = evaluateMarket(history(), policy);
+    expect(evaluation.recommendation).toBe("eligible");
+    expect(evaluation.score).toBeGreaterThanOrEqual(policy.eligibleScore);
+    expect(evaluation.estimatedCapacityUsd).toBe(10_000);
+  });
+
+  it("does not reward a young pool for a one-day APR spike", () => {
+    const evaluation = evaluateMarket(history({ poolAgeDays: 12, feeAprPct: 2_000 }), policy);
+    expect(evaluation.recommendation).toBe("observe");
+    expect(evaluation.reasons.join(" ")).toContain("pool needs 30 days");
+  });
+
+  it("raises an immediate pause recommendation for hard security failures", () => {
+    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", securityFlags: ["honeypot"] }, 2), policy);
+    expect(evaluation.recommendation).toBe("pause");
+    expect(evaluation.reasons).toContain("security: honeypot");
+  });
+
+  it("sends sustained low-turnover incumbents to review", () => {
+    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", volume24hUsd: 10_000, feeAprPct: 4 }), policy);
+    expect(evaluation.recommendation).toBe("review");
+    expect(evaluation.reasons.join(" ")).toContain("daily volume");
+  });
+
+  it("only proposes a same-chain replacement with a material score margin", () => {
+    const candidate = evaluateMarket(history({ marketId: "base-candidate" }), policy);
+    const incumbent = evaluateMarket(history({ marketId: "base-incumbent", symbol: "OLD", incumbent: true, catalogStatus: "active", feeAprPct: 8, volume24hUsd: 55_000, liquidityUsd: 500_000 }), policy);
+    const proposals = proposeReplacements([candidate, incumbent], policy);
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]).toMatchObject({ candidateMarketId: "base-candidate", incumbentMarketId: "base-incumbent" });
+  });
+});

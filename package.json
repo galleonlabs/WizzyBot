@@ -29,7 +29,8 @@
     "build:web": "node scripts/bundle-hosted.mjs && next build",
     "build:eve": "node scripts/bundle-hosted.mjs && eve build",
     "eve:dev": "node scripts/bundle-hosted.mjs && eve dev",
-    "eve:deploy": "eve deploy --project unabot"
+    "eve:deploy": "eve deploy --project unabot",
+    "curate:index": "bun src/curator/cli.ts"
   },
   "engines": {
     "node": ">=20"

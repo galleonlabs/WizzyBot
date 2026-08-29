@@ -121,6 +121,8 @@ Production Solana treasury custody: Vercel stores only the public address. The i
 
 Market allowlist changes ship through `src/config/markets.json` and `src/config/solana-markets.json`. Never delete an entry that may still have open positions. Mark it `paused` or `watch` so wallet positions remain discoverable and withdrawable; only `active` entries receive new liquidity.
 
+The persistent research workflow is documented in `docs/CURATION.md`. `bun run curate:index` records advisory market evidence and replacement studies; it never edits either catalog.
+
 ## Dry-run vs live
 
 | Surface | Dry-run (default) | Live |

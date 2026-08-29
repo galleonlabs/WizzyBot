@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MCP_TOOLS, MCP_TOOL_DEFS, listMcpTools, createMcpServer } from "../src/mcp/server.js";
+import { MCP_TOOLS, MCP_TOOL_DEFS, listMcpTools, createMcpServer, schemaFor, protocolFromArgs } from "../src/mcp/server.js";
 import { PRODUCT_VERBS } from "../src/copy.js";
 
 describe("MCP listTools", () => {
@@ -45,5 +45,22 @@ describe("MCP listTools", () => {
     if (registered) {
       expect(Object.keys(registered).sort()).toEqual(listMcpTools().sort());
     }
+  });
+
+  it("accepts protocol on tools and defaults to v3", () => {
+    const verbs = ["list", "status", "mint", "compound", "range", "exit", "simulate", "create", "position_list", "position_pnl", "quote_mint", "rebalance"];
+    for (const name of verbs) {
+      const shape = schemaFor(name);
+      expect(shape, name).toHaveProperty("protocol");
+    }
+    expect(protocolFromArgs({})).toBe("V3");
+    expect(protocolFromArgs({ protocol: undefined })).toBe("V3");
+    expect(protocolFromArgs({ protocol: "" })).toBe("V3");
+    expect(protocolFromArgs({ protocol: "v3" })).toBe("V3");
+    expect(protocolFromArgs({ protocol: "v2" })).toBe("V2");
+    expect(protocolFromArgs({ protocol: "v4" })).toBe("V4");
+    expect(protocolFromArgs({ protocol: "2" })).toBe("V2");
+    expect(protocolFromArgs({ protocol: "4" })).toBe("V4");
+    expect(() => protocolFromArgs({ protocol: "v5" })).toThrow(/v2\|v3\|v4/);
   });
 });

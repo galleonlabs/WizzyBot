@@ -8,5 +8,6 @@ export type ProductVerb = (typeof PRODUCT_VERBS)[number];
 export const PRODUCT_HELP = [
   `UnaBot. ${PRODUCT_LINE}`,
   "list | status | mint | compound | range | exit | simulate",
+  "--protocol v2|v3|v4 (default v3).",
   "Dry-run default. --live and yes to broadcast.",
 ].join("\n");

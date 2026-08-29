@@ -54,4 +54,21 @@ describe("telegram dry-path", () => {
     expect(sim.awaitConfirm).toBe(false);
     expect(sim.text).toMatch(/simulate compound/);
   });
+
+  it("accepts --protocol v2|v3|v4 and defaults to v3", () => {
+    const def = planTelegramReply("compound 12345", false);
+    expect(def.awaitConfirm).toBe(false);
+    expect(def.text).toMatch(/protocol=v3/);
+    const v4 = planTelegramReply("compound 12345 --protocol v4", false);
+    expect(v4.text).toMatch(/protocol=v4/);
+    const slash = planTelegramReply("/range 12345 --protocol v2", false);
+    expect(slash.text).toMatch(/range tokenId=12345/);
+    expect(slash.text).toMatch(/protocol=v2/);
+    const mint = planTelegramReply("mint WETH/USDC 0.05% width 10 --protocol v4", false);
+    expect(mint.text).toMatch(/protocol=v4/);
+    const sim = planTelegramReply("simulate exit 12345 --protocol v2", false);
+    expect(sim.text).toMatch(/protocol=v2/);
+    const help = planTelegramReply("help", false);
+    expect(help.text).toMatch(/--protocol v2\|v3\|v4/);
+  });
 });

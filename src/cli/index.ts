@@ -20,7 +20,7 @@ import { importHoldForToken } from "../chain/mint-history.js";
 import { runTelegramLoop } from "../surfaces/telegram.js";
 import { COMPOUND_FEE_BPS, NOTIONAL_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
 import { rangeFromWidthPct, snapRange, tickSpacingForFee } from "../core/ticks.js";
-import { parseIntent, confirmPhrase, isWrite, type Intent } from "../agent/nlp.js";
+import { parseIntent, confirmPhrase, isWrite, protocolOf, type Intent } from "../agent/nlp.js";
 import { PRODUCT_LINE, PRODUCT_HELP } from "../copy.js";
 import { StdoutSink } from "../keeper/alerts.js";
 import { runLoop, runOnce } from "../keeper/loop.js";
@@ -65,7 +65,7 @@ export function feeSourceFlag(opts: { feeSource?: string } = {}): "fees" | "noti
   return v;
 }
 
-function protocolFlag(opts: { protocol?: string } = {}): Protocol {
+export function protocolFlag(opts: { protocol?: string } = {}): Protocol {
   return parseProtocol(opts.protocol ?? "v3");
 }
 
@@ -287,12 +287,14 @@ program
   .description("Plan compound | range | exit. No broadcast.")
   .argument("<action>", "compound | range | exit")
   .argument("<tokenId>")
-  .action(async (action: string, tokenId: string, _opts, cmd) => {
+  .option("--protocol <v>", "v2 | v3 | v4 (default v3)", "v3")
+  .action(async (action: string, tokenId: string, opts, cmd) => {
     const mapped = action === "range" || action === "rebalance" ? "rerange" : action;
     if (mapped !== "compound" && mapped !== "rerange" && mapped !== "exit") {
       throw new Error("action must be compound|range|exit");
     }
-    const receipt = await planFor(mapped, BigInt(tokenId), cmd);
+    const protocol = protocolFlag(opts);
+    const receipt = await planFor(mapped, parseTokenId(tokenId, protocol), cmd, { protocol });
     printReceipt(receipt);
   });
 
@@ -509,37 +511,42 @@ async function runChat(text: string, opts: { live?: boolean }): Promise<void> {
   await dispatchIntent(intent);
 }
 
+function protocolArgv(intent: Intent): string[] {
+  return ["--protocol", protocolOf(intent).toLowerCase()];
+}
+
 async function dispatchIntent(intent: Intent): Promise<void> {
+  const proto = protocolArgv(intent);
   switch (intent.verb) {
     case "list":
-      await program.parseAsync(["node", "unabot", "list", ...(intent.owner ? ["--owner", intent.owner] : [])]);
+      await program.parseAsync(["node", "unabot", "list", ...proto, ...(intent.owner ? ["--owner", intent.owner] : [])]);
       break;
     case "status":
       if (intent.tokenId === undefined) {
-        await program.parseAsync(["node", "unabot", "list"]);
+        await program.parseAsync(["node", "unabot", "list", ...proto]);
       } else {
-        await program.parseAsync(["node", "unabot", "status", String(intent.tokenId)]);
+        await program.parseAsync(["node", "unabot", "status", String(intent.tokenId), ...proto]);
       }
       break;
     case "compound":
-      await program.parseAsync(["node", "unabot", "compound", String(intent.tokenId)]);
+      await program.parseAsync(["node", "unabot", "compound", String(intent.tokenId), ...proto]);
       break;
     case "rerange":
-      await program.parseAsync(["node", "unabot", "range", String(intent.tokenId)]);
+      await program.parseAsync(["node", "unabot", "range", String(intent.tokenId), ...proto]);
       break;
     case "exit":
-      await program.parseAsync(["node", "unabot", "exit", String(intent.tokenId)]);
+      await program.parseAsync(["node", "unabot", "exit", String(intent.tokenId), ...proto]);
       break;
     case "mint":
       console.log(JSON.stringify(intent, (_, v) => (typeof v === "bigint" ? v.toString() : v), 2));
-      console.log("Use: unabot mint --token0 <addr> --token1 <addr> --fee <n> --width <pct>");
+      console.log(`Use: unabot mint --protocol ${protocolOf(intent).toLowerCase()} --token0 <addr> --token1 <addr> --fee <n> --width <pct>`);
       break;
     case "simulate":
       if (!intent.action || intent.tokenId === undefined) {
-        console.log("Use: unabot simulate compound|range|exit <tokenId>");
+        console.log("Use: unabot simulate compound|range|exit <tokenId> --protocol v3");
         break;
       }
-      await program.parseAsync(["node", "unabot", "simulate", intent.action, String(intent.tokenId)]);
+      await program.parseAsync(["node", "unabot", "simulate", intent.action, String(intent.tokenId), ...proto]);
       break;
     default:
       break;

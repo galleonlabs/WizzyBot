@@ -1,19 +1,35 @@
+import type { Protocol } from "../types.js";
+import { parseProtocol } from "../core/protocol.js";
+
 export type SimulateAction = "compound" | "range" | "exit" | "mint";
 
 export type Intent =
-  | { verb: "status"; tokenId?: bigint; owner?: string }
-  | { verb: "list"; owner?: string }
-  | { verb: "mint"; token0?: string; token1?: string; fee?: number; widthPct?: number; tickLower?: number; tickUpper?: number; amount?: string }
-  | { verb: "compound"; tokenId: bigint; noFee?: boolean }
-  | { verb: "rerange"; tokenId: bigint; oorPercent?: number }
-  | { verb: "exit"; tokenId: bigint; swapTo?: string }
-  | { verb: "simulate"; action?: SimulateAction; tokenId?: bigint }
+  | { verb: "status"; tokenId?: bigint; owner?: string; protocol: Protocol }
+  | { verb: "list"; owner?: string; protocol: Protocol }
+  | { verb: "mint"; token0?: string; token1?: string; fee?: number; widthPct?: number; tickLower?: number; tickUpper?: number; amount?: string; protocol: Protocol }
+  | { verb: "compound"; tokenId: bigint; noFee?: boolean; protocol: Protocol }
+  | { verb: "rerange"; tokenId: bigint; oorPercent?: number; protocol: Protocol }
+  | { verb: "exit"; tokenId: bigint; swapTo?: string; protocol: Protocol }
+  | { verb: "simulate"; action?: SimulateAction; tokenId?: bigint; protocol: Protocol }
   | { verb: "help" }
   | { verb: "unknown"; text: string };
+
+export function protocolOf(intent: Intent): Protocol {
+  return "protocol" in intent && intent.protocol ? intent.protocol : "V3";
+}
+
+export function captureProtocol(text: string): Protocol {
+  const flagged = text.match(/(?:--)?protocol\s*[:=]?\s*(\S+)/i);
+  if (flagged) return parseProtocol(flagged[1]);
+  const bare = text.match(/(?:^|[\s/])(v[234])(?:\s|$)/i);
+  if (bare) return parseProtocol(bare[1]);
+  return "V3";
+}
 
 export function parseIntent(text: string): Intent {
   const raw = text.trim();
   const lower = raw.toLowerCase();
+  const protocol = captureProtocol(raw);
 
   if (!raw || /^(help|\?)$/.test(lower)) return { verb: "help" };
 
@@ -27,35 +43,35 @@ export function parseIntent(text: string): Intent {
           ? "range"
           : undefined;
     const tokenId = "tokenId" in inner && inner.tokenId !== undefined ? inner.tokenId : captureTokenId(raw);
-    return { verb: "simulate", action, tokenId };
+    return { verb: "simulate", action, tokenId, protocol };
   }
 
   if (/\b(list|positions|nfts)\b/.test(lower)) {
-    return { verb: "list", owner: captureAddress(raw) };
+    return { verb: "list", owner: captureAddress(raw), protocol };
   }
 
   if (/\b(status|card|pnl|position)\b/.test(lower)) {
-    return { verb: "status", tokenId: captureTokenId(raw), owner: captureAddress(raw) };
+    return { verb: "status", tokenId: captureTokenId(raw), owner: captureAddress(raw), protocol };
   }
 
   if (/\b(compound|reinvest)\b/.test(lower)) {
     const tokenId = captureTokenId(raw);
     if (tokenId === undefined) return { verb: "unknown", text: raw };
-    return { verb: "compound", tokenId, noFee: /\bno-?fee\b/.test(lower) };
+    return { verb: "compound", tokenId, noFee: /\bno-?fee\b/.test(lower), protocol };
   }
 
   if (/\b(range|re-?range|rerange|recenter|auto-?range)\b/.test(lower)) {
     const tokenId = captureTokenId(raw);
     if (tokenId === undefined) return { verb: "unknown", text: raw };
     const oor = raw.match(/oor(?:\s*percent)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
-    return { verb: "rerange", tokenId, oorPercent: oor ? Number(oor[1]) : undefined };
+    return { verb: "rerange", tokenId, oorPercent: oor ? Number(oor[1]) : undefined, protocol };
   }
 
   if (/\b(exit|close|withdraw)\b/.test(lower)) {
     const tokenId = captureTokenId(raw);
     if (tokenId === undefined) return { verb: "unknown", text: raw };
     const swap = raw.match(/\bto\s+([A-Za-z0-9]+)/i);
-    return { verb: "exit", tokenId, swapTo: swap?.[1] };
+    return { verb: "exit", tokenId, swapTo: swap?.[1], protocol };
   }
 
   if (/\b(mint|open|create)\b/.test(lower)) {
@@ -78,6 +94,7 @@ export function parseIntent(text: string): Intent {
       tickLower: ticks ? Number(ticks[1]) : undefined,
       tickUpper: ticks ? Number(ticks[2]) : undefined,
       amount: amount?.[1],
+      protocol,
     };
   }
 
@@ -95,15 +112,16 @@ function captureAddress(text: string): string | undefined {
 }
 
 export function confirmPhrase(intent: Intent): string {
+  const proto = protocolOf(intent).toLowerCase();
   switch (intent.verb) {
     case "compound":
-      return `Compound tokenId ${intent.tokenId}${intent.noFee ? " with --no-fee" : ""}? Type yes to broadcast.`;
+      return `Compound tokenId ${intent.tokenId}${intent.noFee ? " with --no-fee" : ""} protocol=${proto}? Type yes to broadcast.`;
     case "rerange":
-      return `Re-range tokenId ${intent.tokenId}? Type yes to broadcast.`;
+      return `Re-range tokenId ${intent.tokenId} protocol=${proto}? Type yes to broadcast.`;
     case "exit":
-      return `Exit tokenId ${intent.tokenId}${intent.swapTo ? ` into ${intent.swapTo}` : ""}? Type yes to broadcast.`;
+      return `Exit tokenId ${intent.tokenId}${intent.swapTo ? ` into ${intent.swapTo}` : ""} protocol=${proto}? Type yes to broadcast.`;
     case "mint":
-      return `Mint ${intent.token0 ?? "?"}/${intent.token1 ?? "?"} fee=${intent.fee ?? "?"}? Type yes to broadcast.`;
+      return `Mint ${intent.token0 ?? "?"}/${intent.token1 ?? "?"} fee=${intent.fee ?? "?"} protocol=${proto}? Type yes to broadcast.`;
     default:
       return "This is a read. No confirmation needed.";
   }

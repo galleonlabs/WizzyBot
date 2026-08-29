@@ -2,5 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "node scripts/bundle-hosted.mjs && next build",
-  "installCommand": "bun install"
+  "installCommand": "npx -y bun@1.4.0 install --frozen-lockfile"
 }

@@ -1,0 +1,10 @@
+{
+  "name": "unabot-hosted-cjs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./index.cjs",
+  "exports": {
+    ".": "./index.cjs"
+  }
+}

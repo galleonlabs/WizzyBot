@@ -23,7 +23,7 @@ unabot mcp
 Copy `.env.example`. Never commit `.env`.
 
 ```
-unabot pool --token0 0x4200000000000000000000000000000000000006 \
+unabot pool --token0 0x4200000000000000000000000000000000000006 \\
   --token1 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 --fee 500
 ```
 
@@ -38,10 +38,12 @@ Hosted chat + keeper. Node 24+ for the eve CLI. Project name `unabot`.
 ```
 bun install
 cp .env.example .env
-eve dev
+bun run eve:dev
 ```
 
 `eve deploy --project unabot` (or push to a Git-linked Vercel project). `next dev` / `next build` via `withEve()` ships the chat UI and `/eve/v1` together.
+
+Eve tools call a pre-bundled CJS surface (`unabot-hosted-cjs` from `src/hosted-bundle.ts`) so `@uniswap/sdk-core` never loads as extensionless ESM during `eve build`.
 
 Env for the hosted agent:
 

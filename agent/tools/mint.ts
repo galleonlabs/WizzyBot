@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { mintPosition } from "../../src/surfaces/hosted.js";
+import { mintPosition } from "../lib/hosted.js";
 
 export default defineTool({
   description: "Mint a Uniswap LP position. NFT stays in the user wallet. Dry-run by default.",

@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { exitPosition } from "../../src/surfaces/hosted.js";
+import { exitPosition } from "../lib/hosted.js";
 
 export default defineTool({
   description: "Fully exit a position, optional swap to one token. Dry-run by default.",

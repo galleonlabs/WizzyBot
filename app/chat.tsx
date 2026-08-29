@@ -34,7 +34,7 @@ type ChatMessage = {
   parts: MessagePart[];
 };
 
-const STARTERS = ["Why did my fees change?", "How much have I earned?", "Should I collect my fees?", "What could make my position lose?"];
+const STARTERS = ["Show my unclaimed fees", "Why did my earnings change?", "What can make me lose money?", "Prepare a withdrawal"];
 
 const WRITE_TOOLS = new Set(["mint", "compound", "range", "exit"]);
 
@@ -100,11 +100,8 @@ export function Chat({
         <div className="thread-inner">
           {messages.length === 0 ? (
             <div className="empty">
-              <div className="empty-art" aria-hidden="true">
-                <i className="mark" />
-              </div>
-              <h2>Ask before you move.</h2>
-              <p>Explain your fees, flag meaningful risks, and prepare an action. Your wallet keeps the final word.</p>
+              <h2>What do you want to know?</h2>
+              <p>Ask about a market, your fees, or a withdrawal.</p>
               <div className="chips">
                 {STARTERS.map((item) => (
                   <button
@@ -171,14 +168,14 @@ export function Chat({
               autoComplete="off"
               disabled={isResuming || !authenticated}
               placeholder={
-                authenticated ? "Ask about your fees, positions, or a withdrawal…" : "Sign in with email to chat"
+                authenticated ? "Ask Una about your positions…" : "Connect to ask Una"
               }
             />
             <button className="btn btn-accent btn-send" type="submit" disabled={isResuming || !authenticated}>
               Send
             </button>
           </form>
-          <p className="dock-hint">Dry-run first. Confirm to go live.</p>
+          <p className="dock-hint">Nothing moves until you approve it in your wallet.</p>
         </div>
       </footer>
     </section>

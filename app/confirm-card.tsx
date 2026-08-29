@@ -16,8 +16,8 @@ export function ConfirmCard({
   return (
     <section className="confirm-card">
       <header>
-        <h3>Confirm live write</h3>
-        <span>Privy signs only after this.</span>
+        <h3>Review transaction</h3>
+        <span>Nothing signs until you approve.</span>
       </header>
       {confirm ? (
         <dl>
@@ -63,7 +63,7 @@ export function ConfirmCard({
       ) : prompt ? (
         <p>{prompt}</p>
       ) : (
-        <p>Live write waiting on confirm. Dry-run is the default.</p>
+        <p>This transaction is ready for your review.</p>
       )}
       {confirm?.reason ? <p className="confirm-reason">{confirm.reason}</p> : null}
       <div className="confirm-row">

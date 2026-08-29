@@ -10,12 +10,14 @@ describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
     expect(page).toContain("PortfolioApp");
     expect(portfolio).toContain("The meme market maker");
-    expect(portfolio).toContain("Deposit once. Earn the trading fees");
+    expect(portfolio).toContain("Deposit ETH once");
     expect(portfolio).toContain("Make markets");
-    expect(portfolio).toContain("Observed fees yesterday");
-    expect(portfolio).toContain("It is not an APY or return promise");
+    expect(portfolio).toContain("Pool fees yesterday");
+    expect(portfolio).toContain("evidence, not a return forecast");
+    expect(portfolio).toContain("Eight markets. One index.");
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
     expect(portfolio).not.toMatch(/autopilot|guaranteed returns|UnaBot/i);
+    expect(portfolio).not.toMatch(/one deposit · every market|self-custodial by design/i);
   });
 
   it("uses Plus Jakarta Sans and the approved index palette", () => {
@@ -31,12 +33,11 @@ describe("meme index product UI", () => {
   it("keeps the tri-chain index, custody, and responsive navigation explicit", () => {
     expect(portfolio).toContain("Base · Robinhood · Solana");
     expect(portfolio).toContain("Base · Aero");
-    expect(portfolio).toContain("1</b> index");
-    expect(portfolio).toContain("You own every position");
-    expect(portfolio).toContain("wallet approvals: Base, Robinhood, and one Solana review");
-    expect(portfolio).toContain("This keeps every position self-custodial");
-    expect(css).toContain(".index-nav nav { position: fixed");
-    expect(css).toContain("env(safe-area-inset-bottom");
-    expect(css).toContain("min-height: 48px");
+    expect(portfolio).toContain("Keep every position");
+    expect(portfolio).toContain("approvals across Base, Robinhood, and Solana");
+    expect(portfolio).toContain("Each approval creates positions you own");
+    expect(css).toContain(".index-hero { grid-template-columns: 1fr");
+    expect(css).toContain("min-height: 44px");
+    expect(css).not.toContain("position: fixed");
   });
 });

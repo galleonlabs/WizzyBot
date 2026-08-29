@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Liquidity, as an agent. v2, v3, and v4. You hold the NFT.",
+  "description": "The one-click market maker for memes.",
   "license": "UNLICENSED",
   "bin": {
     "unabot": "./bin/unabot.mjs"

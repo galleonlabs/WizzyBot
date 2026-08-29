@@ -137,7 +137,6 @@ export function PortfolioApp() {
     return [...evm, ...solana];
   }, [markets]);
   const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
-  const metrics = portfolioMetrics(positions);
   const feePace = weightedFeePace(activeMarkets, stats);
 
   function changeTab(next: ViewTab) {
@@ -164,7 +163,7 @@ export function PortfolioApp() {
       setPlanState({ kind: "error", message: "Enter a valid ETH amount." });
       return;
     }
-    setPlanState({ kind: "planning", message: "Finding the cleanest route into every market…" });
+    setPlanState({ kind: "planning", message: "Getting the latest route for your deposit…" });
     setPlan(null);
     try {
       const response = await fetch("/api/portfolio/index", {
@@ -175,7 +174,7 @@ export function PortfolioApp() {
       const payload = await response.json() as { plan?: MemeIndexPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not prepare the index deposit");
       setPlan(payload.plan);
-      setPlanState({ kind: "ready", message: "Your deposit is ready. Una handles every market and network." });
+      setPlanState({ kind: "ready", message: "Review your deposit and fees before continuing." });
     } catch (error) {
       setPlanState({ kind: "error", message: error instanceof Error ? error.message : "Could not prepare the index deposit" });
     }
@@ -192,7 +191,7 @@ export function PortfolioApp() {
     try {
       setPlanState({ kind: "signing", message: "Make markets: approve your deposit on Base." });
       await sendWalletCalls({ wallet: connected, owner: address, chainId: fund.chainId, transactions: fund.transactions });
-      setPlanState({ kind: "waiting", message: "Una is moving your deposit into all three networks…" });
+      setPlanState({ kind: "waiting", message: "Moving your deposit to Robinhood and Solana…" });
       await Promise.all([
         waitForRelay(fund.robinhoodBridge.statusPath),
         waitForRelay(fund.solanaBridge.statusPath),
@@ -223,7 +222,7 @@ export function PortfolioApp() {
           message: step === 0 ? "Approve every Solana market in one wallet review." : `${label} · ${symbol} · ${step} of ${total}`,
         }),
       });
-      setPlanState({ kind: "submitted", message: "You are making markets across Base, Robinhood, and Solana. Your positions live in your wallets." });
+      setPlanState({ kind: "submitted", message: "Your market positions are being confirmed. They will appear here after the networks settle." });
       window.setTimeout(() => void loadPositions(), 8_000);
     } catch (error) {
       setPlanState({ kind: "error", message: error instanceof Error ? error.message : "The deposit could not be completed" });
@@ -281,7 +280,7 @@ export function PortfolioApp() {
         </button>
         <nav aria-label="Primary navigation">
           {(["overview", "markets", "agent"] as const).map((item) => (
-            <button key={item} type="button" className={tab === item ? "is-active" : ""} onClick={() => changeTab(item)}>{capitalize(item)}</button>
+            <button key={item} type="button" className={tab === item ? "is-active" : ""} onClick={() => changeTab(item)}>{item === "agent" ? "Ask Una" : capitalize(item)}</button>
           ))}
         </nav>
         <div className="nav-actions">
@@ -302,65 +301,66 @@ export function PortfolioApp() {
         <AgentWorkspace authenticated={authenticated} onLogin={() => void login()} />
       ) : (
         <div className="index-shell" data-view={tab}>
-          <section className="index-main">
-            <header className="index-title-row">
-              <div>
-                <h1>{tab === "markets" ? "The meme markets" : "The meme market maker"}</h1>
-                <p>{tab === "markets" ? "The pools Una manages inside one index." : "Deposit once. Earn the trading fees across Base, Robinhood, and Solana."}</p>
-              </div>
-              <button className="icon-button" type="button" onClick={() => void (previewMode ? Promise.resolve() : loadPositions())} aria-label="Refresh portfolio"><RefreshIcon /></button>
-            </header>
-
-            {tab === "overview" ? (
-              <>
-                <IndexHero feePace={feePace} markets={activeMarkets} stats={stats} loading={marketsState === "loading"} positions={positions} metrics={metrics} />
+          {tab === "overview" ? (
+            <>
+              <section className="index-hero">
+                <div className="hero-copy">
+                  <h1>The meme market maker.</h1>
+                  <p>Deposit ETH once. Make eight meme markets across Base, Robinhood, and Solana. Keep every position and the trading fees.</p>
+                  <MarketRibbon markets={activeMarkets} loading={marketsState === "loading"} />
+                  <span className="hero-policy"><LockIcon />The same reviewed index for everyone.</span>
+                </div>
+                <MarketAction
+                  amount={amount}
+                  onAmount={setAmount}
+                  constituentCount={activeMarkets.length}
+                  feePace={feePace}
+                  feeBps={markets.catalog.fees.allocateBps}
+                  ready={ready && solanaReady}
+                  onPrepare={() => void prepareIndex()}
+                  plan={plan}
+                  state={planState}
+                  onExecute={() => void executeIndex()}
+                  onCancel={() => { setPlan(null); setPlanState({ kind: "idle" }); }}
+                />
+              </section>
+              <section className="index-main">
                 <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} compact />
-              </>
-            ) : (
+                <PositionLedger
+                  authenticated={authenticated || previewMode}
+                  positions={positions}
+                  state={positionsState}
+                  onLogin={() => void login()}
+                  onAction={preparePositionAction}
+                  actionPlan={actionPlan}
+                  actionState={actionState}
+                  onExecute={executePositionAction}
+                  onCancel={() => { setActionPlan(null); setActionState({ kind: "idle" }); }}
+                />
+              </section>
+            </>
+          ) : (
+            <section className="index-main markets-view">
+              <header className="index-title-row">
+                <div><h1>Eight markets. One index.</h1><p>See where the index is active and what each market earned in fees yesterday.</p></div>
+                <button className="icon-button" type="button" onClick={() => void (previewMode ? Promise.resolve() : loadPositions())} aria-label="Refresh market data"><RefreshIcon /></button>
+              </header>
               <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} />
-            )}
-
-            <PositionLedger
-              authenticated={authenticated || previewMode}
-              positions={positions}
-              state={positionsState}
-              onLogin={() => void login()}
-              onAction={preparePositionAction}
-              actionPlan={actionPlan}
-              actionState={actionState}
-              onExecute={executePositionAction}
-              onCancel={() => { setActionPlan(null); setActionState({ kind: "idle" }); }}
-            />
-          </section>
-
-          <MarketAction
-            amount={amount}
-            onAmount={setAmount}
-            constituentCount={activeMarkets.length}
-            feePace={feePace}
-            feeBps={markets.catalog.fees.allocateBps}
-            authenticated={authenticated}
-            ready={ready && solanaReady}
-            onPrepare={() => void prepareIndex()}
-            plan={plan}
-            state={planState}
-            onExecute={() => void executeIndex()}
-            onCancel={() => { setPlan(null); setPlanState({ kind: "idle" }); }}
-          />
+            </section>
+          )}
         </div>
       )}
-      <footer className="index-footer"><span>Self-custodial by design</span><span>Una is independent from Uniswap, Meteora, Robinhood, Privy, and Relay.</span></footer>
+      <footer className="index-footer"><span>You own the positions.</span><span>Una is independent and is not affiliated with the networks, venues, or tokens shown.</span></footer>
     </main>
   );
 }
 
-function MarketAction({ amount, onAmount, constituentCount, feePace, feeBps, authenticated, ready, onPrepare, plan, state, onExecute, onCancel }: {
+function MarketAction({ amount, onAmount, constituentCount, feePace, feeBps, ready, onPrepare, plan, state, onExecute, onCancel }: {
   amount: string;
   onAmount: (amount: string) => void;
   constituentCount: number;
   feePace: number | null;
   feeBps: number;
-  authenticated: boolean;
   ready: boolean;
   onPrepare: () => void;
   plan: MemeIndexPlan | null;
@@ -371,33 +371,32 @@ function MarketAction({ amount, onAmount, constituentCount, feePace, feeBps, aut
   return (
     <aside className="market-action" aria-label="Make markets">
       <div className="action-head">
-        <div><span className="eyebrow">ONE DEPOSIT · EVERY MARKET</span><h2>Make markets</h2><p>ETH in. Trading fees back to you.</p></div>
+        <div><h2>Your deposit</h2><p>ETH in. {constituentCount || "Eight"} market positions out.</p></div>
         <ShieldIcon />
       </div>
       <label className="amount-field">
-        <span>You deposit</span>
+        <span>Amount</span>
         <span className="amount-input"><input inputMode="decimal" value={amount} onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" /><b>ETH</b></span>
       </label>
 
-      <div className="index-facts" aria-label="Index coverage">
-        <span><b>{constituentCount || "—"}</b> meme markets</span>
-        <span><b>3</b> networks</span>
-        <span><b>1</b> index</span>
+      <div className="deposit-route" aria-label="Deposit coverage">
+        <span><b>One deposit</b><small>on Base</small></span>
+        <ArrowIcon />
+        <span><b>{constituentCount || "Eight"} markets</b><small>on three networks</small></span>
       </div>
 
       <div className="action-economics">
-        <div><span>Observed fees yesterday</span><b>{feePace === null ? "Unavailable" : `$${feePace.toFixed(2)} / $1k`}</b></div>
-        <div><span>Una deposit fee</span><b>{(feeBps / 100).toFixed(2)}%</b></div>
-        <div><span>Position owner</span><b>You</b></div>
+        <div><span>Pool fees yesterday</span><b>{feePace === null ? "Unavailable" : `$${feePace.toFixed(2)} per $1,000`}</b></div>
+        <div><span>Deposit fee</span><b>{(feeBps / 100).toFixed(2)}%</b></div>
       </div>
-      <p className="pace-note">Fee pace follows live pool activity. It is not an APY or return promise.</p>
+      <p className="pace-note">Yesterday's pool fees are evidence, not a return forecast.</p>
 
       {state.kind !== "idle" ? <PlanPreview plan={plan} state={state} onExecute={onExecute} onCancel={onCancel} /> : (
         <button className="fund-button" type="button" disabled={!ready} onClick={onPrepare}>
-          {!ready ? "Loading wallets…" : authenticated ? "Review deposit" : "Continue with email"}<ArrowIcon />
+          {!ready ? "Preparing wallets…" : "Make markets"}<ArrowIcon />
         </button>
       )}
-      <p className="custody-note"><LockIcon />You own every position. Withdraw anytime.</p>
+      <p className="custody-note"><LockIcon />You keep the positions. Withdraw any time.</p>
     </aside>
   );
 }
@@ -410,19 +409,19 @@ function PlanPreview({ plan, state, onExecute, onCancel }: { plan: MemeIndexPlan
     ? Number(plan.stages[0].robinhoodBridge.relayerFeeUsd ?? 0) + Number(plan.stages[0].solanaBridge.relayerFeeUsd ?? 0)
     : 0;
   const busy = state.kind === "planning" || state.kind === "signing" || state.kind === "waiting";
-  const title = state.kind === "ready" ? "Ready to make markets" : state.kind === "error" ? "Needs attention" : state.kind === "submitted" ? "Markets made" : "Una is working";
+  const title = state.kind === "ready" ? "Review deposit" : state.kind === "error" ? "Deposit not ready" : state.kind === "submitted" ? "Deposit submitted" : "Preparing deposit";
   return (
     <section className={`plan-preview is-${state.kind}`} aria-live="polite">
-      <header><span>{title}</span><button type="button" onClick={onCancel} disabled={busy}>Close</button></header>
+      <header><span>{title}</span><button type="button" onClick={onCancel} disabled={busy}>Cancel</button></header>
       <p>{state.message}</p>
       {plan ? <dl>
-        <div><dt>Your deposit</dt><dd>{trimEth(BigInt(plan.totalAmountWei))} ETH</dd></div>
-        <div><dt>Index</dt><dd>{plan.constituentCount} markets · 3 networks</dd></div>
+        <div><dt>Deposit</dt><dd>{trimEth(BigInt(plan.totalAmountWei))} ETH</dd></div>
+        <div><dt>Markets</dt><dd>{plan.constituentCount} across 3 networks</dd></div>
         <div><dt>Una fee</dt><dd>{trimEth(feeWei)} ETH</dd></div>
-        <div><dt>Network routing</dt><dd>{relayFee > 0 ? `$${relayFee.toFixed(2)}` : "Included in quote"}</dd></div>
+        <div><dt>Network costs</dt><dd>{relayFee > 0 ? `$${relayFee.toFixed(2)}` : "Included in quote"}</dd></div>
       </dl> : <div className="plan-loading"><i /><i /><i /></div>}
       {state.kind === "ready" && plan ? <>
-        <p className="approval-note">One Una action, then {plan.expectedWalletSteps} wallet approvals: Base, Robinhood, and one Solana review. This keeps every position self-custodial.</p>
+        <p className="approval-note">Your wallet will ask for {plan.expectedWalletSteps} approvals across Base, Robinhood, and Solana. Each approval creates positions you own.</p>
         <p className="risk-note">Meme prices can fall, and trading fees may not cover losses.</p>
         <button className="fund-button" type="button" onClick={onExecute}>Make markets<ArrowIcon /></button>
       </> : null}
@@ -431,62 +430,36 @@ function PlanPreview({ plan, state, onExecute, onCancel }: { plan: MemeIndexPlan
   );
 }
 
-function IndexHero({ feePace, markets, stats, loading, positions, metrics }: {
-  feePace: number | null;
+function MarketRibbon({ markets, loading }: {
   markets: IndexMarket[];
-  stats: Map<string, MarketStats>;
   loading: boolean;
-  positions: PositionView[];
-  metrics: ReturnType<typeof portfolioMetrics>;
 }) {
-  return <section className="portfolio-hero" aria-label="Meme liquidity index summary">
-    <div className="hero-value">
-      <span>Observed fees</span>
-      <strong>{loading || feePace === null ? "—" : `$${feePace.toFixed(2)}`}</strong>
-      <small>per $1,000 of liquidity yesterday</small>
-    </div>
-    <MarketPulse markets={markets} stats={stats} loading={loading} />
-    <dl className="hero-metrics">
-      <div><dt>Networks</dt><dd>Base · Robinhood · Solana</dd></div>
-      <div><dt>Your liquidity</dt><dd>{metrics.hasValue ? money(metrics.value) : positions.length ? money(metrics.value) : "No deposit yet"}</dd></div>
-      <div><dt>Unclaimed fees</dt><dd>{positions.length ? money(metrics.fees) : "—"}</dd></div>
-    </dl>
-  </section>;
-}
-
-function MarketPulse({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {
-  const values = markets.map(({ market }) => stats.get(market.id)?.dailyFeesPer1000Usd ?? 0);
-  const max = Math.max(1, ...values);
-  return <div className="index-trace">
-    <header><span>Fee pace by market</span><small>{loading ? "Reading live markets" : `${markets.length} live constituents`}</small></header>
-    <div className="fee-bars" role="img" aria-label="Observed fee pace by index constituent">
-      {markets.map(({ market }, index) => <span key={market.id}>
-        <i style={{ height: `${Math.max(4, (values[index]! / max) * 100)}%`, background: market.color, animationDelay: `${index * 55}ms` }} />
-        <small>{market.symbol}</small>
-      </span>)}
-    </div>
+  return <div className={`market-ribbon ${loading ? "is-loading" : ""}`} aria-label="Markets in the Una index">
+    {loading ? <span>Reading the index…</span> : markets.map(({ market }) => (
+      <span key={market.id}><i style={{ background: market.color }} />{market.symbol}</span>
+    ))}
   </div>;
 }
 
 function MarketLedger({ markets, stats, state, compact = false }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error"; compact?: boolean }) {
   return (
     <section className={`market-ledger ${compact ? "is-compact" : ""}`}>
-      <header><div><h2>Inside the index</h2><p>Una selects and manages every pool.</p></div><span>{markets.length} live</span></header>
+      <header><div><h2>{compact ? "Inside Una" : "Current index"}</h2><p>{compact ? "The markets your deposit enters." : "Una reviews each market before it joins the index."}</p></div><span className="market-data-note"><i />Onchain data</span></header>
       <div className="market-table-wrap">
-        <table className="market-table">
-          <thead><tr><th>Pair</th><th>1D fee pace</th><th>Network</th><th>Liquidity</th><th>Risk</th></tr></thead>
+        <table className={`market-table ${compact ? "is-compact" : ""}`}>
+          <thead><tr><th>Market</th><th>Fees yesterday</th><th>Network</th><th>Liquidity</th>{compact ? null : <th>Risk</th>}</tr></thead>
           <tbody>
-            {state === "loading" ? Array.from({ length: compact ? 5 : 8 }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={5}><i /></td></tr>) : null}
-            {state === "error" ? <tr><td colSpan={5} className="table-message">Live market readings are temporarily unavailable.</td></tr> : null}
+            {state === "loading" ? Array.from({ length: compact ? 5 : 8 }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={compact ? 4 : 5}><i /></td></tr>) : null}
+            {state === "error" ? <tr><td colSpan={compact ? 4 : 5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
             {state === "ready" ? markets.map(({ market, chain }) => {
               const row = stats.get(market.id);
               const quote = chain === "solana" ? "SOL" : "WETH";
               return <tr key={market.id}>
                 <td><span className="pair-cell"><i style={{ background: market.color }}>{market.symbol.slice(0, 1)}</i><span><b>{market.symbol}/{quote}</b><small>{market.name}</small></span></span></td>
-                <td><b className="fee-pace">{row?.dailyFeesPer1000Usd == null ? "—" : `$${row.dailyFeesPer1000Usd.toFixed(2)}`}</b><small className="cell-note">per $1k</small></td>
+                <td><b className="fee-pace">{row?.dailyFeesPer1000Usd == null ? "—" : `$${row.dailyFeesPer1000Usd.toFixed(2)}`}</b><small className="cell-note">per $1,000</small></td>
                 <td><span className={`chain-pill is-${chain}`}><i />{market.protocol === "AERODROME_SLIPSTREAM" ? "Base · Aero" : chainLabel(chain)}</span></td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
-                <td><span className={`risk-pill is-${market.risk}`}>{market.risk}</span></td>
+                {compact ? null : <td><span className={`risk-label is-${market.risk}`}><i />{market.risk === "established" ? "Established" : "Emerging"}</span></td>}
               </tr>;
             }) : null}
           </tbody>
@@ -509,7 +482,7 @@ function PositionLedger({ authenticated, positions, state, onLogin, onAction, ac
 }) {
   return (
     <section className="position-ledger">
-      <header><div><h2>Your liquidity</h2><p>Your positions and fees, held in your wallets.</p></div>{!authenticated ? <button type="button" onClick={onLogin}>Connect wallet</button> : null}</header>
+      <header><div><h2>Your positions</h2><p>See their value, unclaimed fees, and status.</p></div>{!authenticated ? <button type="button" onClick={onLogin}>Connect</button> : null}</header>
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
           <div><b>{actionPlan ? `${actionPlan.kind === "compound" ? "Collect fees" : "Withdraw"} · ${actionPlan.pair}` : "Preparing your position"}</b><p>{actionState.message}</p></div>
@@ -517,17 +490,17 @@ function PositionLedger({ authenticated, positions, state, onLogin, onAction, ac
           <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>Approve</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing"}>Close</button></div>
         </section>
       ) : null}
-      {!authenticated ? <div className="position-empty"><LockIcon /><p>Connect to see your liquidity, fees, and performance.</p></div> : null}
-      {authenticated && state === "loading" ? <div className="position-empty"><p>Reading your positions…</p></div> : null}
-      {authenticated && state === "error" ? <div className="position-empty"><p>Your positions could not be loaded. Your wallets are unaffected.</p></div> : null}
-      {authenticated && state === "ready" && positions.length === 0 ? <div className="position-empty"><p>No Una liquidity in this wallet yet.</p></div> : null}
+      {!authenticated ? <div className="position-empty"><LockIcon /><p>Connect to see the positions held by your wallets.</p></div> : null}
+      {authenticated && state === "loading" ? <div className="position-empty"><p>Reading your wallets…</p></div> : null}
+      {authenticated && state === "error" ? <div className="position-empty"><p>We could not read your positions. Nothing has moved.</p></div> : null}
+      {authenticated && state === "ready" && positions.length === 0 ? <div className="position-empty"><p>Your positions will appear here after your first deposit.</p></div> : null}
       {positions.length ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
         <span className="position-pair"><i>{position.symbol0.slice(0, 1)}</i><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
         <span><small>Value</small><b>{money(position.lpUsd ?? 0)}</b></span>
         <span><small>Fees</small><b>{money(position.feesUsd ?? 0)}</b></span>
         <span><small>vs HOLD</small><b className={(position.holdDeltaUsd ?? 0) >= 0 ? "positive" : "negative"}>{signedMoney(position.holdDeltaUsd ?? 0)}</b></span>
-        <span className={`position-range is-${position.status}`}><i />{position.status === "in-range" ? "Earning" : position.status === "oor" ? "Needs attention" : "Closed"}</span>
-        <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed}>Collect + earn</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>Withdraw</button></span>
+        <span className={`position-range is-${position.status}`}><i />{position.status === "in-range" ? "Earning fees" : position.status === "oor" ? "Needs attention" : "Closed"}</span>
+        <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed}>Reinvest fees</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>Withdraw</button></span>
       </article>)}</div> : null}
     </section>
   );
@@ -535,7 +508,7 @@ function PositionLedger({ authenticated, positions, state, onLogin, onAction, ac
 
 function AgentWorkspace({ authenticated, onLogin }: { authenticated: boolean; onLogin: () => void }) {
   return <div className="agent-workspace">
-    <aside><span className="agent-orbit"><i /><b /></span><h1>Ask Una.</h1><p>Understand the index, check your fees, or prepare a withdrawal. Una can prepare actions, but only you can approve them.</p><dl><div><dt>Reads</dt><dd>Markets + wallet positions</dd></div><div><dt>Changes</dt><dd>Only what you approve</dd></div><div><dt>Custody</dt><dd>Always yours</dd></div></dl></aside>
+    <aside><h1>Ask Una.</h1><p>Get a straight answer about fees, risk, or a withdrawal. Una can prepare a transaction; your wallet decides whether it happens.</p><span><LockIcon />Nothing moves without your approval.</span></aside>
     <Chat authenticated={authenticated} onLogin={onLogin} />
   </div>;
 }
@@ -545,17 +518,6 @@ function weightedFeePace(markets: IndexMarket[], stats: Map<string, MarketStats>
   if (!available.length) return null;
   const weight = available.reduce((sum, row) => sum + row.indexWeightBps, 0);
   return available.reduce((sum, row) => sum + (stats.get(row.market.id)!.dailyFeesPer1000Usd! * row.indexWeightBps) / weight, 0);
-}
-
-function portfolioMetrics(positions: PositionView[]) {
-  const value = positions.reduce((sum, position) => sum + (position.lpUsd ?? 0), 0);
-  return {
-    value,
-    fees: positions.reduce((sum, position) => sum + (position.feesUsd ?? 0), 0),
-    holdDelta: positions.reduce((sum, position) => sum + (position.holdDeltaUsd ?? 0), 0),
-    inRange: positions.filter((position) => position.status === "in-range").length,
-    hasValue: value > 0,
-  };
 }
 
 async function waitForRelay(statusPath: string): Promise<void> {

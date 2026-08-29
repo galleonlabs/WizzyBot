@@ -1,24 +1,63 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { CHAIN_META, CHAIN_SLUGS, parseChainSlug, type ChainSlug } from "./lib/chains";
+
+function chainFromLocation(): ChainSlug {
+  if (typeof window === "undefined") return "base";
+  try {
+    return parseChainSlug(new URLSearchParams(window.location.search).get("chain"));
+  } catch {
+    return "base";
+  }
+}
+
+function writeChainQuery(slug: ChainSlug) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("chain", slug);
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
 
 export function TopNav({
   active,
   account,
   ready,
   authenticated,
+  chain,
   onLogin,
   onLogout,
   onTab,
+  onChain,
 }: {
   active?: "positions" | "agent";
   account?: string | null;
   ready?: boolean;
   authenticated?: boolean;
+  chain?: ChainSlug;
   onLogin?: () => void;
   onLogout?: () => void;
   onTab?: (tab: "positions" | "agent") => void;
+  onChain?: (slug: ChainSlug) => void;
 }) {
+  const [uncontrolled, setUncontrolled] = useState<ChainSlug>("base");
+
+  useEffect(() => {
+    setUncontrolled(chainFromLocation());
+  }, []);
+
+  const current = chain ?? uncontrolled;
+
+  function selectChain(slug: ChainSlug) {
+    writeChainQuery(slug);
+    setUncontrolled(slug);
+    onChain?.(slug);
+  }
+
+  const positionsHref = `/app?chain=${current}`;
+  const agentHref = `/app?tab=agent&chain=${current}`;
+
   return (
     <header className="topnav">
       <Link className="wordmark" href="/">
@@ -28,7 +67,7 @@ export function TopNav({
       <nav className="topnav-links" aria-label="Primary">
         <Link
           className={active === "positions" ? "is-on" : undefined}
-          href="/app"
+          href={positionsHref}
           onClick={(event) => {
             if (!onTab) return;
             event.preventDefault();
@@ -39,7 +78,7 @@ export function TopNav({
         </Link>
         <Link
           className={active === "agent" ? "is-on" : undefined}
-          href="/app?tab=agent"
+          href={agentHref}
           onClick={(event) => {
             if (!onTab) return;
             event.preventDefault();
@@ -50,7 +89,19 @@ export function TopNav({
         </Link>
       </nav>
       <div className="topnav-meta">
-        <span className="net">Base</span>
+        <div className="net" role="group" aria-label="Chain">
+          {CHAIN_SLUGS.map((slug) => (
+            <button
+              key={slug}
+              type="button"
+              className={current === slug ? "is-on" : undefined}
+              aria-pressed={current === slug}
+              onClick={() => selectChain(slug)}
+            >
+              {CHAIN_META[slug].label}
+            </button>
+          ))}
+        </div>
         {ready === false ? (
           <span className="ghost">…</span>
         ) : authenticated ? (

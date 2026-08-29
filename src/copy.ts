@@ -6,8 +6,8 @@ export const PRODUCT_VERBS = ["list", "status", "mint", "compound", "range", "ex
 export type ProductVerb = (typeof PRODUCT_VERBS)[number];
 
 export const PRODUCT_HELP = [
-  `Una. ${PRODUCT_LINE}`,
+  `Una. Base and Robinhood. ${PRODUCT_LINE}`,
   "list | status | mint | compound | range | exit | simulate",
-  "--protocol v2|v3|v4 (default v3).",
+  "--protocol v2|v3|v4 (default v3). --chain base|robinhood (default base).",
   "Dry-run default. --live and yes to broadcast.",
 ].join("\n");

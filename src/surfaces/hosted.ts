@@ -32,6 +32,7 @@ import {
   sendWithPrivy,
   PRIVY_STUB_MESSAGE,
 } from "../signer/privy.js";
+import { parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
 
 export type WriteFlags = {
   live?: boolean;
@@ -50,14 +51,19 @@ export function assertWriteAllowed(flags: WriteFlags): boolean {
   return live;
 }
 
-export function connectRead() {
-  const env = loadEnv();
-  const client = makePublicClient(env.rpcUrl);
-  return { env, client, adapter: new V3Adapter(client) };
+function slugOf(chain?: string | ChainSlug): ChainSlug {
+  return parseChainSlug(chain ?? "base");
 }
 
-export async function connectHosted(ownerArg?: string) {
-  const { env, client, adapter } = connectRead();
+export function connectRead(chain: ChainSlug | string = "base") {
+  const slug = slugOf(chain);
+  const env = loadEnv();
+  const client = makePublicClient(env.rpcByChain[slug], viemChainFor(slug));
+  return { env, client, adapter: new V3Adapter(client), chain: slug };
+}
+
+export async function connectHosted(ownerArg?: string, chain: ChainSlug | string = "base") {
+  const { env, client, adapter, chain: slug } = connectRead(chain);
   let owner: Address | undefined;
   if (ownerArg && isAddress(ownerArg)) owner = getAddress(ownerArg);
   if (!owner && privyConfigured()) {
@@ -70,7 +76,7 @@ export async function connectHosted(ownerArg?: string) {
   if (!owner) {
     throw new Error("Pass owner, or set PRIVY_APP_SECRET so the hosted Privy wallet can be resolved.");
   }
-  return { env, client, owner, adapter };
+  return { env, client, owner, adapter, chain: slug };
 }
 
 async function liveViewFor(snap: PositionSnapshot, client: ReturnType<typeof makePublicClient>, ethUsd?: number) {
@@ -84,8 +90,9 @@ async function liveViewFor(snap: PositionSnapshot, client: ReturnType<typeof mak
   return { card, view: serializeLiveView(card) };
 }
 
-export async function listPositions(ownerArg?: string) {
-  const { client, owner, env } = await connectHosted(ownerArg);
+export async function listPositions(ownerArg?: string, chain: ChainSlug | string = "base") {
+  const slug = slugOf(chain);
+  const { client, owner, env } = await connectHosted(ownerArg, slug);
   const out: Record<string, unknown>[] = [];
   for (const protocol of ["V2", "V3", "V4"] as const) {
     const adapter = adapterFor(protocol, client);
@@ -105,6 +112,8 @@ export async function listPositions(ownerArg?: string) {
           fee: snap.fee,
           inRange: snap.inRange,
           owner,
+          chain: slug,
+          chainId: snap.ref.chainId,
         };
         try {
           const { view } = await liveViewFor(snap, client, env.ethUsd);
@@ -128,20 +137,22 @@ export async function listPositions(ownerArg?: string) {
         out.push({
           protocol: ref.protocol,
           tokenId: ref.tokenId.toString(),
+          chain: slug,
           error: err instanceof Error ? err.message : String(err),
         });
       }
     }
   }
-  return jsonSafe({ owner, count: out.length, positions: out });
+  return jsonSafe({ owner, chain: slug, count: out.length, positions: out });
 }
 
-export async function statusPosition(tokenId: string) {
-  const { adapter, client, env } = connectRead();
+export async function statusPosition(tokenId: string, chain: ChainSlug | string = "base") {
+  const slug = slugOf(chain);
+  const { adapter, client, env } = connectRead(slug);
   const id = BigInt(tokenId);
   const snap = await adapter.readPosition(id);
   const { card, view } = await liveViewFor(snap, client, env.ethUsd);
-  return jsonSafe({ card: formatCard(card), view, tokenId, owner: snap.owner });
+  return jsonSafe({ card: formatCard(card), view, tokenId, owner: snap.owner, chain: slug, chainId: snap.ref.chainId });
 }
 
 async function planContext(
@@ -149,10 +160,11 @@ async function planContext(
   owner: Address,
   live: boolean,
   action: "compound" | "rerange" | "exit",
-  flags: { noFee?: boolean; feeSource?: "fees" | "notional" },
+  flags: { noFee?: boolean; feeSource?: "fees" | "notional"; chain?: ChainSlug | string },
 ): Promise<PlanContext> {
+  const slug = slugOf(flags.chain);
   const env = loadEnv();
-  const client = makePublicClient(env.rpcUrl);
+  const client = makePublicClient(env.rpcByChain[slug], viemChainFor(slug));
   const px = await usdPricesForPosition(client, snap, env.ethUsd);
   const usd = snapshotUsd(snap, px.price0Usd, px.price1Usd);
   const policy = policyFor(loadConfig(), snap.ref.tokenId);
@@ -175,13 +187,14 @@ async function maybeBroadcast(
   snap: PositionSnapshot,
   owner: Address,
   live: boolean,
+  chain: ChainSlug = "base",
 ): Promise<ActionReceipt & { hashes?: string[]; stubbed?: boolean }> {
   if (receipt.skipped || !live) {
     return { ...receipt, dryRun: !live };
   }
   const env = loadEnv();
   const filled = hydrateCalldata(receipt, snap, owner);
-  const extra = allowlistWithTokens(snap.token0.address, snap.token1.address);
+  const extra = allowlistWithTokens(snap.token0.address, snap.token1.address, chain);
   if (!privyConfigured()) {
     return {
       ...filled,
@@ -192,13 +205,15 @@ async function maybeBroadcast(
   }
   const hashes: string[] = [];
   const wallet = await resolveHostedWallet();
+  const chainId = chain === "robinhood" ? 4663 : 8453;
   for (const tx of filled.txs) {
     const sent = await sendWithPrivy({
-      rpcUrl: env.rpcUrl,
+      rpcUrl: env.rpcByChain[chain],
       tx,
       extraAllow: extra,
       live: true,
       wallet,
+      chainId,
     });
     if (sent.hash) hashes.push(sent.hash);
   }
@@ -212,16 +227,19 @@ export async function compoundPosition(input: {
   confirm?: boolean;
   noFee?: boolean;
   feeSource?: "fees" | "notional";
+  chain?: ChainSlug | string;
 }) {
   const live = assertWriteAllowed(input);
-  const { adapter, owner } = await connectHosted(input.owner);
+  const slug = slugOf(input.chain);
+  const { adapter, owner } = await connectHosted(input.owner, slug);
   const snap = await adapter.readPosition(BigInt(input.tokenId));
-  const ctx = await planContext(snap, owner, live, "compound", input);
+  const ctx = await planContext(snap, owner, live, "compound", { ...input, chain: slug });
   const receipt = planCompound(snap, ctx);
-  const executed = await maybeBroadcast(receipt, snap, owner, live);
+  const executed = await maybeBroadcast(receipt, snap, owner, live, slug);
   return jsonSafe({
     text: formatReceipt(executed),
     receipt: executed,
+    chain: slug,
     confirm: confirmFromPosition("compound", snap, executed, { feesUsd: ctx.feesUsd, gasUsd: ctx.gasUsd }),
   });
 }
@@ -234,14 +252,16 @@ export async function rangePosition(input: {
   noFee?: boolean;
   feeSource?: "fees" | "notional";
   oorPercent?: number;
+  chain?: ChainSlug | string;
 }) {
   const live = assertWriteAllowed(input);
-  const { adapter, owner } = await connectHosted(input.owner);
+  const slug = slugOf(input.chain);
+  const { adapter, owner } = await connectHosted(input.owner, slug);
   const snap = await adapter.readPosition(BigInt(input.tokenId));
   const policy = policyFor(loadConfig(), snap.ref.tokenId);
-  const ctx = await planContext(snap, owner, live, "rerange", input);
+  const ctx = await planContext(snap, owner, live, "rerange", { ...input, chain: slug });
   const receipt = planRerange(snap, ctx, { oorPercent: input.oorPercent ?? policy.oorPercent });
-  const executed = await maybeBroadcast(receipt, snap, owner, live);
+  const executed = await maybeBroadcast(receipt, snap, owner, live, slug);
   let projection;
   try {
     if (snap.ref.protocol !== "V2") {
@@ -257,6 +277,7 @@ export async function rangePosition(input: {
     text: formatReceipt(executed),
     receipt: executed,
     projection,
+    chain: slug,
     confirm: confirmFromPosition("range", snap, executed, {
       feesUsd: ctx.feesUsd,
       gasUsd: ctx.gasUsd,
@@ -274,12 +295,14 @@ export async function exitPosition(input: {
   feeSource?: "fees" | "notional";
   exitPrice?: number;
   swapTo?: string;
+  chain?: ChainSlug | string;
 }) {
   const live = assertWriteAllowed(input);
-  const { adapter, owner } = await connectHosted(input.owner);
+  const slug = slugOf(input.chain);
+  const { adapter, owner } = await connectHosted(input.owner, slug);
   const snap = await adapter.readPosition(BigInt(input.tokenId));
   const policy = policyFor(loadConfig(), snap.ref.tokenId);
-  const ctx = await planContext(snap, owner, live, "exit", input);
+  const ctx = await planContext(snap, owner, live, "exit", { ...input, chain: slug });
   const receipt = planExit(snap, ctx, {
     exitPrice: input.exitPrice ?? policy.exitPrice,
     currentPrice: input.exitPrice !== undefined ? (Number(snap.sqrtPriceX96) / 2 ** 96) ** 2 : undefined,
@@ -290,10 +313,11 @@ export async function exitPosition(input: {
           ? getAddress(policy.exitToken)
           : undefined,
   });
-  const executed = await maybeBroadcast(receipt, snap, owner, live);
+  const executed = await maybeBroadcast(receipt, snap, owner, live, slug);
   return jsonSafe({
     text: formatReceipt(executed),
     receipt: executed,
+    chain: slug,
     confirm: confirmFromPosition("exit", snap, executed, { feesUsd: ctx.feesUsd, gasUsd: ctx.gasUsd }),
   });
 }
@@ -310,9 +334,11 @@ export async function mintPosition(input: {
   tickUpper?: number;
   amount0?: string;
   amount1?: string;
+  chain?: ChainSlug | string;
 }) {
   const live = assertWriteAllowed(input);
-  const { client, owner, env } = await connectHosted(input.owner);
+  const slug = slugOf(input.chain);
+  const { client, owner, env } = await connectHosted(input.owner, slug);
   const result = await runMintFlow({
     client,
     owner,
@@ -335,6 +361,7 @@ export async function mintPosition(input: {
       receipt: result.receipt,
       view,
       projection: view,
+      chain: slug,
       confirm: confirmFromMint(result.quote, result.receipt),
       usedLpApi: result.usedLpApi,
       simulation: result.simulation,
@@ -349,6 +376,7 @@ export async function mintPosition(input: {
       receipt: result.receipt,
       view,
       projection: view,
+      chain: slug,
       confirm: confirmFromMint(result.quote, result.receipt),
       stubbed: true,
       note: PRIVY_STUB_MESSAGE,
@@ -357,13 +385,15 @@ export async function mintPosition(input: {
   const extra = extraAllowForMint(result.quote);
   const wallet = await resolveHostedWallet();
   const hashes: string[] = [];
+  const chainId = slug === "robinhood" ? 4663 : 8453;
   for (const tx of result.receipt.txs) {
     const sent = await sendWithPrivy({
-      rpcUrl: env.rpcUrl,
+      rpcUrl: env.rpcByChain[slug],
       tx,
       extraAllow: extra,
       live: true,
       wallet,
+      chainId,
     });
     if (sent.hash) hashes.push(sent.hash);
   }
@@ -375,6 +405,7 @@ export async function mintPosition(input: {
     receipt: result.receipt,
     view,
     projection: view,
+    chain: slug,
     confirm: confirmFromMint(result.quote, { ...result.receipt, dryRun: false }),
     hashes,
     note: "Mint submitted via Privy. HOLD persists on next status once the NFT exists.",
@@ -385,9 +416,10 @@ export function keeperLiveEnabled(source: NodeJS.ProcessEnv = process.env): bool
   return source.KEEPER_LIVE === "1" || source.UNABOT_KEEPER_LIVE === "1";
 }
 
-export async function runKeeperScan(input: { owner?: string; live?: boolean } = {}) {
+export async function runKeeperScan(input: { owner?: string; live?: boolean; chain?: ChainSlug | string } = {}) {
   const live = Boolean(input.live) && keeperLiveEnabled();
-  const { adapter, owner, client, env } = await connectHosted(input.owner);
+  const slug = slugOf(input.chain);
+  const { adapter, owner, client, env } = await connectHosted(input.owner, slug);
   const sink = new StdoutSink();
   const receipts = await runOnce({
     list: async (who: Address) => {
@@ -401,7 +433,7 @@ export async function runKeeperScan(input: { owner?: string; live?: boolean } = 
     execute: live
       ? async (receipt, snap) => {
           if (receipt.tokenId === undefined) return receipt;
-          return maybeBroadcast(receipt, snap, owner, true);
+          return maybeBroadcast(receipt, snap, owner, true, slug);
         }
       : undefined,
     prices: async (p: PositionSnapshot) => {
@@ -417,6 +449,7 @@ export async function runKeeperScan(input: { owner?: string; live?: boolean } = 
   });
   return jsonSafe({
     owner,
+    chain: slug,
     live,
     dryRun: !live,
     privy: privyConfigured() ? "ready" : "stubbed",

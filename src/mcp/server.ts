@@ -2,6 +2,7 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ADDRESSES, CHAIN_ID, TREASURY } from "../constants.js";
+import { addressesFor, parseChainSlug, viemChainFor } from "../chains.js";
 import { parseProtocol, parseTokenId } from "../core/protocol.js";
 import type { Protocol } from "../types.js";
 
@@ -52,17 +53,18 @@ const mintFields = {
   owner: opt,
   live: opt,
   protocol: opt.describe("v2 | v3 | v4 (default v3)"),
+  chain: opt.describe("base | robinhood (default base)"),
 };
 
 export function schemaFor(name: string): z.ZodRawShape {
   name = MCP_NAME_ALIAS[name] ?? name;
   switch (name) {
     case "pool_info":
-      return { token0: str, token1: str, fee: str, protocol: opt };
+      return { token0: str, token1: str, fee: str, protocol: opt, chain: opt };
     case "position_list":
-      return { owner: str, protocol: opt };
+      return { owner: str, protocol: opt, chain: opt };
     case "position_pnl":
-      return { tokenId: str, protocol: opt };
+      return { tokenId: str, protocol: opt, chain: opt };
     case "quote_mint":
     case "create":
       return mintFields;
@@ -72,14 +74,19 @@ export function schemaFor(name: string): z.ZodRawShape {
     case "compound":
     case "rebalance":
     case "exit":
-      return { tokenId: str, owner: opt, live: opt, noFee: opt, feeSource: opt, pct: opt, swapTo: opt, oorPercent: opt, protocol: opt };
+      return { tokenId: str, owner: opt, live: opt, noFee: opt, feeSource: opt, pct: opt, swapTo: opt, oorPercent: opt, protocol: opt, chain: opt };
     case "simulate":
-      return { action: str, tokenId: opt, token0: opt, token1: opt, fee: opt, widthPct: opt, amount0: opt, amount1: opt, protocol: opt };
+      return { action: str, tokenId: opt, token0: opt, token1: opt, fee: opt, widthPct: opt, amount0: opt, amount1: opt, protocol: opt, chain: opt };
     default:
       return {};
   }
 }
 
+
+export function chainFromArgs(args: Record<string, unknown> = {}): ReturnType<typeof parseChainSlug> {
+  if (args.chain === undefined || args.chain === null || args.chain === "") return parseChainSlug("base");
+  return parseChainSlug(String(args.chain));
+}
 
 export function protocolFromArgs(args: Record<string, unknown> = {}): Protocol {
   if (args.protocol === undefined || args.protocol === null || args.protocol === "") return parseProtocol("v3");
@@ -133,7 +140,8 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
   const { importHoldForToken } = await import("../chain/mint-history.js");
   const { adapterFor } = await import("../core/protocols.js");
   const env = loadEnv();
-  const client = makePublicClient(env.rpcUrl);
+  const chain = chainFromArgs(args);
+  const client = makePublicClient(env.rpcByChain[chain], viemChainFor(chain));
   const protocol = protocolFromArgs(args);
   const adapter = adapterFor(protocol, client);
 
@@ -141,14 +149,14 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
     const { factoryAbi, poolAbi } = await import("../chain/abi.js");
     const { getAddress } = await import("viem");
     const pool = await client.readContract({
-      address: ADDRESSES.factory,
+      address: addressesFor(chain).factory,
       abi: factoryAbi,
       functionName: "getPool",
       args: [getAddress(String(args.token0)), getAddress(String(args.token1)), Number(args.fee)],
     });
-    if (pool === ADDRESSES.nativeEth) return JSON.stringify({ chainId: CHAIN_ID, pool: null, error: "pool not found" });
+    if (pool === addressesFor(chain).nativeEth) return JSON.stringify({ chainId: client.chain?.id ?? CHAIN_ID, pool: null, error: "pool not found" });
     const slot0 = await client.readContract({ address: pool, abi: poolAbi, functionName: "slot0" });
-    return JSON.stringify({ chainId: CHAIN_ID, pool, tick: slot0[1], sqrtPriceX96: slot0[0].toString() });
+    return JSON.stringify({ chainId: client.chain?.id ?? CHAIN_ID, pool, tick: slot0[1], sqrtPriceX96: slot0[0].toString() });
   }
 
   if (name === "position_list") {
@@ -236,7 +244,7 @@ async function quoteOrCreate(
       tool: name,
       protocol: protocol.toLowerCase(),
       dryRun: !ctx.live,
-      chainId: CHAIN_ID,
+      chainId: ctx.client.chain?.id ?? CHAIN_ID,
       treasury: TREASURY,
       quote: {
         ...quote,

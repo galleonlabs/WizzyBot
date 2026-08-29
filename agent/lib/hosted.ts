@@ -10,8 +10,8 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 
 export type HostedSurface = {
-  listPositions: (owner?: string) => Promise<unknown>;
-  statusPosition: (tokenId: string) => Promise<unknown>;
+  listPositions: (owner?: string, chain?: string) => Promise<unknown>;
+  statusPosition: (tokenId: string, chain?: string) => Promise<unknown>;
   compoundPosition: (input: {
     tokenId: string;
     owner?: string;
@@ -19,6 +19,7 @@ export type HostedSurface = {
     confirm?: boolean;
     noFee?: boolean;
     feeSource?: "fees" | "notional";
+    chain?: string;
   }) => Promise<unknown>;
   rangePosition: (input: {
     tokenId: string;
@@ -27,6 +28,7 @@ export type HostedSurface = {
     confirm?: boolean;
     noFee?: boolean;
     feeSource?: "fees" | "notional";
+    chain?: string;
     oorPercent?: number;
   }) => Promise<unknown>;
   exitPosition: (input: {
@@ -36,6 +38,7 @@ export type HostedSurface = {
     confirm?: boolean;
     noFee?: boolean;
     feeSource?: "fees" | "notional";
+    chain?: string;
     exitPrice?: number;
     swapTo?: string;
   }) => Promise<unknown>;
@@ -51,8 +54,9 @@ export type HostedSurface = {
     tickUpper?: number;
     amount0?: string;
     amount1?: string;
+    chain?: string;
   }) => Promise<unknown>;
-  runKeeperScan: (input?: { owner?: string; live?: boolean }) => Promise<{
+  runKeeperScan: (input?: { owner?: string; live?: boolean; chain?: string }) => Promise<{
     owner?: unknown;
     decisions?: unknown;
   }>;

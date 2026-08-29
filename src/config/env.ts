@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { isAddress, type Address, type Hex } from "viem";
 import { BASE_RPC_DEFAULT, TREASURY } from "../constants.js";
+import { ROBINHOOD_RPC_DEFAULT, type ChainSlug } from "../chains.js";
 
 /** Load cwd .env into a map. Never log values. process.env wins. */
 export function readDotEnv(path = join(process.cwd(), ".env")): Record<string, string> {
@@ -37,6 +38,7 @@ const address = z
 
 export const EnvSchema = z.object({
   BASE_RPC_URL: z.string().url().default(BASE_RPC_DEFAULT),
+  ROBINHOOD_RPC_URL: z.string().url().default(ROBINHOOD_RPC_DEFAULT),
   UNISWAP_API_KEY: z.string().optional().default(""),
   UNABOT_PRIVATE_KEY: hexKey,
   UNABOT_TREASURY: address,
@@ -47,6 +49,7 @@ export const EnvSchema = z.object({
 
 export type Env = {
   rpcUrl: string;
+  rpcByChain: Record<ChainSlug, string>;
   uniswapApiKey: string | undefined;
   privateKey: Hex | undefined;
   treasury: Address;
@@ -68,6 +71,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   try {
     parsed = EnvSchema.parse({
       BASE_RPC_URL: env.BASE_RPC_URL ?? BASE_RPC_DEFAULT,
+      ROBINHOOD_RPC_URL: env.ROBINHOOD_RPC_URL ?? ROBINHOOD_RPC_DEFAULT,
       UNISWAP_API_KEY: env.UNISWAP_API_KEY ?? "",
       UNABOT_PRIVATE_KEY: env.UNABOT_PRIVATE_KEY || undefined,
       UNABOT_TREASURY: env.UNABOT_TREASURY || undefined,
@@ -92,6 +96,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
 
   return {
     rpcUrl: parsed.BASE_RPC_URL,
+    rpcByChain: { base: parsed.BASE_RPC_URL, robinhood: parsed.ROBINHOOD_RPC_URL },
     uniswapApiKey: parsed.UNISWAP_API_KEY || undefined,
     privateKey: parsed.UNABOT_PRIVATE_KEY as Hex | undefined,
     treasury: (parsed.UNABOT_TREASURY as Address | undefined) ?? TREASURY,

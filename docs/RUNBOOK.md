@@ -1,6 +1,6 @@
 # Production runbook
 
-How to run UnaBot. Base only. You keep the position (v3/v4 NFT; v2 LP token).
+How to run UnaBot. Base and Robinhood. You keep the position (v3/v4 NFT; v2 LP token).
 
 **Never commit `.env`.** Copy `.env.example` locally. `.env` is gitignored. Do not paste secrets into git, Vercel project settings screenshots, or this file.
 
@@ -98,6 +98,7 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 | Variable | Role |
 | --- | --- |
 | `BASE_RPC_URL` | Base RPC. Default `https://mainnet.base.org`. Use a dedicated provider in production. |
+| `ROBINHOOD_RPC_URL` | Robinhood RPC. Default `https://rpc.mainnet.chain.robinhood.com`. Use a dedicated provider in production. |
 | `UNISWAP_API_KEY` | Optional. Write paths use Uniswap LP + Trading APIs when set. Never commit. |
 | `UNABOT_PRIVATE_KEY` | CLI `--live` signer. `0x` + 32-byte hex. Never commit. Hosted agent does **not** use this. |
 | `UNABOT_TREASURY` | Optional override. Product fees go here. |

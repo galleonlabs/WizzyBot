@@ -4,6 +4,7 @@ import { stdin as input, stdout as output } from "node:process";
 import { Command } from "commander";
 import { getAddress, isAddress, type Address } from "viem";
 import { ADDRESSES, CHAIN_ID } from "../constants.js";
+import { CHAIN_SLUGS, addressesFor, parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
 import { loadEnv } from "../config/env.js";
 import { loadConfig, policyFor } from "../config/policy.js";
 import { loadAccount } from "../signer/account.js";
@@ -26,7 +27,7 @@ import { createAlertSink } from "../keeper/alerts.js";
 import { runLoop, runOnce } from "../keeper/loop.js";
 import { safeExecute } from "../keeper/execute.js";
 import { startMcpStdio } from "../mcp/server.js";
-import type { ActionReceipt, PositionSnapshot } from "../types.js";
+import type { ActionReceipt, AlertEvent, AlertSink, PositionSnapshot } from "../types.js";
 
 const program = new Command();
 
@@ -38,6 +39,7 @@ program
   .option("--live", "broadcast (default is dry-run)")
   .option("--no-fee", "skip the take")
   .option("--fee-source <source>", "fees | notional", "fees")
+  .option("--chain <slug>", "base | robinhood (default base)", "base")
   .option("--config <path>", "policy file (merged over ~/.unabot/config.json)")
   .action(async (utterance: string[], opts) => {
     if (utterance.length === 0) {
@@ -68,6 +70,11 @@ export function feeSourceFlag(opts: { feeSource?: string } = {}): "fees" | "noti
 
 export function protocolFlag(opts: { protocol?: string } = {}): Protocol {
   return parseProtocol(opts.protocol ?? "v3");
+}
+
+export function chainFlag(opts: { chain?: string } = {}, cmd?: Command): ChainSlug {
+  const v = opts.chain ?? cmd?.optsWithGlobals?.().chain ?? (program.opts() as { chain?: string }).chain ?? "base";
+  return parseChainSlug(v);
 }
 
 program
@@ -174,15 +181,17 @@ program
   .requiredOption("--token1 <address>")
   .requiredOption("--fee <fee>", "100 | 500 | 3000 | 10000")
   .action(async (opts) => {
+    const chain = chainFlag();
     const { client } = await connectRead();
+    const addrs = addressesFor(chain);
     const { factoryAbi, poolAbi } = await import("../chain/abi.js");
     const pool = await client.readContract({
-      address: ADDRESSES.factory,
+      address: addrs.factory,
       abi: factoryAbi,
       functionName: "getPool",
       args: [getAddress(opts.token0), getAddress(opts.token1), Number(opts.fee)],
     });
-    if (pool === ADDRESSES.nativeEth) {
+    if (pool === addrs.nativeEth) {
       console.log("pool not found");
       return;
     }
@@ -206,7 +215,8 @@ program
   .action(async (opts, cmd) => {
     const live = liveFlag(cmd.optsWithGlobals(), cmd);
     const protocol = protocolFlag(opts);
-    const { client, owner, env, account } = await connect(opts.owner, { optional: !live, protocol });
+    const chain = chainFlag(cmd.optsWithGlobals(), cmd);
+    const { client, owner, env, account } = await connect(opts.owner, { optional: !live, protocol, chain });
     const result = await runMintFlow({
       client,
       owner,
@@ -234,10 +244,9 @@ program
     const { sendPlannedTx } = await import("../signer/broadcast.js");
     const extra = extraAllowForMint(result.quote);
     for (const tx of result.receipt.txs) {
-      const sent = await sendPlannedTx({ rpcUrl: env.rpcUrl, account, tx, extraAllow: extra, live: true });
+      const sent = await sendPlannedTx({ rpcUrl: env.rpcByChain[chain], account, tx, extraAllow: extra, live: true, chain });
       console.log(tx.description, "hash" in sent ? sent.hash : "dry-run");
     }
-    // tokenId is unknown until the mint receipt is mined; persistMintHold no-ops on 0n.
     persistMintHold(result.quote, 0n);
     console.log("HOLD for the new tokenId is persisted on next import/status once the NFT exists.");
   });
@@ -306,80 +315,26 @@ program
   .option("--once", "single pass", false)
   .action(async (opts, cmd) => {
     const live = liveFlag(cmd.optsWithGlobals(), cmd);
-    const { owner, client, env, account } = await connect(undefined, { optional: !live });
+    const env = loadEnv();
+    const account = loadAccount(env);
+    const owner = account?.address;
+    if (!owner && !live) {
+      /* dry-run still needs an owner */
+    }
+    if (!owner) {
+      const dummy = await connect(undefined, { optional: !live });
+      if (live) {
+        await confirmOrThrow("Broadcast keeper actions? Dry-run is the default.");
+        if (!account) throw new Error("missing_key: UNABOT_PRIVATE_KEY required for --live");
+      }
+      await runKeeperBoth(opts, live, dummy.owner, env, dummy.account);
+      return;
+    }
     if (live) {
       await confirmOrThrow("Broadcast keeper actions? Dry-run is the default.");
       if (!account) throw new Error("missing_key: UNABOT_PRIVATE_KEY required for --live");
     }
-    const sink = createAlertSink({ webhookUrl: env.alertWebhook });
-    const deps = {
-      list: async (who: Address) => {
-        const snaps: PositionSnapshot[] = [];
-        for (const proto of ["V2", "V3", "V4"] as const) {
-          const protoAdapter = adapterFor(proto, client);
-          protoAdapter.bindOwner?.(who);
-          let refs: { tokenId: bigint }[] = [];
-          try {
-            refs = await protoAdapter.listPositions(who);
-          } catch {
-            refs = [];
-          }
-          for (const ref of refs) {
-            try {
-              snaps.push(await protoAdapter.readPosition(ref.tokenId));
-            } catch {
-              /* unreadable position */
-            }
-          }
-        }
-        return snaps;
-      },
-      owner,
-      live,
-      intervalMs: Number(opts.interval),
-      sink,
-      hasSigner: Boolean(account),
-      execute: live
-        ? async (receipt: ActionReceipt, position: PositionSnapshot) => {
-            const { hydrateCalldata } = await import("../core/hydrate.js");
-            const { sendPlannedTx, isPlaceholderTx } = await import("../signer/broadcast.js");
-            const { allowlistWithTokens } = await import("../signer/allowlist.js");
-            return safeExecute(receipt, position, {
-              live: true,
-              hasSigner: Boolean(account),
-              hydrate: (r, p) => hydrateCalldata(r, p, owner),
-              send: async (tx) => {
-                if (!account) throw new Error("missing_key: UNABOT_PRIVATE_KEY required for --live");
-                if (isPlaceholderTx(tx)) {
-                  throw new Error(`placeholder_calldata: refusing empty calldata to ${tx.to}`);
-                }
-                return sendPlannedTx({
-                  rpcUrl: env.rpcUrl,
-                  account,
-                  tx,
-                  extraAllow: allowlistWithTokens(position.token0.address, position.token1.address),
-                  live: true,
-                });
-              },
-            });
-          }
-        : undefined,
-      prices: async (p: PositionSnapshot) => {
-        const px = await usdPricesForPosition(client, p, env.ethUsd);
-        const usd = snapshotUsd(p, px.price0Usd, px.price1Usd);
-        return {
-          feesUsd: usd.feesUsd,
-          notionalUsd: usd.positionUsd,
-          gasUsd: 0.15,
-          price: Number(p.sqrtPriceX96) > 0 ? (Number(p.sqrtPriceX96) / 2 ** 96) ** 2 : 0,
-        };
-      },
-    };
-    if (opts.once) {
-      await runOnce(deps);
-    } else {
-      await runLoop(deps);
-    }
+    await runKeeperBoth(opts, live, owner, env, account);
   });
 
 program
@@ -439,23 +394,139 @@ program
     console.log(JSON.stringify(loadConfig(), null, 2));
   });
 
-async function connectRead(protocol: Protocol = "V3") {
+async function connectRead(protocol: Protocol = "V3", chain: ChainSlug = chainFlag()) {
   const env = loadEnv();
-  const client = makePublicClient(env.rpcUrl);
+  const client = makePublicClient(env.rpcByChain[chain], viemChainFor(chain));
   const adapter = adapterFor(protocol, client);
-  return { env, client, adapter };
+  return { env, client, adapter, chain };
 }
 
-async function connect(ownerArg?: string, opts: { optional?: boolean; protocol?: Protocol } = {}) {
+async function connect(ownerArg?: string, opts: { optional?: boolean; protocol?: Protocol; chain?: ChainSlug } = {}) {
   const protocol = opts.protocol ?? "V3";
-  const { env, client, adapter } = await connectRead(protocol);
+  const chain = opts.chain ?? chainFlag();
+  const { env, client, adapter } = await connectRead(protocol, chain);
   const account = loadAccount(env);
   const owner = ownerArg
     ? getAddress(ownerArg)
     : account?.address ?? (opts.optional ? getAddress("0x0000000000000000000000000000000000000001") : undefined);
   if (!owner) throw new Error("Pass --owner or set UNABOT_PRIVATE_KEY");
   adapter.bindOwner?.(owner);
-  return { env, client, account, owner, adapter };
+  return { env, client, account, owner, adapter, chain };
+}
+
+function chainSink(inner: AlertSink, slug: ChainSlug): AlertSink {
+  return {
+    emit(event: AlertEvent) {
+      return inner.emit({ ...event, message: `chain=${slug} ${event.message}` });
+    },
+  };
+}
+
+async function runKeeperBoth(
+  opts: { interval?: string; once?: boolean },
+  live: boolean,
+  owner: Address,
+  env: ReturnType<typeof loadEnv>,
+  account: ReturnType<typeof loadAccount>,
+): Promise<void> {
+  const sink = createAlertSink({ webhookUrl: env.alertWebhook });
+  const intervalMs = Number(opts.interval);
+  const tick = async () => {
+    for (const slug of CHAIN_SLUGS) {
+      const client = makePublicClient(env.rpcByChain[slug], viemChainFor(slug));
+      const chained = chainSink(sink, slug);
+      const deps = {
+        list: async (who: Address) => {
+          const snaps: PositionSnapshot[] = [];
+          for (const proto of ["V2", "V3", "V4"] as const) {
+            const protoAdapter = adapterFor(proto, client);
+            protoAdapter.bindOwner?.(who);
+            let refs: { tokenId: bigint }[] = [];
+            try {
+              refs = await protoAdapter.listPositions(who);
+            } catch {
+              refs = [];
+            }
+            for (const ref of refs) {
+              try {
+                snaps.push(await protoAdapter.readPosition(ref.tokenId));
+              } catch {
+                /* unreadable position */
+              }
+            }
+          }
+          return snaps;
+        },
+        owner,
+        live,
+        intervalMs,
+        sink: chained,
+        hasSigner: Boolean(account),
+        execute: live
+          ? async (receipt: ActionReceipt, position: PositionSnapshot) => {
+              const { hydrateCalldata } = await import("../core/hydrate.js");
+              const { sendPlannedTx, isPlaceholderTx } = await import("../signer/broadcast.js");
+              const { allowlistWithTokens } = await import("../signer/allowlist.js");
+              return safeExecute(receipt, position, {
+                live: true,
+                hasSigner: Boolean(account),
+                hydrate: (r, p) => hydrateCalldata(r, p, owner),
+                send: async (tx) => {
+                  if (!account) throw new Error("missing_key: UNABOT_PRIVATE_KEY required for --live");
+                  if (isPlaceholderTx(tx)) {
+                    throw new Error(`placeholder_calldata: refusing empty calldata to ${tx.to}`);
+                  }
+                  return sendPlannedTx({
+                    rpcUrl: env.rpcByChain[slug],
+                    account,
+                    tx,
+                    extraAllow: allowlistWithTokens(position.token0.address, position.token1.address, slug),
+                    live: true,
+                    chain: slug,
+                  });
+                },
+              });
+            }
+          : undefined,
+        prices: async (p: PositionSnapshot) => {
+          const px = await usdPricesForPosition(client, p, env.ethUsd);
+          const usd = snapshotUsd(p, px.price0Usd, px.price1Usd);
+          return {
+            feesUsd: usd.feesUsd,
+            notionalUsd: usd.positionUsd,
+            gasUsd: 0.15,
+            price: Number(p.sqrtPriceX96) > 0 ? (Number(p.sqrtPriceX96) / 2 ** 96) ** 2 : 0,
+          };
+        },
+      };
+      await runOnce(deps);
+    }
+  };
+  if (opts.once) {
+    await tick();
+    return;
+  }
+  chainedStart(sink, intervalMs, live);
+  while (true) {
+    try {
+      await tick();
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
+function chainedStart(sink: AlertSink, intervalMs: number, live: boolean): void {
+  for (const slug of CHAIN_SLUGS) {
+    void chainSink(sink, slug).emit({
+      level: "info",
+      kind: "keeper",
+      message: `Liquidity, as an agent. starting loop interval=${intervalMs}ms live=${live}`,
+      at: new Date().toISOString(),
+      dryRun: !live,
+    });
+  }
 }
 
 async function planFor(
@@ -508,20 +579,21 @@ async function maybeBroadcast(receipt: ReturnType<typeof planCompound>, cmd: Com
     return;
   }
   await confirmOrThrow(`Broadcast ${receipt.action} tokenId=${receipt.tokenId}?`);
-  const { adapter, owner, env, account } = await connect();
+  const chain = chainFlag(cmd.optsWithGlobals(), cmd);
+  const { adapter, owner, env, account } = await connect(undefined, { chain });
   if (!account || receipt.tokenId === undefined) throw new Error("signer and tokenId required");
   const { hydrateCalldataMaybeApi } = await import("../core/hydrate.js");
   const { isPlaceholderTx, sendPlannedTx } = await import("../signer/broadcast.js");
   const { allowlistWithTokens } = await import("../signer/allowlist.js");
   const snap = await adapter.readPosition(receipt.tokenId);
   const filled = await hydrateCalldataMaybeApi(receipt, snap, owner, env.uniswapApiKey);
-  const extra = allowlistWithTokens(snap.token0.address, snap.token1.address);
+  const extra = allowlistWithTokens(snap.token0.address, snap.token1.address, chain);
   for (const tx of filled.txs) {
     if (isPlaceholderTx(tx)) {
       console.log(`skip ${tx.description}: empty calldata (not broadcast)`);
       continue;
     }
-    const sent = await sendPlannedTx({ rpcUrl: env.rpcUrl, account, tx, extraAllow: extra, live: true });
+    const sent = await sendPlannedTx({ rpcUrl: env.rpcByChain[chain], account, tx, extraAllow: extra, live: true, chain });
     console.log(tx.description, "hash" in sent ? sent.hash : "dry-run");
   }
 }
@@ -565,36 +637,37 @@ function protocolArgv(intent: Intent): string[] {
 
 async function dispatchIntent(intent: Intent): Promise<void> {
   const proto = protocolArgv(intent);
+  const chain = ["--chain", chainFlag()];
   switch (intent.verb) {
     case "list":
-      await program.parseAsync(["node", "unabot", "list", ...proto, ...(intent.owner ? ["--owner", intent.owner] : [])]);
+      await program.parseAsync(["node", "unabot", ...chain, "list", ...proto, ...(intent.owner ? ["--owner", intent.owner] : [])]);
       break;
     case "status":
       if (intent.tokenId === undefined) {
-        await program.parseAsync(["node", "unabot", "list", ...proto]);
+        await program.parseAsync(["node", "unabot", ...chain, "list", ...proto]);
       } else {
-        await program.parseAsync(["node", "unabot", "status", String(intent.tokenId), ...proto]);
+        await program.parseAsync(["node", "unabot", ...chain, "status", String(intent.tokenId), ...proto]);
       }
       break;
     case "compound":
-      await program.parseAsync(["node", "unabot", "compound", String(intent.tokenId), ...proto]);
+      await program.parseAsync(["node", "unabot", ...chain, "compound", String(intent.tokenId), ...proto]);
       break;
     case "rerange":
-      await program.parseAsync(["node", "unabot", "range", String(intent.tokenId), ...proto]);
+      await program.parseAsync(["node", "unabot", ...chain, "range", String(intent.tokenId), ...proto]);
       break;
     case "exit":
-      await program.parseAsync(["node", "unabot", "exit", String(intent.tokenId), ...proto]);
+      await program.parseAsync(["node", "unabot", ...chain, "exit", String(intent.tokenId), ...proto]);
       break;
     case "mint":
       console.log(JSON.stringify(intent, (_, v) => (typeof v === "bigint" ? v.toString() : v), 2));
-      console.log(`Use: unabot mint --protocol ${protocolOf(intent).toLowerCase()} --token0 <addr> --token1 <addr> --fee <n> --width <pct>`);
+      console.log(`Use: unabot mint --chain ${chainFlag()} --protocol ${protocolOf(intent).toLowerCase()} --token0 <addr> --token1 <addr> --fee <n> --width <pct>`);
       break;
     case "simulate":
       if (!intent.action || intent.tokenId === undefined) {
         console.log("Use: unabot simulate compound|range|exit <tokenId> --protocol v3");
         break;
       }
-      await program.parseAsync(["node", "unabot", "simulate", intent.action, String(intent.tokenId), ...proto]);
+      await program.parseAsync(["node", "unabot", ...chain, "simulate", intent.action, String(intent.tokenId), ...proto]);
       break;
     default:
       break;

@@ -1,4 +1,5 @@
 import type { ActionReceipt, PositionCard, PositionSnapshot, Protocol } from "../types.js";
+import { labelForChainId, slugForChainId, type ChainSlug } from "../chains.js";
 import { percentThroughRange } from "./range.js";
 
 /** JSON card the hosted UI panel renders. No bigint. No SDK types. */
@@ -12,6 +13,8 @@ export const MAX_TICK = 887272;
 export type PositionView = {
   kind: PositionKind;
   protocol: Protocol;
+  chain: ChainSlug;
+  chainLabel: string;
   tokenId?: string;
   pair: string;
   fee: number;
@@ -127,6 +130,7 @@ export type ConfirmView = {
 };
 
 export type MintQuoteLike = {
+  chainId?: number;
   protocol: Protocol;
   symbol0: string;
   symbol1: string;
@@ -178,6 +182,8 @@ export function serializeLiveView(card: PositionCard): PositionView {
     {
       kind: "live",
       protocol: card.ref.protocol,
+      chain: slugForChainId(card.ref.chainId),
+      chainLabel: labelForChainId(card.ref.chainId),
       tokenId: card.ref.tokenId.toString(),
       pair: `${card.token0.symbol}/${card.token1.symbol}`,
       fee: card.fee,
@@ -219,6 +225,8 @@ export function serializeMintView(quote: MintQuoteLike): PositionView {
     {
       kind: "projected",
       protocol: quote.protocol,
+      chain: slugForChainId(quote.chainId ?? 8453),
+      chainLabel: labelForChainId(quote.chainId ?? 8453),
       pair: `${quote.symbol0}/${quote.symbol1}`,
       fee: quote.fee,
       feeLabel: feeTierLabel(quote.fee),
@@ -252,6 +260,8 @@ export function serializeProjectedRange(
     {
       kind: "projected",
       protocol: snap.ref.protocol,
+      chain: slugForChainId(snap.ref.chainId),
+      chainLabel: labelForChainId(snap.ref.chainId),
       tokenId: snap.ref.tokenId.toString(),
       pair: `${snap.token0.symbol}/${snap.token1.symbol}`,
       fee: snap.fee,

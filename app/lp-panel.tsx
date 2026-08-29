@@ -93,7 +93,7 @@ export function LpPanel({
                 <div className="lp-id">
                   <span className="lp-pair">{view.pair}</span>
                   <span className="lp-id-meta">
-                    {view.feeLabel} · {view.protocol.toLowerCase()}
+                    {view.chainLabel ?? "Base"} · {view.feeLabel} · {view.protocol.toLowerCase()}
                     {view.tokenId ? ` · #${view.tokenId}` : ""}
                   </span>
                 </div>
@@ -164,7 +164,7 @@ function PositionDetail({
         <div className="lp-detail-id">
           <h3>{view.pair}</h3>
           <p>
-            {view.protocol.toLowerCase()} · {view.feeLabel}
+            {view.chainLabel ?? "Base"} · {view.protocol.toLowerCase()} · {view.feeLabel}
             {view.tokenId ? ` · #${view.tokenId}` : ""}
           </p>
         </div>

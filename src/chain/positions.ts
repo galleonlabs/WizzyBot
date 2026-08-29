@@ -2,6 +2,7 @@ import { type Address, type PublicClient } from "viem";
 import { Token } from "@uniswap/sdk-core";
 import { Pool, Position as SdkPosition } from "@uniswap/v3-sdk";
 import { ADDRESSES, CHAIN_ID } from "../constants.js";
+import { addressesFor, chainIdOfClient, slugOfClient } from "../chains.js";
 import { factoryAbi, nfpmAbi, poolAbi, erc20Abi } from "./abi.js";
 import { feeGrowthInside, uncollectedFees } from "./fees-onchain.js";
 import { isInRange, percentThroughRange } from "../core/range.js";
@@ -14,8 +15,10 @@ export class V3Adapter implements ProtocolAdapter {
   constructor(private readonly client: PublicClient) {}
 
   async listPositions(owner: Address): Promise<PositionRef[]> {
+    const addrs = addressesFor(slugOfClient(this.client));
+    const chainId = chainIdOfClient(this.client);
     const balance = await this.client.readContract({
-      address: ADDRESSES.nfpm,
+      address: addrs.nfpm,
       abi: nfpmAbi,
       functionName: "balanceOf",
       args: [owner],
@@ -23,19 +26,20 @@ export class V3Adapter implements ProtocolAdapter {
     const refs: PositionRef[] = [];
     for (let i = 0n; i < balance; i++) {
       const tokenId = await this.client.readContract({
-        address: ADDRESSES.nfpm,
+        address: addrs.nfpm,
         abi: nfpmAbi,
         functionName: "tokenOfOwnerByIndex",
         args: [owner, i],
       });
-      refs.push({ protocol: "V3", chainId: CHAIN_ID, tokenId });
+      refs.push({ protocol: "V3", chainId, tokenId });
     }
     return refs;
   }
 
   async importViaLogs(owner: Address, fromBlock?: bigint): Promise<bigint[]> {
+    const addrs = addressesFor(slugOfClient(this.client));
     const logs = await this.client.getContractEvents({
-      address: ADDRESSES.nfpm,
+      address: addrs.nfpm,
       abi: nfpmAbi,
       eventName: "Transfer",
       args: { to: owner },
@@ -50,7 +54,7 @@ export class V3Adapter implements ProtocolAdapter {
     for (const id of ids) {
       try {
         const current = await this.client.readContract({
-          address: ADDRESSES.nfpm,
+          address: addrs.nfpm,
           abi: nfpmAbi,
           functionName: "ownerOf",
           args: [id],
@@ -64,8 +68,10 @@ export class V3Adapter implements ProtocolAdapter {
   }
 
   async readPosition(tokenId: bigint): Promise<PositionSnapshot> {
+    const addrs = addressesFor(slugOfClient(this.client));
+    const chainId = chainIdOfClient(this.client);
     const pos = await this.client.readContract({
-      address: ADDRESSES.nfpm,
+      address: addrs.nfpm,
       abi: nfpmAbi,
       functionName: "positions",
       args: [tokenId],
@@ -87,14 +93,14 @@ export class V3Adapter implements ProtocolAdapter {
     ] = pos;
 
     const owner = await this.client.readContract({
-      address: ADDRESSES.nfpm,
+      address: addrs.nfpm,
       abi: nfpmAbi,
       functionName: "ownerOf",
       args: [tokenId],
     });
 
     const poolAddr = await this.client.readContract({
-      address: ADDRESSES.factory,
+      address: addrs.factory,
       abi: factoryAbi,
       functionName: "getPool",
       args: [token0Addr, token1Addr, fee],
@@ -149,7 +155,7 @@ export class V3Adapter implements ProtocolAdapter {
     });
 
     return {
-      ref: { protocol: "V3", chainId: CHAIN_ID, tokenId },
+      ref: { protocol: "V3", chainId, tokenId },
       owner,
       token0: token0Meta,
       token1: token1Meta,
@@ -206,4 +212,3 @@ export function amountsForPosition(args: {
     amount1: BigInt(position.amount1.quotient.toString()),
   };
 }
-

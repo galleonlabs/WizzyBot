@@ -4,6 +4,7 @@ import type { PlannedTx } from "../types.js";
 import { assertAllowedTarget } from "./allowlist.js";
 import { makePublicClient } from "./broadcast.js";
 import { CHAIN_ID } from "../constants.js";
+import { slugForChainId, viemChainFor } from "../chains.js";
 
 /** Public Privy app id. Safe to ship. Secret stays in env. */
 export const DEFAULT_PRIVY_APP_ID = "cmteeqkjc03e20cjl59c9kbwu";
@@ -120,8 +121,11 @@ export async function sendWithPrivy(args: {
   extraAllow: Address[];
   live: boolean;
   wallet?: HostedWallet;
+  chainId?: number;
 }): Promise<{ hash?: Hex; dryRun: boolean; stubbed?: boolean }> {
-  assertAllowedTarget(args.tx.to, args.extraAllow);
+  const chainId = args.chainId ?? CHAIN_ID;
+  const slug = slugForChainId(chainId);
+  assertAllowedTarget(args.tx.to, args.extraAllow, slug);
   if (!args.live) return { dryRun: true };
   if (!privyConfigured()) {
     return { dryRun: true, stubbed: true };
@@ -133,10 +137,10 @@ export async function sendWithPrivy(args: {
       to: args.tx.to,
       data: args.tx.data,
       value: `0x${args.tx.value.toString(16)}`,
-      chainId: CHAIN_ID,
+      chainId,
     },
   });
-  const client = makePublicClient(args.rpcUrl);
+  const client = makePublicClient(args.rpcUrl, viemChainFor(slug));
   const hash = await client.sendRawTransaction({
     serializedTransaction: signed.signedTransaction as Hex,
   });

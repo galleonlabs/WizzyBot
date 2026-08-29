@@ -147,7 +147,7 @@ Bankr later docs now describe the right controls: wallet-level daily / per-tx US
 - Club NFT / membership as a privilege grant that unlocks transfers.
 - Trading-desk scope. Swaps, perps, Polymarket, tokenized stocks, browser checkout, x402 image gens — out of v1.
 - A 0.8% (or any) user-swap fee. UnaBot takes protocol fees on compound / range / exit only.
-- Aerodrome routing, Hyperliquid, Robinhood Chain. Base Uniswap v3 only.
+- Aerodrome routing, Hyperliquid, Robinhood Chain. Base Uniswap v2, v3, and v4.
 - Token launch in v1. Virtuals is a later step (virtuals.md). Do not Doppler-launch from this repo.
 
 ## 10. Open items

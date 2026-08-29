@@ -58,7 +58,7 @@ export default function Page() {
       <section className="landing-body">
         <div className="landing-hero">
           <h1>
-            Liquidity, <em>as an agent.</em>
+            Liquidity, as an agent.
           </h1>
           <p className="sub">v2, v3, and v4. You hold the NFT.</p>
           <div className="cta-row">

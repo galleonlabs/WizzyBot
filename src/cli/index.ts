@@ -3,7 +3,7 @@ import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { Command } from "commander";
 import { getAddress, isAddress, type Address } from "viem";
-import { ADDRESSES, CHAIN_ID, TREASURY } from "../constants.js";
+import { ADDRESSES, CHAIN_ID } from "../constants.js";
 import { loadEnv } from "../config/env.js";
 import { loadConfig, policyFor } from "../config/policy.js";
 import { loadAccount } from "../signer/account.js";
@@ -16,7 +16,7 @@ import { extraAllowForMint, persistMintHold, runMintFlow } from "../core/mint-fl
 import { formatHoldNote, getHold, holdAmounts } from "../core/hold.js";
 import { importHoldForToken } from "../chain/mint-history.js";
 import { runTelegramLoop } from "../surfaces/telegram.js";
-import { COMPOUND_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
+import { COMPOUND_FEE_BPS, NOTIONAL_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
 import { rangeFromWidthPct, snapRange, tickSpacingForFee } from "../core/ticks.js";
 import { parseIntent, confirmPhrase, isWrite, type Intent } from "../agent/nlp.js";
 import { StdoutSink } from "../keeper/alerts.js";
@@ -197,6 +197,7 @@ program
       const sent = await sendPlannedTx({ rpcUrl: env.rpcUrl, account, tx, extraAllow: extra, live: true });
       console.log(tx.description, "hash" in sent ? sent.hash : "dry-run");
     }
+    // tokenId is unknown until the mint receipt is mined; persistMintHold no-ops on 0n.
     persistMintHold(result.quote, 0n);
     console.log("HOLD for the new tokenId is persisted on next import/status once the NFT exists.");
   });
@@ -381,7 +382,13 @@ async function planFor(
     feesUsd: usd.feesUsd,
     notionalUsd: usd.positionUsd,
     gasUsd: 0.15,
-    takeBps: action === "compound" ? COMPOUND_FEE_BPS : RANGE_EXIT_FEE_BPS,
+    takeBps:
+      action === "compound"
+        ? COMPOUND_FEE_BPS
+        : feeSourceFlag(program.opts()) === "notional"
+          ? NOTIONAL_FEE_BPS
+          : RANGE_EXIT_FEE_BPS,
+    takeBaseUsd: feeSourceFlag(program.opts()) === "notional" ? usd.positionUsd : usd.feesUsd,
   };
   if (action === "compound") return planCompound(snap, ctx);
   if (action === "rerange") return planRerange(snap, ctx, { oorPercent: extra.oorPercent ?? policy.oorPercent });
@@ -407,12 +414,16 @@ async function maybeBroadcast(receipt: ReturnType<typeof planCompound>, cmd: Com
   const { adapter, owner, env, account } = await connect();
   if (!account || receipt.tokenId === undefined) throw new Error("signer and tokenId required");
   const { hydrateCalldata } = await import("../core/hydrate.js");
-  const { sendPlannedTx } = await import("../signer/broadcast.js");
+  const { isPlaceholderTx, sendPlannedTx } = await import("../signer/broadcast.js");
   const { allowlistWithTokens } = await import("../signer/allowlist.js");
   const snap = await adapter.readPosition(receipt.tokenId);
   const filled = hydrateCalldata(receipt, snap, owner);
   const extra = allowlistWithTokens(snap.token0.address, snap.token1.address);
   for (const tx of filled.txs) {
+    if (isPlaceholderTx(tx)) {
+      console.log(`skip ${tx.description}: empty calldata (not broadcast)`);
+      continue;
+    }
     const sent = await sendPlannedTx({ rpcUrl: env.rpcUrl, account, tx, extraAllow: extra, live: true });
     console.log(tx.description, "hash" in sent ? sent.hash : "dry-run");
   }

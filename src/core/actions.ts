@@ -1,5 +1,5 @@
 import { getAddress, type Address } from "viem";
-import { ADDRESSES, TREASURY } from "../constants.js";
+import { ADDRESSES } from "../constants.js";
 import type {
   ActionReceipt,
   FeeSource,
@@ -24,6 +24,7 @@ export interface PlanContext {
   notionalUsd: number;
   gasUsd: number;
   takeBps: number;
+  takeBaseUsd?: number;
 }
 
 function recipients(fee: TreasuryFee | null, owner: Address): Address[] {
@@ -99,6 +100,7 @@ export function planCompound(
     minPositionUsd: ctx.minPositionUsd,
     takeBps: ctx.takeBps,
     noFee: ctx.noFee,
+    takeBaseUsd: ctx.takeBaseUsd,
   });
 
   const fee = resolveActionFee({
@@ -204,6 +206,7 @@ export function planRerange(
     minPositionUsd: ctx.minPositionUsd,
     takeBps: ctx.takeBps,
     noFee: ctx.noFee,
+    takeBaseUsd: ctx.takeBaseUsd,
   });
 
   if (econ.skip && econ.reason?.startsWith("size floor")) {
@@ -401,4 +404,3 @@ export function formatReceipt(receipt: ActionReceipt): string {
   return lines.filter(Boolean).join("\n");
 }
 
-export { TREASURY };

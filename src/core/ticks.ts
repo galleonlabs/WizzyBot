@@ -11,7 +11,7 @@ export function tickSpacingForFee(fee: number): number {
 
 export function snapTick(tick: number, spacing: number): number {
   if (!Number.isInteger(tick) || !Number.isInteger(spacing) || spacing <= 0) {
-    throw new Error("tick and spacing must be positive integers");
+    throw new Error("tick must be an integer; spacing must be a positive integer");
   }
   const clamped = Math.max(MIN_TICK, Math.min(MAX_TICK, tick));
   return nearestUsableTick(clamped, spacing);

@@ -10,6 +10,8 @@ import {
   holdIsReconstructed,
   rememberHold,
 } from "../src/core/hold.js";
+import { persistMintHold } from "../src/core/mint-flow.js";
+import { ADDRESSES } from "../src/constants.js";
 
 function tmpPath(): string {
   return join(mkdtempSync(join(tmpdir(), "unabot-hold-")), "positions.json");
@@ -35,5 +37,34 @@ describe("HOLD persistence", () => {
     expect(formatHoldNote(rec)).toMatch(/first-seen|not the original/i);
     expect(formatHoldNote(undefined)).toBe(HOLD_LIMITATION);
     expect(HOLD_LIMITATION).toMatch(/never silently/);
+  });
+
+  it("persistMintHold ignores tokenId 0 (unknown until mined)", () => {
+    const path = tmpPath();
+    persistMintHold(
+      {
+        token0: ADDRESSES.weth,
+        token1: ADDRESSES.usdc,
+        symbol0: "WETH",
+        symbol1: "USDC",
+        decimals0: 18,
+        decimals1: 6,
+        fee: 500,
+        pool: ADDRESSES.weth,
+        tickCurrent: 0,
+        tickLower: -100,
+        tickUpper: 100,
+        sqrtPriceX96: 1n,
+        amount0: 10n,
+        amount1: 20n,
+        liquidity: "1",
+        singleSided: false,
+        useNative: false,
+        nativeIsToken0: false,
+      },
+      0n,
+      path,
+    );
+    expect(getHold(0n, path)).toBeUndefined();
   });
 });

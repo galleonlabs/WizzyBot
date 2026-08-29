@@ -11,7 +11,10 @@ export function evaluateEconomics(input: EconomicsInput): EconomicsDecision {
     };
   }
 
-  const takeUsd = input.noFee ? 0 : Number(bpsOf(BigInt(Math.round(input.feesUsd * 1e6)), input.takeBps)) / 1e6;
+  const takeBaseUsd = input.takeBaseUsd ?? input.feesUsd;
+  const takeUsd = input.noFee
+    ? 0
+    : Number(bpsOf(BigInt(Math.round(Math.max(0, takeBaseUsd) * 1e6)), input.takeBps)) / 1e6;
   const netUsd = input.feesUsd - takeUsd - input.gasUsd;
 
   if (input.feesUsd <= 0) {

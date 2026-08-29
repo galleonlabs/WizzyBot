@@ -129,6 +129,8 @@ export interface EconomicsInput {
   minPositionUsd: number;
   takeBps: number;
   noFee: boolean;
+  /** USD base the take is applied to. Defaults to feesUsd (compound / fee-source=fees). */
+  takeBaseUsd?: number;
 }
 
 export interface EconomicsDecision {

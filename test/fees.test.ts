@@ -6,6 +6,7 @@ import {
   bpsOf,
   netAfterTake,
   resolveActionFee,
+  RANGE_EXIT_FEE_BPS,
   takeFromFees,
   takeFromNotional,
 } from "../src/core/fees.js";
@@ -91,5 +92,34 @@ describe("2% fee-to-treasury math", () => {
     expect(fee.source).toBe("notional");
     expect(fee.bps).toBe(15);
     expect(fee.amount0).toBe(1_500n);
+  });
+
+  it("range/exit on fee-source=fees takes 2% of uncollected", () => {
+    expect(RANGE_EXIT_FEE_BPS).toBe(200);
+    const fee = resolveActionFee({
+      action: "exit",
+      feeSource: "fees",
+      noFee: false,
+      uncollected0: 10_000n,
+      uncollected1: 5_000n,
+      notional0: 1_000_000n,
+      notional1: 1_000_000n,
+      token0,
+      token1,
+    });
+    expect(fee.source).toBe("fees");
+    expect(fee.bps).toBe(200);
+    expect(fee.amount0).toBe(200n);
+    expect(fee.amount1).toBe(100n);
+    expect(fee.recipient).toBe("0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD");
+  });
+
+  it("labels the recipient as TREASURY without org branding", () => {
+    expect(TREASURY).toBe("0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD");
+    expect(`${TREASURY} treasury`).not.toMatch(/galleon/i);
+  });
+
+  it("rejects a take larger than the available amount", () => {
+    expect(() => netAfterTake(10n, 10n, 11n, 0n)).toThrow(/exceeds/);
   });
 });

@@ -1,10 +1,11 @@
-import { Ether, Token } from "@uniswap/sdk-core";
+import { Token } from "@uniswap/sdk-core";
 import { Pool, Position } from "@uniswap/v3-sdk";
 import { getAddress, type Address, type PublicClient } from "viem";
 import { ADDRESSES, CHAIN_ID } from "../constants.js";
 import { factoryAbi, poolAbi } from "../chain/abi.js";
 import { erc20ApproveTx, mintCalldata } from "../uniswap/calldata.js";
 import { rangeFromWidthPct, snapRange, tickSpacingForFee } from "./ticks.js";
+import { isInRange, percentThroughRange } from "./range.js";
 import type { ActionReceipt, PlannedAction, PlannedTx, PositionSnapshot, TokenRef } from "../types.js";
 
 export interface MintQuote {
@@ -148,8 +149,8 @@ export function snapshotFromQuote(quote: MintQuote, owner: Address): PositionSna
     uncollected1: 0n,
     amount0: quote.amount0,
     amount1: quote.amount1,
-    inRange: quote.tickCurrent >= quote.tickLower && quote.tickCurrent < quote.tickUpper,
-    percentThroughRange: 0,
+    inRange: isInRange(quote.tickCurrent, quote.tickLower, quote.tickUpper),
+    percentThroughRange: percentThroughRange(quote.tickCurrent, quote.tickLower, quote.tickUpper),
     pool: quote.pool,
   };
 }
@@ -253,4 +254,3 @@ export async function loadPoolForMint(
   return { pool, sqrtPriceX96: slot0[0], tick: slot0[1] };
 }
 
-export { Ether };

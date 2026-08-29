@@ -135,6 +135,7 @@ async function tryLpApi(apiKey: string, quote: MintQuote, owner: Address): Promi
 }
 
 export function persistMintHold(quote: MintQuote, tokenId: bigint, path?: string): void {
+  if (tokenId === 0n) return;
   rememberHold(tokenId, quote.amount0, quote.amount1, "live-mint", { path });
 }
 

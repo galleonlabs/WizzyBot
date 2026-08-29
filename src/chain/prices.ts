@@ -55,7 +55,7 @@ export async function tokenUsd(
   const viaUsdc = await midPriceUsd(client, token, decimals, usdc, 6);
   if (viaUsdc !== undefined) return viaUsdc;
 
-  if (token.toLowerCase() === weth.toLowerCase()) {
+  if (token.toLowerCase() === weth.toLowerCase() || token.toLowerCase() === ADDRESSES.nativeEth.toLowerCase()) {
     const wethUsdc = await midPriceUsd(client, weth, 18, usdc, 6);
     if (wethUsdc !== undefined) return wethUsdc;
     return ethUsdFallback ?? 0;

@@ -183,4 +183,5 @@ export interface ProtocolAdapter {
   listPositions(owner: Address): Promise<PositionRef[]>;
   readPosition(tokenId: bigint): Promise<PositionSnapshot>;
   importViaLogs?(owner: Address, fromBlock?: bigint): Promise<bigint[]>;
+  bindOwner?(owner: Address): void;
 }

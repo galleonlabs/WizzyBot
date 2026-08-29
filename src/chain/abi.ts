@@ -357,3 +357,168 @@ export const v4PositionManagerAbi = [
     ],
   },
 ] as const;
+
+export const v2RouterAbi = [
+  {
+    type: "function",
+    name: "addLiquidity",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "tokenA", type: "address" },
+      { name: "tokenB", type: "address" },
+      { name: "amountADesired", type: "uint256" },
+      { name: "amountBDesired", type: "uint256" },
+      { name: "amountAMin", type: "uint256" },
+      { name: "amountBMin", type: "uint256" },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [
+      { name: "amountA", type: "uint256" },
+      { name: "amountB", type: "uint256" },
+      { name: "liquidity", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "addLiquidityETH",
+    stateMutability: "payable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "amountTokenDesired", type: "uint256" },
+      { name: "amountTokenMin", type: "uint256" },
+      { name: "amountETHMin", type: "uint256" },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [
+      { name: "amountToken", type: "uint256" },
+      { name: "amountETH", type: "uint256" },
+      { name: "liquidity", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "removeLiquidity",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "tokenA", type: "address" },
+      { name: "tokenB", type: "address" },
+      { name: "liquidity", type: "uint256" },
+      { name: "amountAMin", type: "uint256" },
+      { name: "amountBMin", type: "uint256" },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [
+      { name: "amountA", type: "uint256" },
+      { name: "amountB", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "removeLiquidityETH",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "liquidity", type: "uint256" },
+      { name: "amountTokenMin", type: "uint256" },
+      { name: "amountETHMin", type: "uint256" },
+      { name: "to", type: "address" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [
+      { name: "amountToken", type: "uint256" },
+      { name: "amountETH", type: "uint256" },
+    ],
+  },
+] as const;
+
+export const permit2Abi = [
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint160" },
+      { name: "expiration", type: "uint48" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+export const v4StateViewAbi = [
+  {
+    type: "function",
+    name: "getSlot0",
+    stateMutability: "view",
+    inputs: [{ name: "poolId", type: "bytes32" }],
+    outputs: [
+      { name: "sqrtPriceX96", type: "uint160" },
+      { name: "tick", type: "int24" },
+      { name: "protocolFee", type: "uint24" },
+      { name: "lpFee", type: "uint24" },
+    ],
+  },
+  {
+    type: "function",
+    name: "getLiquidity",
+    stateMutability: "view",
+    inputs: [{ name: "poolId", type: "bytes32" }],
+    outputs: [{ type: "uint128" }],
+  },
+  {
+    type: "function",
+    name: "getFeeGrowthInside",
+    stateMutability: "view",
+    inputs: [
+      { name: "poolId", type: "bytes32" },
+      { name: "tickLower", type: "int24" },
+      { name: "tickUpper", type: "int24" },
+    ],
+    outputs: [
+      { name: "feeGrowthInside0X128", type: "uint256" },
+      { name: "feeGrowthInside1X128", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "getPositionInfo",
+    stateMutability: "view",
+    inputs: [
+      { name: "poolId", type: "bytes32" },
+      { name: "owner", type: "address" },
+      { name: "tickLower", type: "int24" },
+      { name: "tickUpper", type: "int24" },
+      { name: "salt", type: "bytes32" },
+    ],
+    outputs: [
+      { name: "liquidity", type: "uint128" },
+      { name: "feeGrowthInside0LastX128", type: "uint256" },
+      { name: "feeGrowthInside1LastX128", type: "uint256" },
+    ],
+  },
+] as const;
+
+export const v4PositionManagerWriteAbi = [
+  {
+    type: "function",
+    name: "modifyLiquidities",
+    stateMutability: "payable",
+    inputs: [
+      { name: "unlockData", type: "bytes" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+export type V4PoolKey = {
+  currency0: `0x${string}`;
+  currency1: `0x${string}`;
+  fee: number;
+  tickSpacing: number;
+  hooks: `0x${string}`;
+};

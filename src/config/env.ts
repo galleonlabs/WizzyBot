@@ -42,6 +42,7 @@ export const EnvSchema = z.object({
   UNABOT_TREASURY: address,
   UNABOT_ETH_USD: z.coerce.number().positive().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional().default(""),
+  UNABOT_ALERT_WEBHOOK: z.string().optional().default(""),
 });
 
 export type Env = {
@@ -51,9 +52,15 @@ export type Env = {
   treasury: Address;
   ethUsd: number | undefined;
   telegramBotToken: string | undefined;
+  alertWebhook: string | undefined;
 };
 
-const SECRET_ENV_KEYS = new Set(["UNABOT_PRIVATE_KEY", "UNISWAP_API_KEY", "TELEGRAM_BOT_TOKEN"]);
+const SECRET_ENV_KEYS = new Set([
+  "UNABOT_PRIVATE_KEY",
+  "UNISWAP_API_KEY",
+  "TELEGRAM_BOT_TOKEN",
+  "UNABOT_ALERT_WEBHOOK",
+]);
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const env = mergedEnv(source);
@@ -66,6 +73,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       UNABOT_TREASURY: env.UNABOT_TREASURY || undefined,
       UNABOT_ETH_USD: env.UNABOT_ETH_USD || undefined,
       TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN ?? "",
+      UNABOT_ALERT_WEBHOOK: env.UNABOT_ALERT_WEBHOOK ?? "",
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -77,6 +85,11 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     }
     throw err;
   }
+  if (parsed.UNABOT_ALERT_WEBHOOK) {
+    const url = z.string().url().safeParse(parsed.UNABOT_ALERT_WEBHOOK);
+    if (!url.success) throw new Error("Invalid env: UNABOT_ALERT_WEBHOOK: invalid url");
+  }
+
   return {
     rpcUrl: parsed.BASE_RPC_URL,
     uniswapApiKey: parsed.UNISWAP_API_KEY || undefined,
@@ -84,6 +97,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     treasury: (parsed.UNABOT_TREASURY as Address | undefined) ?? TREASURY,
     ethUsd: parsed.UNABOT_ETH_USD,
     telegramBotToken: parsed.TELEGRAM_BOT_TOKEN || undefined,
+    alertWebhook: parsed.UNABOT_ALERT_WEBHOOK || undefined,
   };
 }
 

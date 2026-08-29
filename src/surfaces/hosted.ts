@@ -328,9 +328,8 @@ export async function runKeeperScan(input: { owner?: string; live?: boolean } = 
     intervalMs: 0,
     sink,
     execute: live
-      ? async (receipt) => {
+      ? async (receipt, snap) => {
           if (receipt.tokenId === undefined) return receipt;
-          const snap = await adapter.readPosition(receipt.tokenId);
           return maybeBroadcast(receipt, snap, owner, true);
         }
       : undefined,

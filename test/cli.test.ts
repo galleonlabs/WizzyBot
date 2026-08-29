@@ -77,6 +77,9 @@ describe("CLI --help smoke", () => {
     expect(mint?.helpInformation()).toMatch(/--protocol/);
     expect(list?.helpInformation()).toMatch(/--protocol/);
     expect(mint?.helpInformation()).toMatch(/v2 \| v3 \| v4/);
+    const run = program.commands.find((c) => c.name() === "run");
+    expect(run?.helpInformation()).toMatch(/dry-run/i);
+    expect(run?.helpInformation()).toMatch(/--live/);
   });
 
   it("registers MCP tools required by the spec", () => {

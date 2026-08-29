@@ -7,19 +7,30 @@ const str = z.string();
 const opt = z.string().optional();
 
 export const MCP_TOOL_DEFS = [
+  { name: "list", description: "List LP positions (v2, v3, v4)", required: ["owner"] },
+  { name: "status", description: "Status / position card: range, fees, APR, HOLD", required: ["tokenId"] },
+  { name: "mint", description: "Mint a position. Dry-run unless live=true.", required: ["token0", "token1", "fee"] },
+  { name: "compound", description: "Compound: collect, optional swap, increase. Take unless noFee.", required: ["tokenId"] },
+  { name: "range", description: "Range: same-width recenter when out of range", required: ["tokenId"] },
+  { name: "exit", description: "Exit a position, optional swap to one token", required: ["tokenId"] },
+  { name: "simulate", description: "Simulate compound | range | exit | mint without broadcast", required: ["action"] },
   { name: "pool_info", description: "Pool state for a pair + fee", required: ["token0", "token1", "fee"] },
-  { name: "position_list", description: "List LP positions for a wallet", required: ["owner"] },
-  { name: "position_pnl", description: "Position card / PnL vs persisted HOLD", required: ["tokenId"] },
+  { name: "position_list", description: "List LP positions for a wallet (same as list)", required: ["owner"] },
+  { name: "position_pnl", description: "Status / position card vs HOLD (same as status)", required: ["tokenId"] },
   { name: "quote_mint", description: "Quote a mint with tick snap (single- or two-sided)", required: ["token0", "token1", "fee"] },
-  { name: "create", description: "Create (mint) a position. Dry-run unless live=true. Same as mint.", required: ["token0", "token1", "fee"] },
-  { name: "increase", description: "Increase liquidity of an existing NFT", required: ["tokenId"] },
-  { name: "decrease", description: "Decrease liquidity of an existing NFT", required: ["tokenId"] },
+  { name: "create", description: "Mint a position (same as mint). Dry-run unless live=true.", required: ["token0", "token1", "fee"] },
+  { name: "increase", description: "Increase liquidity of an existing position", required: ["tokenId"] },
+  { name: "decrease", description: "Decrease liquidity of an existing position", required: ["tokenId"] },
   { name: "claim", description: "Claim / collect uncollected fees", required: ["tokenId"] },
-  { name: "compound", description: "Collect → optional swap → increase. Take unless noFee.", required: ["tokenId"] },
-  { name: "rebalance", description: "Auto-range same-width recenter", required: ["tokenId"] },
-  { name: "exit", description: "Fully exit a position, optional swap to one token", required: ["tokenId"] },
-  { name: "simulate", description: "Simulate compound | rebalance | exit | mint without broadcast", required: ["action"] },
+  { name: "rebalance", description: "Range: same-width recenter (same as range)", required: ["tokenId"] },
 ] as const;
+
+const MCP_NAME_ALIAS: Record<string, string> = {
+  list: "position_list",
+  status: "position_pnl",
+  mint: "create",
+  range: "rebalance",
+};
 
 export const MCP_TOOLS = MCP_TOOL_DEFS.map((t) => t.name);
 
@@ -41,6 +52,7 @@ const mintFields = {
 };
 
 function schemaFor(name: string): z.ZodRawShape {
+  name = MCP_NAME_ALIAS[name] ?? name;
   switch (name) {
     case "pool_info":
       return { token0: str, token1: str, fee: str };
@@ -102,13 +114,14 @@ export async function startMcpStdio(): Promise<void> {
 }
 
 export async function callTool(name: string, args: Record<string, unknown>): Promise<string> {
+  name = MCP_NAME_ALIAS[name] ?? name;
   const { loadEnv } = await import("../config/env.js");
   const { makePublicClient } = await import("../signer/broadcast.js");
   const { V3Adapter } = await import("../chain/positions.js");
   const { planCompound, planExit, planRerange, formatReceipt } = await import("../core/actions.js");
   const { usdPricesForPosition, snapshotUsd } = await import("../chain/prices.js");
   const { buildCard, formatCard } = await import("../core/card.js");
-  const { getHold, holdAmounts, formatHoldNote, rememberHold } = await import("../core/hold.js");
+  const { getHold, holdAmounts, formatHoldNote } = await import("../core/hold.js");
   const { importHoldForToken } = await import("../chain/mint-history.js");
   const { quoteMintFromPool, planMint, formatMintQuote, loadPoolForMint, resolveMintToken, sortPoolPair } = await import("../core/mint.js");
   const env = loadEnv();
@@ -151,7 +164,7 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
 
   const owner = (args.owner as `0x${string}`) ?? "0x0000000000000000000000000000000000000001";
   if (["increase", "decrease", "claim", "compound", "rebalance", "exit", "simulate"].includes(name)) {
-    if (name === "simulate" && String(args.action) === "mint") {
+    if (name === "simulate" && (String(args.action) === "mint" || String(args.action) === "create")) {
       return quoteOrCreate("quote_mint", args, { client, env, live: false });
     }
     const snap = await adapter.readPosition(BigInt(String(args.tokenId)));
@@ -173,7 +186,7 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
     const receipt =
       action === "compound" || action === "claim" || action === "increase"
         ? planCompound(snap, ctx)
-        : action === "rebalance" || action === "rerange" || action === "decrease"
+        : action === "rebalance" || action === "rerange" || action === "range" || action === "decrease"
           ? planRerange(snap, ctx, { oorPercent: Number(args.oorPercent ?? 0) })
           : planExit(snap, ctx, { swapTo: args.swapTo as `0x${string}` | undefined });
     return formatReceipt(receipt);

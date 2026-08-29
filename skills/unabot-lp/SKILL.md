@@ -31,4 +31,4 @@ unabot telegram
 unabot mcp
 ```
 
-MCP: `pool_info`, `position_list`, `position_pnl`, `quote_mint`, `create`, `increase`, `decrease`, `claim`, `compound`, `rebalance`, `exit`, `simulate`. `create` is mint.
+MCP verbs: `list`, `status`, `mint`, `compound`, `range`, `exit`, `simulate`. Aliases: `position_list`, `position_pnl`, `create`, `rebalance`, plus `pool_info`, `quote_mint`, `increase`, `decrease`, `claim`.

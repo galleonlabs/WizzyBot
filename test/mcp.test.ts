@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { MCP_TOOLS, listMcpTools, createMcpServer } from "../src/mcp/server.js";
+import { MCP_TOOLS, MCP_TOOL_DEFS, listMcpTools, createMcpServer } from "../src/mcp/server.js";
+import { PRODUCT_VERBS } from "../src/copy.js";
 
 describe("MCP listTools", () => {
-  it("advertises the required tool names including create (mint)", () => {
+  it("advertises product verbs and the required spec names", () => {
     const tools = listMcpTools();
     expect(tools).toEqual(MCP_TOOLS);
-    expect(tools.sort()).toEqual(
-      [
+    for (const verb of PRODUCT_VERBS) {
+      expect(tools).toContain(verb);
+    }
+    expect(tools).toEqual(
+      expect.arrayContaining([
         "claim",
         "compound",
         "create",
@@ -19,9 +23,19 @@ describe("MCP listTools", () => {
         "quote_mint",
         "rebalance",
         "simulate",
-      ].sort(),
+      ]),
     );
     expect(tools).toContain("create");
+    expect(tools).toContain("mint");
+    expect(tools).toContain("range");
+  });
+
+  it("tool descriptions match verbs: list, status, mint, compound, range, exit, simulate", () => {
+    for (const verb of PRODUCT_VERBS) {
+      const def = MCP_TOOL_DEFS.find((t) => t.name === verb);
+      expect(def, verb).toBeTruthy();
+      expect(def!.description.toLowerCase()).toContain(verb);
+    }
   });
 
   it("registers the same names on the official SDK server", () => {

@@ -3,7 +3,7 @@ import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { Command } from "commander";
 import { getAddress, isAddress, type Address } from "viem";
-import { ADDRESSES, CHAIN_ID, TREASURY } from "../constants.js";
+import { ADDRESSES, CHAIN_ID } from "../constants.js";
 import { loadEnv } from "../config/env.js";
 import { loadConfig, policyFor } from "../config/policy.js";
 import { loadAccount } from "../signer/account.js";
@@ -19,6 +19,7 @@ import { runTelegramLoop } from "../surfaces/telegram.js";
 import { COMPOUND_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
 import { rangeFromWidthPct, snapRange, tickSpacingForFee } from "../core/ticks.js";
 import { parseIntent, confirmPhrase, isWrite, type Intent } from "../agent/nlp.js";
+import { PRODUCT_LINE, PRODUCT_HELP } from "../copy.js";
 import { StdoutSink } from "../keeper/alerts.js";
 import { runLoop, runOnce } from "../keeper/loop.js";
 import { startMcpStdio } from "../mcp/server.js";
@@ -28,11 +29,11 @@ const program = new Command();
 
 program
   .name("unabot")
-  .description("Uniswap LP on autopilot. v2, v3, and v4. You keep the position.")
+  .description(PRODUCT_LINE)
   .version("1.0.0")
   .argument("[utterance...]", "natural-language command, e.g. unabot \"status 12345\"")
-  .option("--live", "broadcast transactions (default is dry-run)", false)
-  .option("--no-fee", "skip the take", false)
+  .option("--live", "broadcast (default is dry-run)")
+  .option("--no-fee", "skip the take")
   .option("--fee-source <source>", "fees | notional", "fees")
   .option("--config <path>", "policy file (merged over ~/.unabot/config.json)")
   .action(async (utterance: string[], opts) => {
@@ -43,26 +44,28 @@ program
     await runChat(utterance.join(" "), opts);
   });
 
-function liveFlag(opts: { live?: boolean }, cmd?: Command): boolean {
+export function liveFlag(opts: { live?: boolean } = {}, cmd?: Command): boolean {
   return Boolean(opts.live || cmd?.optsWithGlobals?.().live || program.opts().live);
 }
 
-function noFeeFlag(opts: { noFee?: boolean; fee?: boolean } = {}): boolean {
+export function noFeeFlag(opts: { noFee?: boolean; fee?: boolean } = {}): boolean {
+  if (opts.noFee) return true;
+  if (opts.fee === false) return true;
   const global = program.opts() as { noFee?: boolean; fee?: boolean };
-  if (opts.noFee || global.noFee) return true;
-  if (opts.fee === false || global.fee === false) return true;
+  if (global.noFee) return true;
+  if (global.fee === false) return true;
   return false;
 }
 
-function feeSourceFlag(opts: { feeSource?: string }): "fees" | "notional" {
-  const v = opts.feeSource ?? program.opts().feeSource ?? "fees";
+export function feeSourceFlag(opts: { feeSource?: string } = {}): "fees" | "notional" {
+  const v = opts.feeSource ?? (program.opts() as { feeSource?: string }).feeSource ?? "fees";
   if (v !== "fees" && v !== "notional") throw new Error("--fee-source must be fees|notional");
   return v;
 }
 
 program
   .command("list")
-  .description("List LP positions (v2, v3, v4)")
+  .description("List positions (v2, v3, v4)")
   .option("--owner <address>", "wallet to inspect (default: signer)")
   .action(async (opts) => {
     const { client, owner } = await connect(opts.owner);
@@ -91,28 +94,51 @@ program
 
 program
   .command("import")
-  .description("Import v3 NFTs via tokenOfOwnerByIndex and Transfer logs")
+  .description("Import existing positions (v2, v3, v4)")
   .option("--owner <address>", "wallet to import")
   .option("--from-block <n>", "log start block")
   .action(async (opts) => {
-    const { adapter, owner, client } = await connect(opts.owner);
-    const indexed = await adapter.listPositions(owner);
-    const logged = await adapter.importViaLogs(owner, opts.fromBlock ? BigInt(opts.fromBlock) : undefined);
-    const ids = new Set([...indexed.map((r) => r.tokenId), ...logged]);
-    console.log(`owner=${owner} indexed=${indexed.length} logs=${logged.length} unique=${ids.size} rpc=${client.chain?.id ?? CHAIN_ID}`);
-    for (const id of ids) {
-      const snap = await adapter.readPosition(id);
-      const rec = await importHoldForToken(client, id, { amount0: snap.amount0, amount1: snap.amount1 }, {
-        fromBlock: opts.fromBlock ? BigInt(opts.fromBlock) : undefined,
-      });
-      console.log(`${id} HOLD source=${rec.source} hold0=${rec.hold0} hold1=${rec.hold1}`);
+    const { owner, client } = await connect(opts.owner);
+    const { adapterFor } = await import("../core/protocols.js");
+    let any = false;
+    for (const protocol of ["V2", "V3", "V4"] as const) {
+      const adapter = adapterFor(protocol, client);
+      let refs: { protocol: string; tokenId: bigint }[] = [];
+      try {
+        refs = await adapter.listPositions(owner);
+      } catch {
+        refs = [];
+      }
+      let logged: bigint[] = [];
+      if (typeof adapter.importViaLogs === "function") {
+        try {
+          logged = await adapter.importViaLogs(owner, opts.fromBlock ? BigInt(opts.fromBlock) : undefined);
+        } catch {
+          logged = [];
+        }
+      }
+      const ids = new Set([...refs.map((r) => r.tokenId), ...logged]);
+      if (ids.size) any = true;
+      console.log(`${protocol} owner=${owner} indexed=${refs.length} logs=${logged.length} unique=${ids.size} rpc=${client.chain?.id ?? CHAIN_ID}`);
+      for (const id of ids) {
+        try {
+          const snap = await adapter.readPosition(id);
+          const rec = await importHoldForToken(client, id, { amount0: snap.amount0, amount1: snap.amount1 }, {
+            fromBlock: opts.fromBlock ? BigInt(opts.fromBlock) : undefined,
+          });
+          console.log(`${protocol} ${id} HOLD source=${rec.source} hold0=${rec.hold0} hold1=${rec.hold1}`);
+        } catch (err) {
+          console.log(`${protocol} ${id}  (${err instanceof Error ? err.message : err})`);
+        }
+      }
     }
+    if (!any) console.log(`No positions for ${owner}`);
   });
 
 program
   .command("status")
   .alias("card")
-  .description("Position card: range, amounts, fees, APR, HOLD, divergence")
+  .description("Status / position card")
   .argument("<tokenId>", "NFPM tokenId")
   .action(async (tokenId: string) => {
     const { adapter, env, client } = await connectRead();
@@ -155,7 +181,7 @@ program
 
 program
   .command("mint")
-  .description("Mint a position. Dry-run by default.")
+  .description("Mint a position. Dry-run default.")
   .requiredOption("--token0 <address>")
   .requiredOption("--token1 <address>")
   .requiredOption("--fee <fee>")
@@ -203,7 +229,7 @@ program
 
 program
   .command("compound")
-  .description("Collect fees, optional swap to ratio, increase. Skips if uneconomic.")
+  .description("Compound fees into the position")
   .argument("<tokenId>")
   .action(async (tokenId: string, _opts, cmd) => {
     const receipt = await planFor("compound", BigInt(tokenId), cmd);
@@ -214,7 +240,7 @@ program
 program
   .command("range")
   .alias("rerange")
-  .description("Auto-range: same-width recenter when OOR (or near-edge).")
+  .description("Re-range when out of range")
   .argument("<tokenId>")
   .option("--oor <pct>", "0 = only fully OOR", "0")
   .action(async (tokenId: string, opts, cmd) => {
@@ -225,7 +251,7 @@ program
 
 program
   .command("exit")
-  .description("Exit at price (or now). Optional swap to one token.")
+  .description("Exit the position")
   .argument("<tokenId>")
   .option("--price <n>", "trigger price token1/token0")
   .option("--swap-to <address>", "optional single-token exit")
@@ -240,20 +266,21 @@ program
 
 program
   .command("simulate")
-  .description("Print planned actions without broadcasting")
-  .argument("<action>", "compound | rerange | exit")
+  .description("Plan compound | range | exit. No broadcast.")
+  .argument("<action>", "compound | range | exit")
   .argument("<tokenId>")
   .action(async (action: string, tokenId: string, _opts, cmd) => {
-    if (action !== "compound" && action !== "rerange" && action !== "exit") {
-      throw new Error("action must be compound|rerange|exit");
+    const mapped = action === "range" || action === "rebalance" ? "rerange" : action;
+    if (mapped !== "compound" && mapped !== "rerange" && mapped !== "exit") {
+      throw new Error("action must be compound|range|exit");
     }
-    const receipt = await planFor(action, BigInt(tokenId), cmd);
+    const receipt = await planFor(mapped, BigInt(tokenId), cmd);
     printReceipt(receipt);
   });
 
 program
   .command("run")
-  .description("Keeper loop: log skip/execute decisions for configured tokenIds")
+  .description("Keeper loop")
   .option("--interval <ms>", "poll interval", "30000")
   .option("--once", "single pass", false)
   .action(async (opts, cmd) => {
@@ -289,10 +316,10 @@ program
 
 program
   .command("chat")
-  .description("Chat. Live writes require confirmation.")
+  .description("Chat. Live writes need yes.")
   .action(async (_opts, cmd) => {
     const rl = createInterface({ input, output });
-    console.log("UnaBot chat. You keep the NFT. Dry-run unless --live. Type help or quit.");
+    console.log(`UnaBot chat. ${PRODUCT_LINE} Type help or quit.`);
     try {
       while (true) {
         const line = (await rl.question("> ")).trim();
@@ -307,14 +334,14 @@ program
 
 program
   .command("mcp")
-  .description("MCP stdio server for Claude / Bankr")
+  .description("MCP stdio server")
   .action(async () => {
     await startMcpStdio();
   });
 
 program
   .command("telegram")
-  .description("Telegram. Confirm before live.")
+  .description("Telegram. Live writes need yes.")
   .action(async (_opts, cmd) => {
     const env = loadEnv();
     const live = liveFlag(cmd.optsWithGlobals(), cmd);
@@ -339,7 +366,7 @@ program
 
 program
   .command("config")
-  .description("Print merged policy (cwd + ~/.unabot/config.json)")
+  .description("Print merged policy")
   .action(() => {
     console.log(JSON.stringify(loadConfig(), null, 2));
   });
@@ -434,6 +461,7 @@ async function confirmOrThrow(prompt: string): Promise<void> {
 async function runChat(text: string, opts: { live?: boolean }): Promise<void> {
   const intent = parseIntent(text);
   if (intent.verb === "help") {
+    console.log(PRODUCT_HELP);
     program.outputHelp();
     return;
   }
@@ -475,6 +503,13 @@ async function dispatchIntent(intent: Intent): Promise<void> {
       console.log(JSON.stringify(intent, (_, v) => (typeof v === "bigint" ? v.toString() : v), 2));
       console.log("Use: unabot mint --token0 <addr> --token1 <addr> --fee <n> --width <pct>");
       break;
+    case "simulate":
+      if (!intent.action || intent.tokenId === undefined) {
+        console.log("Use: unabot simulate compound|range|exit <tokenId>");
+        break;
+      }
+      await program.parseAsync(["node", "unabot", "simulate", intent.action, String(intent.tokenId)]);
+      break;
     default:
       break;
   }
@@ -483,6 +518,8 @@ async function dispatchIntent(intent: Intent): Promise<void> {
 export function buildProgram(): Command {
   return program;
 }
+
+export { PRODUCT_LINE, PRODUCT_HELP };
 
 export { snapRange, rangeFromWidthPct, tickSpacingForFee };
 

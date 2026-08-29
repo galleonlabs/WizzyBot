@@ -5,6 +5,7 @@ import {
   telegramBootMessage,
   telegramRequiresConfirm,
 } from "../src/surfaces/telegram.js";
+import { PRODUCT_LINE, PRODUCT_HELP, PRODUCT_VERBS } from "../src/copy.js";
 
 describe("telegram dry-path", () => {
   it("starts without a token and explains how to set one", () => {
@@ -29,5 +30,28 @@ describe("telegram dry-path", () => {
     const live = planTelegramReply("mint WETH/USDC 0.05% width 10", true);
     expect(live.awaitConfirm).toBe(true);
     expect(live.text).toMatch(/yes/i);
+  });
+
+  it("help strings use the same product copy and verbs", () => {
+    const help = planTelegramReply("help", false);
+    expect(help.awaitConfirm).toBe(false);
+    expect(help.text).toBe(PRODUCT_HELP);
+    expect(help.text).toContain(PRODUCT_LINE);
+    expect(help.text).not.toMatch(/galleon/i);
+    for (const verb of PRODUCT_VERBS) {
+      expect(help.text).toContain(verb);
+    }
+    const boot = telegramBootMessage("x:y");
+    expect(boot).toContain(PRODUCT_LINE);
+    expect(telegramBootMessage(undefined)).toContain(PRODUCT_LINE);
+  });
+
+  it("previews range and simulate without confirm on dry-run", () => {
+    const range = planTelegramReply("range 12345", false);
+    expect(range.awaitConfirm).toBe(false);
+    expect(range.text).toMatch(/range tokenId=12345/);
+    const sim = planTelegramReply("simulate compound 12345", false);
+    expect(sim.awaitConfirm).toBe(false);
+    expect(sim.text).toMatch(/simulate compound/);
   });
 });

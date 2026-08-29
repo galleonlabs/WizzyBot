@@ -1,4 +1,5 @@
 import { parseIntent, confirmPhrase, isWrite, type Intent } from "../agent/nlp.js";
+import { PRODUCT_HELP, PRODUCT_LINE } from "../copy.js";
 
 export const TELEGRAM_TOKEN_HELP =
   "TELEGRAM_BOT_TOKEN is not set. Create a bot with @BotFather, export TELEGRAM_BOT_TOKEN (never commit it), then re-run: unabot telegram";
@@ -8,10 +9,11 @@ export function telegramBootMessage(token: string | undefined): string {
     return [
       "UnaBot telegram surface started (no token).",
       TELEGRAM_TOKEN_HELP,
+      PRODUCT_LINE,
       "Dry-run is the default. Live writes still require an explicit yes.",
     ].join("\n");
   }
-  return "UnaBot. Uniswap LP on autopilot. Dry-run unless --live. Live writes require yes.";
+  return `UnaBot. ${PRODUCT_LINE} Dry-run unless --live. Live writes require yes.`;
 }
 
 export function telegramRequiresConfirm(text: string, live: boolean): boolean {
@@ -27,12 +29,7 @@ export function planTelegramReply(text: string, live: boolean): TelegramReply {
   const trimmed = text.trim();
   if (!trimmed || /^(help|\/help|\/start)$/i.test(trimmed)) {
     return {
-      text: [
-        "UnaBot. Uniswap LP on autopilot.",
-        "v2, v3, and v4. You keep the position.",
-        "Compound, re-range, exit. Dry-run default. Type yes for live.",
-        "list | status 12345 | mint WETH/USDC 0.05% width 10",
-      ].join("\n"),
+      text: PRODUCT_HELP,
       awaitConfirm: false,
     };
   }
@@ -63,6 +60,8 @@ export function formatIntentPreview(intent: Intent, live: boolean): string {
       return `${dry} range tokenId=${intent.tokenId}`;
     case "exit":
       return `${dry} exit tokenId=${intent.tokenId}`;
+    case "simulate":
+      return `${dry} simulate ${intent.action ?? "?"} tokenId=${intent.tokenId ?? "?"}`;
     default:
       return `${dry} ${intent.verb}`;
   }

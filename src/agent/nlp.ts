@@ -1,3 +1,5 @@
+export type SimulateAction = "compound" | "range" | "exit" | "mint";
+
 export type Intent =
   | { verb: "status"; tokenId?: bigint; owner?: string }
   | { verb: "list"; owner?: string }
@@ -5,6 +7,7 @@ export type Intent =
   | { verb: "compound"; tokenId: bigint; noFee?: boolean }
   | { verb: "rerange"; tokenId: bigint; oorPercent?: number }
   | { verb: "exit"; tokenId: bigint; swapTo?: string }
+  | { verb: "simulate"; action?: SimulateAction; tokenId?: bigint }
   | { verb: "help" }
   | { verb: "unknown"; text: string };
 
@@ -13,6 +16,19 @@ export function parseIntent(text: string): Intent {
   const lower = raw.toLowerCase();
 
   if (!raw || /^(help|\?)$/.test(lower)) return { verb: "help" };
+
+  if (/\bsimulate\b/.test(lower)) {
+    const rest = raw.replace(/\bsimulate\b/i, " ").trim();
+    const inner = rest ? parseIntent(rest) : { verb: "unknown" as const, text: raw };
+    const action: SimulateAction | undefined =
+      inner.verb === "compound" || inner.verb === "exit" || inner.verb === "mint"
+        ? inner.verb
+        : inner.verb === "rerange"
+          ? "range"
+          : undefined;
+    const tokenId = "tokenId" in inner && inner.tokenId !== undefined ? inner.tokenId : captureTokenId(raw);
+    return { verb: "simulate", action, tokenId };
+  }
 
   if (/\b(list|positions|nfts)\b/.test(lower)) {
     return { verb: "list", owner: captureAddress(raw) };
@@ -28,7 +44,7 @@ export function parseIntent(text: string): Intent {
     return { verb: "compound", tokenId, noFee: /\bno-?fee\b/.test(lower) };
   }
 
-  if (/\b(re-?range|rerange|recenter|auto-?range)\b/.test(lower)) {
+  if (/\b(range|re-?range|rerange|recenter|auto-?range)\b/.test(lower)) {
     const tokenId = captureTokenId(raw);
     if (tokenId === undefined) return { verb: "unknown", text: raw };
     const oor = raw.match(/oor(?:\s*percent)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);

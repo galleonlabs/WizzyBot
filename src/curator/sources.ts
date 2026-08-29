@@ -1,7 +1,5 @@
 import { getMarketCatalog } from "../markets/catalog.js";
 import { getSolanaMarketCatalog } from "../markets/solana-catalog.js";
-import { unpackMint } from "@solana/spl-token";
-import { Connection, PublicKey } from "@solana/web3.js";
 import { getCuratorConfig, type CuratorCandidate } from "./config.js";
 import type { CuratorObservation } from "./policy.js";
 
@@ -60,12 +58,11 @@ type MeteoraPool = {
   fees?: { "24h"?: number };
 };
 
-type SolanaMintSecurity = {
+export type SolanaMintSecurity = {
   mintAuthorityDisabled: boolean;
   freezeAuthorityDisabled: boolean;
 };
 
-const solanaConnection = new Connection(process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com", "confirmed");
 const solanaMintSecurity = new Map<string, Promise<SolanaMintSecurity | null>>();
 
 function numberOrNull(value: unknown): number | null {
@@ -139,16 +136,38 @@ async function dexPair(chain: MarketDefinition["chain"], pool: string): Promise<
   return payload?.pair ?? payload?.pairs?.[0] ?? null;
 }
 
+export function decodeSolanaMintSecurity(data: Uint8Array): SolanaMintSecurity | null {
+  if (data.byteLength < 82) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const mintAuthorityOption = view.getUint32(0, true);
+  const freezeAuthorityOption = view.getUint32(46, true);
+  if (mintAuthorityOption > 1 || freezeAuthorityOption > 1) return null;
+  return {
+    mintAuthorityDisabled: mintAuthorityOption === 0,
+    freezeAuthorityDisabled: freezeAuthorityOption === 0,
+  };
+}
+
 function getSolanaMintSecurity(token: string): Promise<SolanaMintSecurity | null> {
   const cached = solanaMintSecurity.get(token);
   if (cached) return cached;
   const request = (async () => {
     try {
-      const address = new PublicKey(token);
-      const account = await solanaConnection.getAccountInfo(address);
-      if (!account) return null;
-      const mint = unpackMint(address, account, account.owner);
-      return { mintAuthorityDisabled: mint.mintAuthority === null, freezeAuthorityDisabled: mint.freezeAuthority === null };
+      const response = await fetch(process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": "Una-Curator/1" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getAccountInfo",
+          params: [token, { encoding: "base64", commitment: "confirmed" }],
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) return null;
+      const payload = await response.json() as { result?: { value?: { data?: [string, string] } } };
+      const encoded = payload.result?.value?.data?.[0];
+      return encoded ? decodeSolanaMintSecurity(Buffer.from(encoded, "base64")) : null;
     } catch {
       return null;
     }

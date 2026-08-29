@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getCuratorConfig } from "../src/curator/config.js";
 import { evaluateMarket, proposeReplacements, type CuratorObservation } from "../src/curator/policy.js";
+import { decodeSolanaMintSecurity } from "../src/curator/sources.js";
 
 const policy = getCuratorConfig().policy;
 
@@ -38,6 +39,18 @@ function history(overrides: Partial<CuratorObservation> = {}, hours = 14 * 24): 
 }
 
 describe("index curator", () => {
+  it("reads Solana mint and freeze authority options without native bindings", () => {
+    const immutableMint = new Uint8Array(82);
+    expect(decodeSolanaMintSecurity(immutableMint)).toEqual({ mintAuthorityDisabled: true, freezeAuthorityDisabled: true });
+
+    const mutableMint = new Uint8Array(82);
+    const view = new DataView(mutableMint.buffer);
+    view.setUint32(0, 1, true);
+    view.setUint32(46, 1, true);
+    expect(decodeSolanaMintSecurity(mutableMint)).toEqual({ mintAuthorityDisabled: false, freezeAuthorityDisabled: false });
+    expect(decodeSolanaMintSecurity(new Uint8Array(81))).toBeNull();
+  });
+
   it("requires a complete proof window before a candidate becomes eligible", () => {
     expect(evaluateMarket(history({}, 7 * 24), policy).recommendation).toBe("observe");
     const evaluation = evaluateMarket(history(), policy);

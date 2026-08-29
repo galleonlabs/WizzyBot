@@ -15,10 +15,13 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Make markets");
     expect(portfolio).toContain("Fee APR");
     expect(portfolio).toContain("24h annualized");
-    expect(portfolio).toContain("The index");
+    expect(portfolio).toContain("Live index");
     expect(portfolio).toContain("Earning now");
-    expect(portfolio).toContain('label: "Positions"');
+    expect(portfolio).toContain('{ id: "markets", label: "Markets" }');
     expect(portfolio).toContain('id="positions"');
+    expect(portfolio).toContain("Widens with your deposit");
+    expect(portfolio).toContain("One wallet. Every market.");
+    expect(portfolio).not.toContain('label: "Positions"');
     expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain("https://assets.relay.link/icons/792703809/light.png");
     expect(portfolio).not.toContain("https://avatars.githubusercontent.com/u/35608259");

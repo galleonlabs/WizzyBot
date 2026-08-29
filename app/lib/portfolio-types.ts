@@ -65,8 +65,23 @@ export type MarketStats = {
 export type MarketsPayload = {
   catalog: MarketCatalog;
   solana: SolanaChainCatalog;
+  index: MemeIndexBreadthPolicy;
   stats: MarketStats[];
   source: string;
+};
+
+export type IndexBreadthTier = {
+  minimumAmountWei: string;
+  constituentCount: number;
+  marketIds: Record<"base" | "robinhood" | "solana", string[]>;
+};
+
+export type MemeIndexBreadthPolicy = {
+  breadthUnitWei: string;
+  minimumAmountWei: string;
+  maximumConstituents: number;
+  chainSharesBps: Record<"base" | "robinhood" | "solana", number>;
+  tiers: IndexBreadthTier[];
 };
 
 export type SolanaCuratedMarket = {

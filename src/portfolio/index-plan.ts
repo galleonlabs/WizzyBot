@@ -7,10 +7,11 @@ import { activeSolanaMarkets, getSolanaMarketCatalog } from "../markets/solana-c
 import { quoteBaseToRobinhoodEth, quoteBaseToSolanaSol, type RelayBridgeQuote, type RelaySolanaQuote } from "../relay/client.js";
 import { nativeTransferTx } from "../uniswap/calldata.js";
 import { planAllocation, weightedBudgets, type AllocationPlan, type SerializableTx } from "./allocation.js";
+import { INDEX_CHAIN_SHARES_BPS, selectMemeIndexMarkets } from "./index-selection.js";
 
 const BPS = 10_000n;
-const BASE_SHARE_BPS = 6_000n;
-const ROBINHOOD_SHARE_BPS = 1_500n;
+const BASE_SHARE_BPS = BigInt(INDEX_CHAIN_SHARES_BPS.base);
+const ROBINHOOD_SHARE_BPS = BigInt(INDEX_CHAIN_SHARES_BPS.robinhood);
 const SOLANA_SHARE_BPS = BPS - BASE_SHARE_BPS - ROBINHOOD_SHARE_BPS;
 const ROBINHOOD_GAS_RESERVE_WEI = 100_000_000_000_000n;
 
@@ -65,8 +66,8 @@ export type MemeIndexPlan = {
 };
 
 /**
- * Builds the one public Una product: a fixed, versioned meme-liquidity index.
- * Chain and constituent weights are deliberately not user inputs.
+ * Builds the one public Una product: a ranked, versioned meme-liquidity index.
+ * Deposit size controls breadth; chain, market, and range choices are not inputs.
  */
 export async function planMemeIndex(input: {
   owner: string;
@@ -77,6 +78,7 @@ export async function planMemeIndex(input: {
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(input.solanaOwner)) throw new Error("solanaOwner must be a valid Solana address");
   if (input.totalAmountWei <= 0n) throw new Error("amount must be positive");
   const owner = getAddress(input.owner);
+  const selection = selectMemeIndexMarkets(input.totalAmountWei);
 
   const baseGross = (input.totalAmountWei * BASE_SHARE_BPS) / BPS;
   const robinhoodGross = (input.totalAmountWei * ROBINHOOD_SHARE_BPS) / BPS;
@@ -87,21 +89,21 @@ export async function planMemeIndex(input: {
   if (solanaBridgeInput <= 0n) throw new Error("amount is too small after fees");
 
   const [baseAllocation, robinhoodBridge, solanaBridge] = await Promise.all([
-    planAllocation({ owner, chain: "base", amountWei: baseGross }),
+    planAllocation({ owner, chain: "base", amountWei: baseGross, marketIds: selection.marketIds.base }),
     quoteBaseToRobinhoodEth({ owner, amountInWei: robinhoodGross }),
     quoteBaseToSolanaSol({ owner, recipient: input.solanaOwner, amountInWei: solanaBridgeInput }),
   ]);
 
   const robinhoodAmount = BigInt(robinhoodBridge.minimumAmountOutWei) - ROBINHOOD_GAS_RESERVE_WEI;
   if (robinhoodAmount <= 0n) throw new Error("Relay's Robinhood quote leaves no allocatable ETH after gas reserve");
-  const robinhoodAllocation = await planAllocation({ owner, chain: "robinhood", amountWei: robinhoodAmount });
+  const robinhoodAllocation = await planAllocation({ owner, chain: "robinhood", amountWei: robinhoodAmount, marketIds: selection.marketIds.robinhood });
 
   const solanaCatalog = getSolanaMarketCatalog();
   const solanaAmount = BigInt(solanaBridge.minimumAmountOutLamports) - BigInt(solanaCatalog.gasReserveLamports);
   if (solanaAmount < BigInt(solanaCatalog.minimumAllocationLamports)) {
     throw new Error("Increase the amount so Solana receives enough SOL for liquidity and account rent");
   }
-  const solanaMarkets = activeSolanaMarkets();
+  const solanaMarkets = activeSolanaMarkets(selection.marketIds.solana);
   const budgets = weightedBudgets(solanaAmount, solanaMarkets.map((market) => market.weightBps));
   const env = loadEnv();
   const solanaFeeTx = nativeTransferTx(env.treasury ?? TREASURY, solanaServiceFee);
@@ -116,7 +118,7 @@ export async function planMemeIndex(input: {
     solanaOwner: input.solanaOwner,
     totalAmountWei: input.totalAmountWei.toString(),
     indexVersion: getMarketCatalog().version,
-    constituentCount: getMarketCatalog().chains.flatMap((chain) => chain.markets).filter((market) => market.status === "active").length + solanaMarkets.length,
+    constituentCount: selection.constituentCount,
     expectedWalletSteps: 3,
     createdAt: now.toISOString(),
     expiresAt: new Date(expiresAt).toISOString(),
@@ -161,10 +163,10 @@ export async function planMemeIndex(input: {
       },
     ],
     notices: [
-      "Una chooses the versioned chain split, pools, and liquidity ranges; there are no user allocation controls.",
+      "Una opens the broadest ranked slice your deposit can support, then chooses the chain split, pools, and liquidity ranges.",
       "The Base batch funds every network in one intent. Privy then asks for the destination-wallet signatures each network requires.",
       "Every EVM LP NFT and Solana DLMM position is created in wallets controlled by this Privy identity.",
-      "Fees are variable and losses are possible. Observed fee pace is not a return promise.",
+      "Fee APR changes with trading activity. Meme prices can fall, and trading fees may not cover losses.",
     ],
   };
 }

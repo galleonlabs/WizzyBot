@@ -12,7 +12,7 @@ Una is for crypto-native consumers who want to earn meme-market trading fees wit
 
 ## Product Purpose
 
-Una is the one-click market maker for memes. A user signs in with Privy, enters one ETH amount, and makes markets through one fixed, versioned index across Base, Robinhood Chain, and Solana. The user owns every resulting position in their Privy-controlled wallets and can monitor fees or withdraw without learning the machinery behind concentrated liquidity.
+Una is the one-click market maker for memes. A user signs in with Privy, enters one ETH amount, and makes markets through one ranked, versioned index across Base, Robinhood Chain, and Solana. The deposit opens the broadest viable slice of that index automatically. The user owns every resulting position in their Privy-controlled wallets and can monitor fees or withdraw without learning the machinery behind concentrated liquidity.
 
 ## Positioning
 
@@ -22,10 +22,12 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 
 - Privy creates and manages the user's self-custodial EVM and Solana wallets under one identity.
 - There is no public allocation builder, chain selector, pool selector, range editor, bridge picker, or portfolio-split control.
-- Una publishes one managed index. Its versioned chain and constituent weights are product policy, not user input.
+- Una publishes one ranked index. Every viable deposit starts with the strongest active market on each network. Each additional index-sized unit adds the highest-weight remaining constituent; users never choose the count or allocation.
+- The breadth unit is derived from the configured chain allocation floors and fixed chain shares. Pool eligibility, status, and weights remain code-reviewed curator policy.
 - Relay moves the Base deposit to Robinhood Chain and Solana. Una selects reviewed Uniswap v3 or Aerodrome Slipstream concentrated-liquidity venues on EVM; Meteora DLMM zap paths create Solana positions.
 - The product vocabulary is deposit, earn fees, your liquidity, collect, and withdraw. Protocol mechanics belong in receipts and disclosures, not the primary action.
 - Portfolio state should be derived from wallets, LP positions, chain events, and live market data. Avoid a database where onchain or version-controlled state is authoritative.
+- “Markets” is the single home for current positions and the live index. Do not split portfolio tracking and index composition into separate destinations.
 - The agent is internal index machinery: it scouts inclusion candidates, monitors pool risk, and helps operators review allocation and range policy. It is not a public chat or transaction surface. Deterministic transaction and risk rules remain authoritative.
 
 ## Capabilities and Constraints
@@ -52,7 +54,7 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 
 ## Product Principles
 
-1. One product, not a toolkit: one index, one amount, one action.
+1. One product, not a toolkit: one ranked index, one amount, one action. Deposit size changes breadth without exposing a builder.
 2. Consumer language first: deposit, earn fees, collect, withdraw.
 3. Self-custody stays honest: the user owns positions and approves required wallet actions.
 4. Onchain by default: public state and version-controlled policy are authoritative.

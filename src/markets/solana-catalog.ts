@@ -59,6 +59,15 @@ export function getSolanaMarketCatalog(): SolanaChainCatalog {
   return catalog.chain;
 }
 
-export function activeSolanaMarkets(): SolanaMarket[] {
-  return catalog.chain.markets.filter((market) => market.status === "active");
+export function activeSolanaMarkets(marketIds?: readonly string[]): SolanaMarket[] {
+  const selected = marketIds ? new Set(marketIds) : undefined;
+  const markets = catalog.chain.markets.filter(
+    (market) => market.status === "active" && (!selected || selected.has(market.id)),
+  );
+  if (selected) {
+    const missing = [...selected].filter((id) => !markets.some((market) => market.id === id));
+    if (missing.length) throw new Error(`Unknown or inactive Solana markets: ${missing.join(", ")}`);
+  }
+  if (!markets.length) throw new Error("No active Solana markets selected");
+  return markets;
 }

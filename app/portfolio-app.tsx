@@ -13,8 +13,10 @@ import { lightRowToView, type PositionView } from "./lib/cards";
 import { type ChainSlug } from "./lib/chains";
 import {
   type CuratedMarket,
+  type IndexBreadthTier,
   type MarketsPayload,
   type MarketStats,
+  type MemeIndexBreadthPolicy,
   type MemeIndexPlan,
   type PositionActionPlan,
   type SolanaCuratedMarket,
@@ -25,7 +27,7 @@ import { type SolanaZapPlan } from "./lib/solana-zap-server";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { relaySucceeded, sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
 
-type ViewTab = "overview" | "markets" | "positions";
+type ViewTab = "overview" | "markets";
 type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" | "submitted" | "error"; message?: string };
 type AnyPositionActionPlan = PositionActionPlan | SolanaPositionActionPlan;
 type IndexChain = ChainSlug | "solana";
@@ -56,6 +58,13 @@ const EMPTY_MARKETS: MarketsPayload = {
     minimumAllocationLamports: "300000000",
     gasReserveLamports: "25000000",
     markets: [],
+  },
+  index: {
+    breadthUnitWei: "66666666666666667",
+    minimumAmountWei: "66666666666666667",
+    maximumConstituents: INDEX_MARKET_COUNT,
+    chainSharesBps: CHAIN_SHARES,
+    tiers: [],
   },
   stats: [],
   source: "",
@@ -122,7 +131,7 @@ export function PortfolioApp() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("view");
-    if (requested === "markets" || requested === "positions") setTab(requested);
+    if (requested === "markets" || requested === "positions") setTab("markets");
     if (isShotQuery()) {
       setPreviewMode(true);
       setPositions(SHOT_VIEWS);
@@ -150,14 +159,22 @@ export function PortfolioApp() {
   const activeMarkets = useMemo<IndexMarket[]>(() => {
     const evm = markets.catalog.chains.flatMap((chain) => chain.markets
       .filter((market) => market.status === "active")
-      .map((market) => ({ market, chain: chain.slug, indexWeightBps: Math.round((market.weightBps * CHAIN_SHARES[chain.slug]) / 10_000) })));
+      .map((market) => ({ market, chain: chain.slug, indexWeightBps: Math.round((market.weightBps * markets.index.chainSharesBps[chain.slug]) / 10_000) })));
     const solana = markets.solana.markets
       .filter((market) => market.status === "active")
-      .map((market) => ({ market, chain: "solana" as const, indexWeightBps: Math.round((market.weightBps * CHAIN_SHARES.solana) / 10_000) }));
+      .map((market) => ({ market, chain: "solana" as const, indexWeightBps: Math.round((market.weightBps * markets.index.chainSharesBps.solana) / 10_000) }));
     return [...evm, ...solana];
   }, [markets]);
+  const selectedTier = useMemo(() => selectIndexTier(markets.index, amount), [amount, markets.index]);
+  const selectedMarkets = useMemo(() => {
+    if (!selectedTier) return activeMarkets;
+    const ids = new Set(Object.values(selectedTier.marketIds).flat());
+    return activeMarkets
+      .filter(({ market }) => ids.has(market.id))
+      .sort((a, b) => marketTierIndex(markets.index, a.market.id) - marketTierIndex(markets.index, b.market.id) || b.indexWeightBps - a.indexWeightBps);
+  }, [activeMarkets, markets.index, selectedTier]);
   const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
-  const feeApr = weightedFeeApr(activeMarkets, stats);
+  const feeApr = weightedFeeApr(selectedMarkets, stats);
 
   function changeTab(next: ViewTab) {
     setTab(next);
@@ -318,7 +335,10 @@ export function PortfolioApp() {
       state={positionsState}
       stats={stats}
       onLogin={() => void login()}
+      onStart={() => changeTab("overview")}
+      onRetry={() => void loadPositions()}
       onAction={preparePositionAction}
+      markets={selectedMarkets}
       actionPlan={actionPlan}
       actionState={actionState}
       onExecute={executePositionAction}
@@ -334,7 +354,7 @@ export function PortfolioApp() {
           <span>Una</span>
         </button>
         <nav aria-label="Primary navigation">
-          {([{ id: "overview", label: "Make" }, { id: "markets", label: "Index" }, { id: "positions", label: "Positions" }] as const).map((item) => (
+          {([{ id: "overview", label: "Make" }, { id: "markets", label: "Markets" }] as const).map((item) => (
             <button key={item.id} type="button" className={tab === item.id ? "is-active" : ""} onClick={() => changeTab(item.id)}>{item.label}</button>
           ))}
         </nav>
@@ -359,15 +379,16 @@ export function PortfolioApp() {
                     <h1>Make meme markets.</h1>
                     <p>Deposit ETH. Earn trading fees across Base, Robinhood, and Solana.</p>
                   </div>
-                  <IndexShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
+                  <IndexShowcase markets={selectedMarkets} stats={stats} loading={marketsState === "loading"} />
                 </div>
                 <MarketAction
                   amount={amount}
                   onAmount={setAmount}
-                  markets={activeMarkets}
+                  markets={selectedMarkets}
                   stats={stats}
                   loading={marketsState === "loading"}
                   feeApr={feeApr}
+                  maximumConstituents={markets.index.maximumConstituents || INDEX_MARKET_COUNT}
                   ready={ready && solanaReady}
                   onPrepare={() => void prepareIndex()}
                   plan={plan}
@@ -376,16 +397,19 @@ export function PortfolioApp() {
                   onCancel={() => { setPlan(null); setPlanState({ kind: "idle" }); }}
                 />
             </section>
-          ) : tab === "markets" ? (
-            <section className="index-main markets-view">
-              <header className="index-title-row">
-                <div><h1>The index</h1><p>{activeMarkets.length || INDEX_MARKET_COUNT} markets across Base, Robinhood, and Solana.</p></div>
-              </header>
-              <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} />
-            </section>
           ) : (
             <section className="index-main markets-view">
+              <header className="index-title-row">
+                <div><h1>Markets</h1><p>{positions.length ? `${positions.length} onchain position${positions.length === 1 ? "" : "s"} and the live index.` : "Your liquidity and the live index, in one place."}</p></div>
+              </header>
               {positionLedger}
+              <section className="index-section">
+                <header className="section-title">
+                  <div><h2>Live index</h2><p>{activeMarkets.length || INDEX_MARKET_COUNT} eligible markets. Deposits open {markets.index.tiers[0]?.constituentCount ?? 3}–{markets.index.maximumConstituents || INDEX_MARKET_COUNT} automatically.</p></div>
+                  <span>v{markets.catalog.version}</span>
+                </header>
+                <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} policy={markets.index} />
+              </section>
             </section>
           )}
       </div>
@@ -411,13 +435,14 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
   </div>;
 }
 
-function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, ready, onPrepare, plan, state, onExecute, onCancel }: {
+function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, maximumConstituents, ready, onPrepare, plan, state, onExecute, onCancel }: {
   amount: string;
   onAmount: (amount: string) => void;
   markets: IndexMarket[];
   stats: Map<string, MarketStats>;
   loading: boolean;
   feeApr: number | null;
+  maximumConstituents: number;
   ready: boolean;
   onPrepare: () => void;
   plan: MemeIndexPlan | null;
@@ -434,8 +459,11 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, ready
       </label>
 
       <div className={`market-output ${loading ? "is-loading" : ""}`} aria-label="Index markets">
-        <span className="market-stack" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
-          {loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />) : markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />)}
+        <span className="market-breadth">
+          <span className="market-stack" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
+            {loading ? Array.from({ length: 3 }, (_, index) => <i key={index} />) : markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />)}
+          </span>
+          <span><b>{constituentCount || 3} markets</b><small>{constituentCount >= maximumConstituents ? "Full index" : "Widens with your deposit"}</small></span>
         </span>
         <span className="action-economics"><small>Fee APR</small><b>{formatFeeApr(feeApr)}</b></span>
       </div>
@@ -445,7 +473,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, ready
           {!ready ? "Preparing wallets…" : "Make markets"}<ArrowIcon />
         </button>
       )}
-      <p className="action-assurance">{constituentCount || INDEX_MARKET_COUNT} markets · Self-custodial</p>
+      <p className="action-assurance">3 networks · Self-custodial</p>
     </aside>
   );
 }
@@ -479,24 +507,27 @@ function PlanPreview({ plan, state, onExecute, onCancel }: { plan: MemeIndexPlan
   );
 }
 
-function MarketLedger({ markets, stats, state }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error" }) {
+function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error"; policy: MemeIndexBreadthPolicy }) {
+  const orderedMarkets = [...markets].sort(
+    (a, b) => marketTierIndex(policy, a.market.id) - marketTierIndex(policy, b.market.id) || b.indexWeightBps - a.indexWeightBps,
+  );
   return (
     <section className="market-ledger">
       <div className="market-table-wrap">
         <table className="market-table">
-          <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>TVL</th><th>Venue</th></tr></thead>
+          <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>TVL</th><th>Opens at</th></tr></thead>
           <tbody>
             {state === "loading" ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={5}><i /></td></tr>) : null}
             {state === "error" ? <tr><td colSpan={5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
-            {state === "ready" ? markets.map(({ market, chain }) => {
+            {state === "ready" ? orderedMarkets.map(({ market, chain }) => {
               const row = stats.get(market.id);
               const quote = chain === "solana" ? "SOL" : "WETH";
               return <tr key={market.id}>
-                <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/{quote}</b><small>{market.name}</small></span></span></td>
+                <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/{quote}</b><VenueTrail chain={chain} protocol={market.protocol} /></span></span></td>
                 <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b><small className="cell-note">24h annualized</small></td>
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
-                <td><VenueTrail chain={chain} protocol={market.protocol} /></td>
+                <td><b className="index-threshold">{marketOpeningThreshold(policy, market.id)}</b></td>
               </tr>;
             }) : null}
           </tbody>
@@ -506,12 +537,15 @@ function MarketLedger({ markets, stats, state }: { markets: IndexMarket[]; stats
   );
 }
 
-function PositionLedger({ authenticated, positions, state, stats, onLogin, onAction, actionPlan, actionState, onExecute, onCancel }: {
+function PositionLedger({ authenticated, positions, state, stats, markets, onLogin, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel }: {
   authenticated: boolean;
   positions: PositionView[];
   state: "idle" | "loading" | "ready" | "error";
   stats: Map<string, MarketStats>;
+  markets: IndexMarket[];
   onLogin: () => void;
+  onStart: () => void;
+  onRetry: () => void;
   onAction: (position: PositionView, action: "compound" | "withdraw") => void;
   actionPlan: AnyPositionActionPlan | null;
   actionState: PlanState;
@@ -521,7 +555,6 @@ function PositionLedger({ authenticated, positions, state, stats, onLogin, onAct
   const summary = summarizePositions(positions);
   return (
     <section className="position-ledger" id="positions">
-      <header><h2>Your positions</h2>{!authenticated ? <button type="button" onClick={onLogin}>Connect</button> : null}</header>
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
           <div><b>{actionPlan ? `${actionPlan.kind === "compound" ? "Collect fees" : "Withdraw"} · ${actionPlan.pair}` : "Preparing your position"}</b><p>{actionState.message}</p></div>
@@ -529,10 +562,10 @@ function PositionLedger({ authenticated, positions, state, stats, onLogin, onAct
           <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>Approve</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing"}>Close</button></div>
         </section>
       ) : null}
-      {!authenticated ? <div className="position-empty"><LockIcon /><p>Connect to see the positions held by your wallets.</p></div> : null}
-      {authenticated && state === "loading" ? <div className="position-empty"><p>Reading your wallets…</p></div> : null}
-      {authenticated && state === "error" ? <div className="position-empty"><p>We could not read your positions. Nothing has moved.</p></div> : null}
-      {authenticated && state === "ready" && positions.length === 0 ? <div className="position-empty"><p>Your positions will appear here after your first deposit.</p></div> : null}
+      {!authenticated ? <PortfolioEmpty variant="disconnected" markets={markets} stats={stats} onPrimary={onLogin} /> : null}
+      {authenticated && (state === "idle" || state === "loading") ? <PortfolioEmpty variant="loading" markets={markets} stats={stats} /> : null}
+      {authenticated && state === "error" ? <PortfolioEmpty variant="error" markets={markets} stats={stats} onPrimary={onRetry} /> : null}
+      {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" markets={markets} stats={stats} onPrimary={onStart} /> : null}
       {positions.length ? <section className="portfolio-summary" aria-label="Portfolio summary">
         <div><span>Position value</span><strong>{summary.priced ? money(summary.valueUsd) : "—"}</strong><small>{summary.priced} of {positions.length} priced</small></div>
         <div><span>Fees ready</span><strong>{summary.feesPriced ? money(summary.feesUsd) : "—"}</strong><small>Unclaimed across priced positions</small></div>
@@ -549,6 +582,39 @@ function PositionLedger({ authenticated, positions, state, stats, onLogin, onAct
       </article>)}</div> : null}
     </section>
   );
+}
+
+function PortfolioEmpty({ variant, markets, stats, onPrimary }: {
+  variant: "disconnected" | "loading" | "error" | "empty";
+  markets: IndexMarket[];
+  stats: Map<string, MarketStats>;
+  onPrimary?: () => void;
+}) {
+  const content = variant === "disconnected"
+    ? { eyebrow: "Your liquidity", title: "One wallet. Every market.", body: "Connect to see every position you own across three networks.", action: "Connect" }
+    : variant === "error"
+      ? { eyebrow: "Your liquidity", title: "Your wallets didn’t answer.", body: "Try again to read your onchain positions.", action: "Try again" }
+      : variant === "empty"
+        ? { eyebrow: "Your liquidity", title: "Your first markets are one click away.", body: "Deposit ETH and Una opens the strongest market on each network.", action: "Make markets" }
+        : { eyebrow: "Your liquidity", title: "Reading three networks.", body: "Your positions will land here together.", action: "" };
+  return <section className={`portfolio-empty is-${variant}`} aria-live={variant === "loading" ? "polite" : undefined}>
+    <div className="empty-copy">
+      <span>{content.eyebrow}</span>
+      <h3>{content.title}</h3>
+      <p>{content.body}</p>
+      {onPrimary && content.action ? <button type="button" onClick={onPrimary}>{content.action}<ArrowIcon /></button> : null}
+    </div>
+    <div className="empty-route" aria-label={`${markets.length || 3} markets across three networks`}>
+      <span className="route-source"><WalletIcon /><small>Wallet</small></span>
+      <span className="route-line"><i /><small>{markets.length || 3} markets</small></span>
+      <span className="route-destination">
+        <span className="market-stack">
+          {markets.length ? markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />) : Array.from({ length: 3 }, (_, index) => <i key={index} />)}
+        </span>
+        <span className="empty-networks"><BrandLogo brand="base" label="Base" compact /><BrandLogo brand="robinhood" label="Robinhood" compact /><BrandLogo brand="solana" label="Solana" compact /></span>
+      </span>
+    </div>
+  </section>;
 }
 
 function summarizePositions(positions: PositionView[]) {
@@ -571,6 +637,29 @@ function weightedFeeApr(markets: IndexMarket[], stats: Map<string, MarketStats>)
   if (!available.length) return null;
   const weight = available.reduce((sum, row) => sum + row.indexWeightBps, 0);
   return available.reduce((sum, row) => sum + (stats.get(row.market.id)!.trailingFeeAprPct! * row.indexWeightBps) / weight, 0);
+}
+
+function selectIndexTier(policy: MemeIndexBreadthPolicy, amount: string): IndexBreadthTier | null {
+  if (!policy.tiers.length) return null;
+  let amountWei: bigint;
+  try {
+    amountWei = parseEther(amount || "0");
+  } catch {
+    return policy.tiers[0]!;
+  }
+  return [...policy.tiers].reverse().find((tier) => amountWei >= BigInt(tier.minimumAmountWei)) ?? policy.tiers[0]!;
+}
+
+function marketOpeningThreshold(policy: MemeIndexBreadthPolicy, marketId: string): string {
+  const tier = policy.tiers.find((candidate) => Object.values(candidate.marketIds).some((ids) => ids.includes(marketId)));
+  if (!tier || tier === policy.tiers[0]) return "Core";
+  const eth = Number(formatEther(BigInt(tier.minimumAmountWei)));
+  return `${(Math.ceil(eth * 1_000) / 1_000).toFixed(3).replace(/0+$/, "").replace(/\.$/, "")} ETH`;
+}
+
+function marketTierIndex(policy: MemeIndexBreadthPolicy, marketId: string): number {
+  const index = policy.tiers.findIndex((tier) => Object.values(tier.marketIds).some((ids) => ids.includes(marketId)));
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
 async function waitForRelay(statusPath: string): Promise<void> {
@@ -650,5 +739,4 @@ function VenueTrail({ chain, protocol }: { chain: IndexChain; protocol: IndexMar
 }
 
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }
-function LockIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>; }
 function ArrowIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>; }

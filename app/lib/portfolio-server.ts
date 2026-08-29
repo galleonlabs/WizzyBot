@@ -23,6 +23,7 @@ type HostedPortfolioSurface = {
     solanaOwner: string;
     totalAmountWei: bigint;
   }) => Promise<unknown>;
+  getMemeIndexBreadthPolicy: () => unknown;
   planPositionAction: (input: {
     owner: string;
     chain: "base" | "robinhood";
@@ -53,6 +54,7 @@ export const fetchSolanaMarketStats = hosted.fetchSolanaMarketStats;
 export const planAllocation = hosted.planAllocation;
 export const planDualChainAllocation = hosted.planDualChainAllocation;
 export const planMemeIndex = hosted.planMemeIndex;
+export const getMemeIndexBreadthPolicy = hosted.getMemeIndexBreadthPolicy;
 export const planPositionAction = hosted.planPositionAction;
 export const quoteBaseToRobinhoodEth = hosted.quoteBaseToRobinhoodEth;
 export const relayIntentStatus = hosted.relayIntentStatus;

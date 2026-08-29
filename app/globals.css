@@ -232,6 +232,10 @@ svg {
 .market-stack > * { margin-left: -9px; border: 3px solid var(--surface); }
 .market-stack > *:first-child { margin-left: 0; }
 .market-stack > i { display: block; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-3); }
+.market-breadth { display: flex; min-width: 0; align-items: center; gap: 11px; }
+.market-breadth > span:last-child { display: grid; gap: 4px; }
+.market-breadth b { font-size: 11px; }
+.market-breadth small { white-space: nowrap; }
 
 .action-economics { display: grid; justify-items: end; gap: 4px; }
 .action-economics b { color: var(--mint); font-size: 24px; letter-spacing: -.035em; }
@@ -274,11 +278,10 @@ svg {
 .plan-loading i:nth-child(2) { animation-delay: .14s; }
 .plan-loading i:nth-child(3) { animation-delay: .28s; }
 
-.position-ledger { padding-top: 56px; }
+.position-ledger { padding-top: 36px; }
 .position-ledger { scroll-margin-top: 82px; }
 .position-ledger > header { align-items: flex-end; margin-bottom: 16px; }
 .position-ledger h2 { font-size: 20px; }
-.position-ledger > header > button { min-height: 44px; color: var(--coral); font-size: 11px; font-weight: 750; }
 
 .market-table-wrap { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .market-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -286,11 +289,11 @@ svg {
 .market-table td { padding: 15px 18px; text-align: left; vertical-align: middle; }
 .market-table th { color: var(--muted-2); font-size: 10px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
 .market-table td { border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 12px; font-weight: 650; }
-.market-table th:first-child { width: 24%; }
+.market-table th:first-child { width: 27%; }
 .market-table th:nth-child(2) { width: 14%; }
 .market-table th:nth-child(3) { width: 16%; }
 .market-table th:nth-child(4) { width: 14%; }
-.market-table th:nth-child(5) { width: 20%; }
+.market-table th:nth-child(5) { width: 15%; }
 .market-table tr:hover td { background: rgba(255, 255, 255, .018); }
 
 .pair-cell,
@@ -312,13 +315,42 @@ svg {
 .venue-trail .brand-logo + .brand-logo { margin-left: -5px; }
 .venue-trail .brand-logo img { border: 2px solid var(--surface); }
 .venue-trail > span:last-child { margin-left: 7px; }
+.index-threshold { color: var(--ink); font-size: 11px; white-space: nowrap; }
 .table-message { height: 102px; text-align: center !important; color: var(--muted) !important; }
 .skeleton-row td { height: 61px; }
 .skeleton-row i { display: block; width: 100%; height: 20px; border-radius: 6px; background: var(--surface-2); animation: breathe 1.3s ease-in-out infinite; }
 
-.position-empty { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 92px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, .012); color: var(--muted); text-align: center; }
-.position-empty svg { width: 16px; }
-.position-empty p { max-width: 62ch; margin: 0; font-size: 11px; line-height: 1.5; }
+.portfolio-empty {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, .9fr);
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.empty-copy { display: grid; align-content: center; justify-items: start; padding: 36px 42px; }
+.empty-copy > span { color: var(--coral); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.empty-copy h3 { max-width: 18ch; margin: 13px 0 0; font-size: clamp(25px, 3vw, 38px); line-height: 1.05; letter-spacing: -.04em; }
+.empty-copy p { max-width: 42ch; margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.empty-copy button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 24px; padding: 0 15px; border-radius: 10px; background: var(--coral); color: var(--coral-ink); font-size: 11px; font-weight: 800; }
+.empty-copy button:hover { background: #ff8394; }
+.empty-copy button svg { width: 14px; }
+.empty-route { display: grid; grid-template-columns: auto minmax(82px, 1fr) auto; align-items: center; min-width: 0; padding: 34px; border-left: 1px solid var(--line); background: radial-gradient(circle at 70% 45%, rgba(255, 111, 131, .09), transparent 48%); }
+.route-source { display: grid; justify-items: center; gap: 8px; }
+.route-source svg { width: 29px; height: 29px; padding: 6px; border-radius: 9px; background: var(--surface-3); color: var(--ink); }
+.route-source small,
+.route-line small { color: var(--muted-2); font-size: 8px; font-weight: 750; white-space: nowrap; }
+.route-line { display: grid; align-items: center; justify-items: center; gap: 10px; padding: 0 12px; }
+.route-line i { width: 100%; height: 1px; background: linear-gradient(90deg, var(--line-strong), var(--coral)); }
+.route-destination { display: grid; justify-items: center; gap: 17px; }
+.route-destination .market-stack > * { width: 36px; height: 36px; border-color: var(--surface); }
+.empty-networks { display: flex; }
+.empty-networks .brand-logo + .brand-logo { margin-left: -5px; }
+.empty-networks .brand-logo img { border: 2px solid var(--surface); }
+.portfolio-empty.is-loading .empty-copy h3,
+.portfolio-empty.is-loading .empty-copy p,
+.portfolio-empty.is-loading .empty-route { animation: breathe 1.3s ease-in-out infinite; }
 .portfolio-summary { display: grid; grid-template-columns: repeat(4, 1fr); overflow: hidden; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .portfolio-summary > div { display: grid; align-content: center; gap: 6px; min-height: 118px; padding: 18px; }
 .portfolio-summary > div + div { border-left: 1px solid var(--line); }
@@ -350,9 +382,13 @@ svg {
 
 .markets-view { min-height: calc(100dvh - 150px); padding-top: 72px; }
 .markets-view .index-title-row { align-items: center; padding-bottom: 4px; }
-.markets-view .market-ledger { padding-top: 40px; }
 .index-title-row h1 { font-size: clamp(38px, 5vw, 64px); line-height: 1; }
 .index-title-row p { max-width: 560px; margin-top: 14px; font-size: 14px; }
+.index-section { margin-top: 46px; padding-top: 32px; border-top: 1px solid var(--line); }
+.section-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
+.section-title h2 { margin: 0; font-size: 20px; letter-spacing: -.035em; }
+.section-title p { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.section-title > span { color: var(--muted-2); font-size: 9px; font-weight: 750; }
 @keyframes breathe { 0%, 100% { opacity: .45; } 50% { opacity: .9; } }
 @keyframes loading-dot { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-4px); opacity: 1; } }
 @keyframes token-arrive { from { opacity: 0; transform: translateY(18px) scale(.88); filter: blur(5px); } }
@@ -378,6 +414,8 @@ svg {
   .index-hero { grid-template-columns: 1fr; gap: 48px; padding: 68px 0 64px; }
   .hero-copy h1 { max-width: 9ch; }
   .market-action { width: min(488px, 100%); justify-self: center; }
+  .portfolio-empty { grid-template-columns: 1fr; }
+  .empty-route { min-height: 180px; border-top: 1px solid var(--line); border-left: 0; }
 }
 
 @media (max-width: 640px) {
@@ -401,7 +439,7 @@ svg {
   .brand-logo img { width: 17px; height: 17px; }
   .market-action { padding: 14px; }
   .amount-input input { font-size: 43px; }
-  .position-ledger { padding-top: 42px; }
+  .position-ledger { padding-top: 38px; }
   .position-ledger > header { align-items: flex-start; padding-inline: 3px; }
   .market-table-wrap { overflow: visible; border: 0; background: transparent; }
   .market-table,
@@ -417,7 +455,7 @@ svg {
   .market-table td:nth-child(2)::before { content: "Fee APR"; }
   .market-table td:nth-child(3)::before { content: "24h volume"; }
   .market-table td:nth-child(4)::before { content: "TVL"; }
-  .market-table td:nth-child(5)::before { content: "Venue"; }
+  .market-table td:nth-child(5)::before { content: "Opens at"; }
   .market-table .skeleton-row { display: block; }
   .market-table .skeleton-row td { display: block; width: 100%; }
   .position-list article { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px 16px; padding: 16px; }
@@ -436,4 +474,11 @@ svg {
   .action-preview { grid-template-columns: 1fr; }
   .markets-view { padding-top: 44px; }
   .index-title-row h1 { font-size: 42px; }
+  .empty-copy { padding: 28px 22px 30px; }
+  .empty-copy h3 { font-size: 29px; }
+  .empty-route { grid-template-columns: auto minmax(54px, 1fr) auto; min-height: 150px; padding: 24px 18px; }
+  .route-line { padding-inline: 8px; }
+  .route-line small { display: none; }
+  .route-destination .market-stack > * { width: 30px; height: 30px; }
+  .index-section { margin-top: 46px; padding-top: 28px; }
 }

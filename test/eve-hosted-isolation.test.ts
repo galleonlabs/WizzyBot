@@ -38,16 +38,21 @@ describe("eve hosted CJS isolation", () => {
     }
     const loader = readFileSync("agent/lib/hosted.ts", "utf8");
     expect(loader).toContain("createRequire");
-    expect(loader).toContain("unabot-hosted-cjs");
+    expect(loader).toContain("../../vendor/hosted-cjs/index.cjs");
   });
 
   it("loads the CJS surface without Uniswap ESM", () => {
     ensureHostedBundle();
     expect(existsSync(bundlePath)).toBe(true);
+    expect(existsSync("node_modules/unabot-hosted-cjs/index.cjs")).toBe(true);
     const require = createRequire(import.meta.url);
+    const fromVendor = require("../vendor/hosted-cjs/index.cjs") as {
+      assertWriteAllowed: (flags: { live?: boolean; confirm?: boolean }) => boolean;
+    };
     const hosted = require("unabot-hosted-cjs") as {
       assertWriteAllowed: (flags: { live?: boolean; confirm?: boolean }) => boolean;
     };
+    expect(fromVendor.assertWriteAllowed({})).toBe(false);
     expect(hosted.assertWriteAllowed({})).toBe(false);
     expect(hosted.assertWriteAllowed({ live: false })).toBe(false);
     expect(() => hosted.assertWriteAllowed({ live: true })).toThrow(/confirm=true/);

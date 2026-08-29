@@ -1,5 +1,13 @@
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+const vendorCjs = resolve("vendor/hosted-cjs/index.cjs");
+const nodeModulesCjs = resolve("node_modules/unabot-hosted-cjs/index.cjs");
+if (!existsSync(vendorCjs)) throw new Error("missing " + vendorCjs);
+if (!existsSync(nodeModulesCjs)) throw new Error("missing " + nodeModulesCjs);
+console.log("hosted-cjs vendor", vendorCjs);
+console.log("hosted-cjs node_modules", nodeModulesCjs);
 
 const loaderUrl = pathToFileURL(resolve("node_modules/eve/dist/src/internal/authored-module-loader.js")).href;
 const { loadAuthoredModuleNamespace } = await import(loaderUrl);

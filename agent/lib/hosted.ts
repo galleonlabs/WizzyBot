@@ -3,7 +3,9 @@ import { createRequire } from "node:module";
 /**
  * Eve evaluates agent/* as ESM and leaves package deps external.
  * Uniswap SDK ESM is extensionless, so tools must not import those packages.
- * Load the pre-bundled CJS surface (unabot-hosted-cjs) instead.
+ * Load the pre-bundled CJS via a relative path so eve does not need the
+ * file: workspace package. Package-name require is a fallback after the
+ * bundle script copies into node_modules.
  */
 const require = createRequire(import.meta.url);
 
@@ -59,7 +61,15 @@ export type HostedSurface = {
   assertWriteAllowed: (flags: { live?: boolean; confirm?: boolean }) => boolean;
 };
 
-const hosted = require("unabot-hosted-cjs") as HostedSurface;
+function loadHosted(): HostedSurface {
+  try {
+    return require("../../vendor/hosted-cjs/index.cjs") as HostedSurface;
+  } catch {
+    return require("unabot-hosted-cjs") as HostedSurface;
+  }
+}
+
+const hosted = loadHosted();
 
 export const listPositions = hosted.listPositions;
 export const statusPosition = hosted.statusPosition;

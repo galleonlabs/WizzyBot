@@ -16,6 +16,7 @@
         "next": "^16.3.3",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
+        "unabot-hosted-cjs": "file:./vendor/hosted-cjs",
         "viem": "^2.31.7",
         "zod": "^3.24.2",
       },
@@ -1661,6 +1662,8 @@
     "ufo": ["ufo@1.6.4", "", {}, "sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA=="],
 
     "uint8arrays": ["uint8arrays@3.1.1", "", { "dependencies": { "multiformats": "^9.4.2" } }, "sha512-+QJa8QRnbdXVpHYjLoTpJIdCTiw9Ir62nocClWuXIq2JIh4Uta0cQsTSpFL678p2CN8B+XSApwcU+pQEqVpKWg=="],
+
+    "unabot-hosted-cjs": ["unabot-hosted-cjs@file:vendor/hosted-cjs", {}],
 
     "uncrypto": ["uncrypto@0.1.3", "", {}, "sha512-Ql87qFHB3s/De2ClA9e0gsnS6zXG27SkTiSJwjCc9MebbfapQfuPzumMIUMi38ezPZVNFcHI9sUIepeQfw8J8Q=="],
 

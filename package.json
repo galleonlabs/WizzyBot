@@ -9,10 +9,16 @@
     "unabot": "./bin/unabot.mjs"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./hosted": {
+      "types": "./src/hosted-bundle.ts",
+      "require": "./vendor/hosted-cjs/index.cjs",
+      "default": "./vendor/hosted-cjs/index.cjs"
+    }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/bundle-cli.mjs",
+    "bundle:hosted": "node scripts/bundle-hosted.mjs",
+    "build": "tsc -p tsconfig.build.json && node scripts/bundle-cli.mjs && node scripts/bundle-hosted.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.node.json",
@@ -20,8 +26,9 @@
     "mcp": "node ./bin/unabot.mjs mcp",
     "ci": "bash scripts/ci.sh",
     "dev": "next dev",
-    "build:web": "next build",
-    "eve:dev": "eve dev",
+    "build:web": "node scripts/bundle-hosted.mjs && next build",
+    "build:eve": "node scripts/bundle-hosted.mjs && eve build",
+    "eve:dev": "node scripts/bundle-hosted.mjs && eve dev",
     "eve:deploy": "eve deploy --project unabot"
   },
   "engines": {
@@ -39,6 +46,7 @@
     "next": "^16.3.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "unabot-hosted-cjs": "file:./vendor/hosted-cjs",
     "viem": "^2.31.7",
     "zod": "^3.24.2"
   },

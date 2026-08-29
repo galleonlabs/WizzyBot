@@ -1,5 +1,5 @@
 import { defineSchedule } from "eve/schedules";
-import { keeperLiveEnabled, runKeeperScan } from "../../src/surfaces/hosted.js";
+import { keeperLiveEnabled, runKeeperScan } from "../lib/hosted.js";
 
 export default defineSchedule({
   cron: "*/15 * * * *",

@@ -4,7 +4,7 @@ test:
 	npx vitest run
 
 build:
-	npx tsc -p tsconfig.build.json && node scripts/bundle-cli.mjs
+	npx tsc -p tsconfig.build.json && node scripts/bundle-cli.mjs && node scripts/bundle-hosted.mjs
 
 typecheck:
 	npx tsc --noEmit -p tsconfig.node.json

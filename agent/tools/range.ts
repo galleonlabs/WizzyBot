@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { rangePosition } from "../../src/surfaces/hosted.js";
+import { rangePosition } from "../lib/hosted.js";
 
 export default defineTool({
   description: "Same-width recenter when out of range (or near-edge). Dry-run by default.",

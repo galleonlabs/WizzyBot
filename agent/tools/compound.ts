@@ -1,6 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { compoundPosition } from "../../src/surfaces/hosted.js";
+import { compoundPosition } from "../lib/hosted.js";
 
 export default defineTool({
   description: "Collect fees, optional swap to ratio, increase liquidity. Skips if uneconomic. Dry-run by default.",

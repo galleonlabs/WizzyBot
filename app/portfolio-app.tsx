@@ -312,11 +312,10 @@ export function PortfolioApp() {
         </button>
         <nav aria-label="Primary navigation">
           {(["overview", "markets", "agent"] as const).map((item) => (
-            <button key={item} type="button" className={tab === item ? "is-active" : ""} onClick={() => changeTab(item)}>{item === "agent" ? "Ask Una" : capitalize(item)}</button>
+            <button key={item} type="button" className={tab === item ? "is-active" : ""} onClick={() => changeTab(item)}>{item === "overview" ? "Make" : item === "markets" ? "Index" : "Ask"}</button>
           ))}
         </nav>
         <div className="nav-actions">
-          <span className="chain-live"><i /><span>Base · Robinhood · Solana</span></span>
           {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
             <button className="wallet-button" type="button" onClick={() => void logout()} title="Sign out">
               <WalletIcon /> {short(address ?? "Wallet")}
@@ -337,15 +336,14 @@ export function PortfolioApp() {
             <>
               <section className="index-hero">
                 <div className="hero-copy">
-                  <h1>The meme market maker.</h1>
-                  <p>Deposit ETH once. Make eight meme markets across Base, Robinhood, and Solana. Keep every position and the trading fees.</p>
-                  <MarketRibbon markets={activeMarkets} loading={marketsState === "loading"} />
-                  <span className="hero-policy"><LockIcon />The same reviewed index for everyone.</span>
+                  <h1>Make meme markets.</h1>
+                  <p>One ETH deposit. Eight positions across Base, Robinhood, and Solana.</p>
                 </div>
                 <MarketAction
                   amount={amount}
                   onAmount={setAmount}
-                  constituentCount={activeMarkets.length}
+                  markets={activeMarkets}
+                  loading={marketsState === "loading"}
                   feePace={feePace}
                   feeBps={markets.catalog.fees.allocateBps}
                   ready={ready && solanaReady}
@@ -375,7 +373,7 @@ export function PortfolioApp() {
           ) : (
             <section className="index-main markets-view">
               <header className="index-title-row">
-                <div><h1>Eight markets. One index.</h1><p>See where the index is active and what each market earned in fees yesterday.</p></div>
+                <div><h1>Eight markets. One index.</h1><p>Reviewed markets across three networks.</p></div>
                 <button className="icon-button" type="button" onClick={() => void (previewMode ? Promise.resolve() : loadPositions())} aria-label="Refresh market data"><RefreshIcon /></button>
               </header>
               <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} />
@@ -383,15 +381,16 @@ export function PortfolioApp() {
           )}
         </div>
       )}
-      <footer className="index-footer"><span>You own the positions.</span><span>Una is independent and is not affiliated with the networks, venues, or tokens shown.</span></footer>
+      <footer className="index-footer">Una is independent and is not affiliated with the networks, venues, or tokens shown.</footer>
     </main>
   );
 }
 
-function MarketAction({ amount, onAmount, constituentCount, feePace, feeBps, ready, onPrepare, plan, state, onExecute, onCancel }: {
+function MarketAction({ amount, onAmount, markets, loading, feePace, feeBps, ready, onPrepare, plan, state, onExecute, onCancel }: {
   amount: string;
   onAmount: (amount: string) => void;
-  constituentCount: number;
+  markets: IndexMarket[];
+  loading: boolean;
   feePace: number | null;
   feeBps: number;
   ready: boolean;
@@ -401,35 +400,32 @@ function MarketAction({ amount, onAmount, constituentCount, feePace, feeBps, rea
   onExecute: () => void;
   onCancel: () => void;
 }) {
+  const constituentCount = markets.length;
   return (
     <aside className="market-action" aria-label="Make markets">
-      <div className="action-head">
-        <div><h2>Your deposit</h2><p>ETH in. {constituentCount || "Eight"} market positions out.</p></div>
-        <ShieldIcon />
-      </div>
       <label className="amount-field">
-        <span>Amount</span>
+        <span>You deposit</span>
         <span className="amount-input"><input inputMode="decimal" value={amount} onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" /><b>ETH</b></span>
       </label>
 
-      <div className="deposit-route" aria-label="Deposit coverage">
-        <span><b>One deposit</b><small>on Base</small></span>
-        <ArrowIcon />
-        <span><b>{constituentCount || "Eight"} markets</b><small>on three networks</small></span>
+      <div className={`market-output ${loading ? "is-loading" : ""}`} aria-label="Index positions">
+        <span><small>Una makes</small><b>{constituentCount || "Eight"} positions</b><em>Base · Robinhood · Solana</em></span>
+        <span className="market-stack" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
+          {loading ? Array.from({ length: 5 }, (_, index) => <i key={index} />) : markets.map(({ market }) => <i key={market.id} style={{ background: market.color }}>{market.symbol.slice(0, 1)}</i>)}
+        </span>
       </div>
 
       <div className="action-economics">
-        <div><span>Pool fees yesterday</span><b>{feePace === null ? "Unavailable" : `$${feePace.toFixed(2)} per $1,000`}</b></div>
-        <div><span>Deposit fee</span><b>{(feeBps / 100).toFixed(2)}%</b></div>
+        <div><span>24h pool fees</span><b>{feePace === null ? "Unavailable" : `$${feePace.toFixed(2)} / $1k`}</b><small>Observed, not forecast</small></div>
+        <div><span>Una fee</span><b>{(feeBps / 100).toFixed(2)}%</b><small>On deposit</small></div>
       </div>
-      <p className="pace-note">Yesterday's pool fees are evidence, not a return forecast.</p>
 
       {state.kind !== "idle" ? <PlanPreview plan={plan} state={state} onExecute={onExecute} onCancel={onCancel} /> : (
         <button className="fund-button" type="button" disabled={!ready} onClick={onPrepare}>
           {!ready ? "Preparing wallets…" : "Make markets"}<ArrowIcon />
         </button>
       )}
-      <p className="custody-note"><LockIcon />You keep the positions. Withdraw any time.</p>
+      <p className="action-assurance"><span>3 wallet approvals</span><span>Positions stay yours</span></p>
     </aside>
   );
 }
@@ -463,24 +459,13 @@ function PlanPreview({ plan, state, onExecute, onCancel }: { plan: MemeIndexPlan
   );
 }
 
-function MarketRibbon({ markets, loading }: {
-  markets: IndexMarket[];
-  loading: boolean;
-}) {
-  return <div className={`market-ribbon ${loading ? "is-loading" : ""}`} aria-label="Markets in the Una index">
-    {loading ? <span>Reading the index…</span> : markets.map(({ market }) => (
-      <span key={market.id}><i style={{ background: market.color }} />{market.symbol}</span>
-    ))}
-  </div>;
-}
-
 function MarketLedger({ markets, stats, state, compact = false }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error"; compact?: boolean }) {
   return (
     <section className={`market-ledger ${compact ? "is-compact" : ""}`}>
-      <header><div><h2>{compact ? "Inside Una" : "Current index"}</h2><p>{compact ? "The markets your deposit enters." : "Una reviews each market before it joins the index."}</p></div><span className="market-data-note"><i />Onchain data</span></header>
+      <header><h2>The index</h2><span className="market-data-note">{markets.length || 8} markets</span></header>
       <div className="market-table-wrap">
         <table className={`market-table ${compact ? "is-compact" : ""}`}>
-          <thead><tr><th>Market</th><th>Fees yesterday</th><th>Network</th><th>Liquidity</th>{compact ? null : <th>Risk</th>}</tr></thead>
+          <thead><tr><th>Market</th><th>24h fees</th><th>Network</th><th>Liquidity</th>{compact ? null : <th>Risk</th>}</tr></thead>
           <tbody>
             {state === "loading" ? Array.from({ length: compact ? 5 : 8 }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={compact ? 4 : 5}><i /></td></tr>) : null}
             {state === "error" ? <tr><td colSpan={compact ? 4 : 5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
@@ -517,7 +502,7 @@ function PositionLedger({ authenticated, positions, state, constituentCount, onL
   const summary = summarizePositions(positions, constituentCount);
   return (
     <section className="position-ledger">
-      <header><div><h2>Your positions</h2><p>Every position lives in your wallets. Track value, fees, and range health here.</p></div>{!authenticated ? <button type="button" onClick={onLogin}>Connect</button> : null}</header>
+      <header><h2>Your positions</h2>{!authenticated ? <button type="button" onClick={onLogin}>Connect</button> : null}</header>
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
           <div><b>{actionPlan ? `${actionPlan.kind === "compound" ? "Collect fees" : "Withdraw"} · ${actionPlan.pair}` : "Preparing your position"}</b><p>{actionState.message}</p></div>
@@ -573,7 +558,7 @@ function summarizePositions(positions: PositionView[], constituentCount: number)
 
 function AgentWorkspace({ authenticated, onLogin }: { authenticated: boolean; onLogin: () => void }) {
   return <div className="agent-workspace">
-    <aside><h1>Ask Una.</h1><p>Get a straight answer about fees, risk, or a withdrawal. Una can prepare a transaction; your wallet decides whether it happens.</p><span><LockIcon />Nothing moves without your approval.</span></aside>
+    <aside><h1>Ask Una.</h1><p>Fees, risk, withdrawals, or a transaction.</p><span><LockIcon />Nothing moves without your approval.</span></aside>
     <Chat authenticated={authenticated} onLogin={onLogin} />
   </div>;
 }
@@ -632,12 +617,7 @@ function short(value: string): string {
   return value.startsWith("0x") && value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
 }
 
-function capitalize(value: string): string {
-  return value.slice(0, 1).toUpperCase() + value.slice(1);
-}
-
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }
 function RefreshIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 11V5m0 6h-6"/></svg>; }
-function ShieldIcon() { return <svg className="shield-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.6 2.8 8.3 7 10 4.2-1.7 7-5.4 7-10V6l-7-3Z"/><path d="m9.5 12 1.7 1.7 3.6-4"/></svg>; }
 function LockIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>; }
 function ArrowIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>; }

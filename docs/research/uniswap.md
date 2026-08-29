@@ -1,4 +1,4 @@
-# Uniswap — APIs, Base deployments, v3-first, agent surface
+# Uniswap — APIs, Base deployments, agent surface
 
 Last verified: 29 Aug 2026.
 
@@ -166,7 +166,7 @@ Pulled 29 Aug 2026 from https://developers.uniswap.org/deployments.json and cros
 
 v3 fee tiers and tick spacing (protocol constants, not chain-specific): 100/1, 500/10, 3000/60, 10000/200.
 
-### v4 (typed for later; not a v1 write target)
+### v4
 
 | Contract | Address |
 | --- | --- |
@@ -192,7 +192,7 @@ Universal Router on Base (from deployments.json):
 
 v1 signer allowlist (from product code): NFPM, Permit2, Universal Router v2.0, treasury. Position tokens are added only for the fee/approval action in flight.
 
-## 5. v3 vs v4 — ship v3 first
+## 5. v2 / v3 / v4
 
 Official v4-vs-v3 table (Uniswap AI v4-sdk-integration skill + protocol docs):
 
@@ -207,15 +207,15 @@ Official v4-vs-v3 table (Uniswap AI v4-sdk-integration skill + protocol docs):
 | Customization | Fixed fee tiers | Hooks + any static or dynamic fee |
 | Addresses | Often reused across L2s, **not** a rule | Different per chain — always look up |
 
-**Product decision: v3 first on Base.** Reasons that are facts, not slogans:
+**Product: v2, v3, and v4 on Base.** Engineering facts:
 
-1. UnaBot v1 already types the v3 NFPM path and imports existing v3 NFTs. Protocol interfaces are left open for v4 later (repo README).
-2. v3 positions are enumerable on-chain. A keeper can list tokenIds without a subgraph. v4 needs event indexing — more infra than v1 should take.
-3. Revert production automators that UnaBot copies (compound / range / exit) are v3 NFT operator flows. v4 automators exist at Revert (V4Utils on Base `0x209E399ac7FC8747c3821F9376E4eb6Ce105DbA8`) but are a different surface.
-4. v4 hooks are untrusted code until reviewed (Uniswap v4 Security Framework). A v1 keeper that blindly enters hooked pools inherits hook risk.
-5. The LP API already speaks both `protocol: "V3"` and `"V4"`. Adding v4 later is an adapter, not a rewrite.
+1. The LP API already speaks `protocol: "V2"`, `"V3"`, and `"V4"`. Adapters, not a rewrite.
+2. v3 positions are enumerable on-chain (`tokenOfOwnerByIndex`). A keeper can list tokenIds without a subgraph.
+3. v4 needs event indexing. Hooks are untrusted code until reviewed (Uniswap v4 Security Framework). Refuse unknown hooks.
+4. v2 fees are embedded in the LP token; realize them via `/lp/decrease`, not `/lp/claim_fees`.
+5. Revert production automators that UnaBot copies (compound / range / exit) are v3 NFT operator flows. v4 automators exist at Revert (V4Utils on Base `0x209E399ac7FC8747c3821F9376E4eb6Ce105DbA8`) but are a different surface.
 
-**speculation:** a later UnaBot v4 adapter should start with unhooked ETH/USDC-style pools and refuse unknown hooks.
+**speculation:** a v4 path should start with unhooked ETH/USDC-style pools and refuse unknown hooks.
 
 ## 6. MCP / skills / CLI landscape
 

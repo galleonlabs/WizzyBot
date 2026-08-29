@@ -1,5 +1,7 @@
 import { getAddress, type Address } from "viem";
 import { ADDRESSES } from "../constants.js";
+import { writeTarget } from "./protocol.js";
+import { v2ApprovePairTx } from "../uniswap/v2-calldata.js";
 import type {
   ActionReceipt,
   FeeSource,
@@ -27,8 +29,8 @@ export interface PlanContext {
   takeBaseUsd?: number;
 }
 
-function recipients(fee: TreasuryFee | null, owner: Address): Address[] {
-  const out = new Set<Address>([ADDRESSES.nfpm, owner]);
+function recipients(fee: TreasuryFee | null, owner: Address, protocol: PositionSnapshot["ref"]["protocol"] = "V3"): Address[] {
+  const out = new Set<Address>([writeTarget(protocol), owner]);
   if (fee && !fee.skipped && (fee.amount0 > 0n || fee.amount1 > 0n)) {
     out.add(fee.recipient);
   }
@@ -79,10 +81,10 @@ function collectAction(position: PositionSnapshot, recipient: Address): PlannedA
     amountOut: position.uncollected1,
     recipient,
     tx: {
-      to: ADDRESSES.nfpm,
+      to: writeTarget(position.ref.protocol),
       data: "0x",
       value: 0n,
-      description: "NFPM.collect",
+      description: position.ref.protocol === "V4" ? "PositionManager.modifyLiquidities claim (0-liq decrease)" : "NFPM.collect",
     },
   };
 }
@@ -92,6 +94,20 @@ export function planCompound(
   ctx: PlanContext,
   opts: { skipSwap?: boolean } = {},
 ): ActionReceipt {
+  if (position.ref.protocol === "V2") {
+    return {
+      action: "compound",
+      dryRun: ctx.dryRun,
+      skipped: true,
+      reason: "v2 fees are embedded in the LP token; decrease to realize. No claim_fees.",
+      tokenId: position.ref.tokenId,
+      from: ctx.owner,
+      to: [],
+      actions: [],
+      treasuryFee: null,
+      txs: [],
+    };
+  }
   const econ = evaluateEconomics({
     feesUsd: ctx.feesUsd,
     notionalUsd: ctx.notionalUsd,
@@ -176,6 +192,20 @@ export function planRerange(
   ctx: PlanContext,
   opts: { oorPercent: number },
 ): ActionReceipt {
+  if (position.ref.protocol === "V2") {
+    return {
+      action: "rerange",
+      dryRun: ctx.dryRun,
+      skipped: true,
+      reason: "v2 is full-range only; range is a no-op",
+      tokenId: position.ref.tokenId,
+      from: ctx.owner,
+      to: [],
+      actions: [],
+      treasuryFee: null,
+      txs: [],
+    };
+  }
   const fire = shouldRerange({
     tickCurrent: position.tickCurrent,
     tickLower: position.tickLower,
@@ -248,10 +278,10 @@ export function planRerange(
       kind: "decrease",
       description: `decrease 100% tokenId=${position.ref.tokenId}`,
       tx: {
-        to: ADDRESSES.nfpm,
+        to: writeTarget(position.ref.protocol),
         data: "0x",
         value: 0n,
-        description: "NFPM.decreaseLiquidity 100%",
+        description: position.ref.protocol === "V4" ? "PositionManager.modifyLiquidities decrease" : "NFPM.decreaseLiquidity 100%",
       },
     },
     collectAction(position, ctx.owner),
@@ -260,10 +290,10 @@ export function planRerange(
       kind: "mint",
       description: `mint same-width recenter ticks [${nextRange.tickLower}, ${nextRange.tickUpper}]`,
       tx: {
-        to: ADDRESSES.nfpm,
+        to: writeTarget(position.ref.protocol),
         data: "0x",
         value: 0n,
-        description: "NFPM.mint",
+        description: position.ref.protocol === "V4" ? "PositionManager.modifyLiquidities mint" : "NFPM.mint",
       },
     },
     {
@@ -309,6 +339,41 @@ export function planExit(
     }
   }
 
+  if (position.ref.protocol === "V2") {
+    const fee = resolveActionFee({
+      action: "exit",
+      feeSource: ctx.feeSource,
+      noFee: ctx.noFee,
+      uncollected0: position.uncollected0,
+      uncollected1: position.uncollected1,
+      notional0: position.amount0,
+      notional1: position.amount1,
+      token0: position.token0.address,
+      token1: position.token1.address,
+    });
+    const actions: PlannedAction[] = [
+      {
+        kind: "approve",
+        description: `approve Router02 for v2 LP token ${position.pool}`,
+        tokenIn: position.pool,
+        amountIn: position.liquidity,
+        tx: v2ApprovePairTx(position.pool, position.liquidity),
+      },
+      {
+        kind: "decrease",
+        description: `remove 100% v2 liquidity pair=${position.pool}`,
+        tx: {
+          to: ADDRESSES.v2Router,
+          data: "0x",
+          value: 0n,
+          description: "Router02.removeLiquidity",
+        },
+      },
+      ...feeTransfers(fee),
+    ];
+    return receipt("exit", position, ctx, actions, fee);
+  }
+
   const fee = resolveActionFee({
     action: "exit",
     feeSource: ctx.feeSource,
@@ -326,10 +391,10 @@ export function planExit(
       kind: "decrease",
       description: `decrease 100% tokenId=${position.ref.tokenId}`,
       tx: {
-        to: ADDRESSES.nfpm,
+        to: writeTarget(position.ref.protocol),
         data: "0x",
         value: 0n,
-        description: "NFPM.decreaseLiquidity 100%",
+        description: position.ref.protocol === "V4" ? "PositionManager.modifyLiquidities decrease" : "NFPM.decreaseLiquidity 100%",
       },
     },
     collectAction(position, ctx.owner),
@@ -382,7 +447,7 @@ function receipt(
     skipped: false,
     tokenId: position.ref.tokenId,
     from: ctx.owner,
-    to: recipients(fee, ctx.owner),
+    to: recipients(fee, ctx.owner, position.ref.protocol),
     actions,
     treasuryFee: fee,
     txs,

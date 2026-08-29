@@ -8,7 +8,9 @@ import { loadEnv } from "../config/env.js";
 import { loadConfig, policyFor } from "../config/policy.js";
 import { loadAccount } from "../signer/account.js";
 import { makePublicClient } from "../signer/broadcast.js";
-import { V3Adapter } from "../chain/positions.js";
+import { adapterFor } from "../core/protocols.js";
+import { parseProtocol, parseTokenId } from "../core/protocol.js";
+import type { Protocol } from "../types.js";
 import { snapshotUsd, usdPricesForPosition } from "../chain/prices.js";
 import { buildCard, formatCard } from "../core/card.js";
 import { formatReceipt, planCompound, planExit, planRerange, type PlanContext } from "../core/actions.js";
@@ -63,16 +65,21 @@ export function feeSourceFlag(opts: { feeSource?: string } = {}): "fees" | "noti
   return v;
 }
 
+function protocolFlag(opts: { protocol?: string } = {}): Protocol {
+  return parseProtocol(opts.protocol ?? "v3");
+}
+
 program
   .command("list")
   .description("List positions (v2, v3, v4)")
   .option("--owner <address>", "wallet to inspect (default: signer)")
+  .option("--protocol <v>", "v2 | v3 | v4 (default v3)", "v3")
   .action(async (opts) => {
-    const { client, owner } = await connect(opts.owner);
-    const { adapterFor } = await import("../core/protocols.js");
+    const protocol = protocolFlag(opts);
+    const { client, owner } = await connect(opts.owner, { protocol });
     let any = false;
-    for (const protocol of ["V2", "V3", "V4"] as const) {
-      const adapter = adapterFor(protocol, client);
+    for (const proto of [protocol]) {
+      const adapter = adapterFor(proto, client);
       let refs: { protocol: string; tokenId: bigint }[] = [];
       try {
         refs = await adapter.listPositions(owner);
@@ -139,10 +146,13 @@ program
   .command("status")
   .alias("card")
   .description("Status / position card")
-  .argument("<tokenId>", "NFPM tokenId")
-  .action(async (tokenId: string) => {
-    const { adapter, env, client } = await connectRead();
-    const id = BigInt(tokenId);
+  .argument("<tokenId>", "NFT tokenId, or v2 pair address")
+  .option("--protocol <v>", "v2 | v3 | v4 (default v3)", "v3")
+  .action(async (tokenId: string, opts) => {
+    const protocol = protocolFlag(opts);
+    const { adapter, env, client, owner } = await connect(undefined, { optional: true, protocol });
+    adapter.bindOwner?.(owner);
+    const id = parseTokenId(tokenId, protocol);
     const snap = await adapter.readPosition(id);
     const prices = await usdPricesForPosition(client, snap, env.ethUsd);
     let rec = getHold(id);
@@ -191,15 +201,18 @@ program
   .option("--amount0 <raw>")
   .option("--amount1 <raw>")
   .option("--owner <address>", "recipient / signer override (dry-run may omit key)")
+  .option("--protocol <v>", "v2 | v3 | v4 (default v3)", "v3")
   .action(async (opts, cmd) => {
     const live = liveFlag(cmd.optsWithGlobals(), cmd);
-    const { client, owner, env, account } = await connect(opts.owner, { optional: !live });
+    const protocol = protocolFlag(opts);
+    const { client, owner, env, account } = await connect(opts.owner, { optional: !live, protocol });
     const result = await runMintFlow({
       client,
       owner,
       token0: opts.token0,
       token1: opts.token1,
       fee: Number(opts.fee),
+      protocol,
       widthPct: opts.width ? Number(opts.width) : undefined,
       tickLower: opts.tickLower ? Number(opts.tickLower) : undefined,
       tickUpper: opts.tickUpper ? Number(opts.tickUpper) : undefined,
@@ -232,8 +245,9 @@ program
   .command("compound")
   .description("Compound fees into the position")
   .argument("<tokenId>")
-  .action(async (tokenId: string, _opts, cmd) => {
-    const receipt = await planFor("compound", BigInt(tokenId), cmd);
+  .option("--protocol <v>", "v2 | v3 | v4 (default v3)", "v3")
+  .action(async (tokenId: string, opts, cmd) => {
+    const receipt = await planFor("compound", parseTokenId(tokenId, protocolFlag(opts)), cmd, { protocol: protocolFlag(opts) });
     printReceipt(receipt);
     await maybeBroadcast(receipt, cmd);
   });
@@ -244,8 +258,9 @@ program
   .description("Re-range when out of range")
   .argument("<tokenId>")
   .option("--oor <pct>", "0 = only fully OOR", "0")
+  .option("--protocol <v>", "v2 | v3 | v4 (default v3)", "v3")
   .action(async (tokenId: string, opts, cmd) => {
-    const receipt = await planFor("rerange", BigInt(tokenId), cmd, { oorPercent: Number(opts.oor) });
+    const receipt = await planFor("rerange", parseTokenId(tokenId, protocolFlag(opts)), cmd, { oorPercent: Number(opts.oor), protocol: protocolFlag(opts) });
     printReceipt(receipt);
     await maybeBroadcast(receipt, cmd);
   });
@@ -256,10 +271,12 @@ program
   .argument("<tokenId>")
   .option("--price <n>", "trigger price token1/token0")
   .option("--swap-to <address>", "optional single-token exit")
+  .option("--protocol <v>", "v2 | v3 | v4 (default v3)", "v3")
   .action(async (tokenId: string, opts, cmd) => {
-    const receipt = await planFor("exit", BigInt(tokenId), cmd, {
+    const receipt = await planFor("exit", parseTokenId(tokenId, protocolFlag(opts)), cmd, {
       exitPrice: opts.price ? Number(opts.price) : undefined,
       swapTo: opts.swapTo,
+      protocol: protocolFlag(opts),
     });
     printReceipt(receipt);
     await maybeBroadcast(receipt, cmd);
@@ -372,19 +389,22 @@ program
     console.log(JSON.stringify(loadConfig(), null, 2));
   });
 
-async function connectRead() {
+async function connectRead(protocol: Protocol = "V3") {
   const env = loadEnv();
   const client = makePublicClient(env.rpcUrl);
-  return { env, client, adapter: new V3Adapter(client) };
+  const adapter = adapterFor(protocol, client);
+  return { env, client, adapter };
 }
 
-async function connect(ownerArg?: string, opts: { optional?: boolean } = {}) {
-  const { env, client, adapter } = await connectRead();
+async function connect(ownerArg?: string, opts: { optional?: boolean; protocol?: Protocol } = {}) {
+  const protocol = opts.protocol ?? "V3";
+  const { env, client, adapter } = await connectRead(protocol);
   const account = loadAccount(env);
   const owner = ownerArg
     ? getAddress(ownerArg)
     : account?.address ?? (opts.optional ? getAddress("0x0000000000000000000000000000000000000001") : undefined);
   if (!owner) throw new Error("Pass --owner or set UNABOT_PRIVATE_KEY");
+  adapter.bindOwner?.(owner);
   return { env, client, account, owner, adapter };
 }
 
@@ -392,9 +412,9 @@ async function planFor(
   action: "compound" | "rerange" | "exit",
   tokenId: bigint,
   cmd: Command,
-  extra: { oorPercent?: number; exitPrice?: number; swapTo?: string } = {},
+  extra: { oorPercent?: number; exitPrice?: number; swapTo?: string; protocol?: Protocol } = {},
 ) {
-  const { adapter, owner, client, env } = await connect();
+  const { adapter, owner, client, env } = await connect(undefined, { protocol: extra.protocol ?? "V3" });
   const snap = await adapter.readPosition(tokenId);
   const px = await usdPricesForPosition(client, snap, env.ethUsd);
   const usd = snapshotUsd(snap, px.price0Usd, px.price1Usd);
@@ -440,11 +460,11 @@ async function maybeBroadcast(receipt: ReturnType<typeof planCompound>, cmd: Com
   await confirmOrThrow(`Broadcast ${receipt.action} tokenId=${receipt.tokenId}?`);
   const { adapter, owner, env, account } = await connect();
   if (!account || receipt.tokenId === undefined) throw new Error("signer and tokenId required");
-  const { hydrateCalldata } = await import("../core/hydrate.js");
+  const { hydrateCalldataMaybeApi } = await import("../core/hydrate.js");
   const { isPlaceholderTx, sendPlannedTx } = await import("../signer/broadcast.js");
   const { allowlistWithTokens } = await import("../signer/allowlist.js");
   const snap = await adapter.readPosition(receipt.tokenId);
-  const filled = hydrateCalldata(receipt, snap, owner);
+  const filled = await hydrateCalldataMaybeApi(receipt, snap, owner, env.uniswapApiKey);
   const extra = allowlistWithTokens(snap.token0.address, snap.token1.address);
   for (const tx of filled.txs) {
     if (isPlaceholderTx(tx)) {

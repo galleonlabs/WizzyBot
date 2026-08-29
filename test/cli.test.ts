@@ -60,6 +60,15 @@ describe("CLI --help smoke", () => {
     expect(() => feeSourceFlag({ feeSource: "bogus" })).toThrow(/fees\|notional/);
   });
 
+  it("documents --protocol on write verbs", async () => {
+    const program = buildProgram();
+    const mint = program.commands.find((c) => c.name() === "mint");
+    const list = program.commands.find((c) => c.name() === "list");
+    expect(mint?.helpInformation()).toMatch(/--protocol/);
+    expect(list?.helpInformation()).toMatch(/--protocol/);
+    expect(mint?.helpInformation()).toMatch(/v2 \| v3 \| v4/);
+  });
+
   it("registers MCP tools required by the spec", () => {
     expect(MCP_TOOLS).toEqual(expect.arrayContaining([...PRODUCT_VERBS]));
     expect(MCP_TOOLS).toEqual(

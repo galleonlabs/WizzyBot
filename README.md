@@ -9,12 +9,12 @@ Compound, re-range, exit.
 Base. Dry-run until you type yes. `--live` broadcasts.
 
 ```
-unabot list --owner <addr>
+unabot list --owner <addr> --protocol v3
 unabot pool --token0 <addr> --token1 <addr> --fee 500
-unabot mint --token0 <addr> --token1 <addr> --fee 500 --width 10 --amount0 <raw> --amount1 <raw>
-unabot compound <tokenId>
-unabot range <tokenId>
-unabot exit <tokenId>
+unabot mint --protocol v3 --token0 <addr> --token1 <addr> --fee 500 --width 10 --amount0 <raw> --amount1 <raw>
+unabot compound <tokenId> --protocol v3
+unabot range <tokenId> --protocol v3
+unabot exit <tokenId> --protocol v3
 unabot chat
 unabot telegram
 unabot mcp
@@ -29,6 +29,7 @@ unabot pool --token0 0x4200000000000000000000000000000000000006 \
 
 `make ci` or `npx vitest run` && `npx tsc -p tsconfig.build.json`.
 
+`--protocol v2|v3|v4` (default v3) on list, status, mint, compound, range, exit. You keep the position (v3/v4 NFT; v2 LP token).
 
 ## eve (Vercel)
 

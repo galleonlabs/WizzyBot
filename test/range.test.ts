@@ -28,6 +28,15 @@ describe("OOR trigger", () => {
     expect(percentThroughRange(-100, -100, 100)).toBe(0);
     expect(percentThroughRange(0, -100, 100)).toBe(50);
     expect(percentThroughRange(100, -100, 100)).toBe(100);
+    expect(percentThroughRange(-200, -100, 100)).toBe(0);
+  });
+
+  it("oorPercent >= 50 treats the whole in-range interval as near-edge", () => {
+    expect(shouldRerange({ tickCurrent: 0, tickLower: -100, tickUpper: 100, oorPercent: 50 })).toBe(true);
+  });
+
+  it("rejects an inverted range", () => {
+    expect(() => shouldRerange({ tickCurrent: 0, tickLower: 10, tickUpper: 10, oorPercent: 0 })).toThrow(/invalid range/);
   });
 });
 

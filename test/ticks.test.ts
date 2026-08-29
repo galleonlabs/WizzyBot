@@ -35,4 +35,17 @@ describe("tick snap", () => {
     expect(next.tickLower).toBeLessThan(50);
     expect(next.tickUpper).toBeGreaterThan(50);
   });
+
+  it("accepts negative ticks and rejects bad spacing", () => {
+    expect(Number.isInteger(snapTick(-14, 10) / 10)).toBe(true);
+    expect(() => snapTick(7.5, 10)).toThrow(/integer/);
+    expect(() => snapTick(7, 0)).toThrow(/positive integer/);
+    expect(() => snapTick(7, 0)).not.toThrow(/positive integers$/);
+  });
+
+  it("expands a collapsed snap so lower < upper", () => {
+    const range = snapRange(12, 12, 10);
+    expect(range.tickLower).toBeLessThan(range.tickUpper);
+    expect(range.tickUpper - range.tickLower).toBe(10);
+  });
 });

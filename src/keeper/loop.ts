@@ -1,7 +1,7 @@
 import { isAddress, getAddress, type Address } from "viem";
 import { planCompound, planExit, planRerange, formatReceipt } from "../core/actions.js";
 import { cooldownBlocked } from "../core/economics.js";
-import { COMPOUND_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
+import { COMPOUND_FEE_BPS, NOTIONAL_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
 import { loadConfig, policyFor, markRun, saveConfig, copyPolicyToNewToken } from "../config/policy.js";
 import type { ActionReceipt, AlertSink, PositionSnapshot } from "../types.js";
 import { alert } from "./alerts.js";
@@ -50,7 +50,8 @@ export async function decideForPosition(
     feesUsd: px.feesUsd,
     notionalUsd: px.notionalUsd,
     gasUsd: px.gasUsd,
-    takeBps: policy.feeSource === "notional" ? 15 : policy.autoExit || policy.autoRange ? RANGE_EXIT_FEE_BPS : COMPOUND_FEE_BPS,
+    takeBps: policy.feeSource === "notional" ? NOTIONAL_FEE_BPS : policy.autoExit || policy.autoRange ? RANGE_EXIT_FEE_BPS : COMPOUND_FEE_BPS,
+    takeBaseUsd: policy.feeSource === "notional" ? px.notionalUsd : px.feesUsd,
   };
 
   const out: ActionReceipt[] = [];

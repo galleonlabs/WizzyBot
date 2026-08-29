@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateEconomics } from "../src/core/economics.js";
+import { cooldownBlocked, evaluateEconomics } from "../src/core/economics.js";
 
 describe("uneconomic skip", () => {
   it("skips when net fees after gas + 2% take are below minFeeUsd", () => {
@@ -58,5 +58,28 @@ describe("uneconomic skip", () => {
     });
     expect(decision.skip).toBe(true);
     expect(decision.reason).toMatch(/no uncollected fees/);
+  });
+
+  it("applies notional take to takeBaseUsd, not feesUsd", () => {
+    const decision = evaluateEconomics({
+      feesUsd: 20,
+      notionalUsd: 10_000,
+      gasUsd: 0.2,
+      minFeeUsd: 1,
+      minPositionUsd: 50,
+      takeBps: 15,
+      noFee: false,
+      takeBaseUsd: 10_000,
+    });
+    // take = 0.15% of $10k = $15; net = 20 - 15 - 0.2 = 4.8
+    expect(decision.takeUsd).toBeCloseTo(15);
+    expect(decision.netUsd).toBeCloseTo(4.8);
+    expect(decision.skip).toBe(false);
+  });
+
+  it("blocks cooldown until the window elapses", () => {
+    expect(cooldownBlocked(100, 60, 130)).toBe(true);
+    expect(cooldownBlocked(100, 60, 161)).toBe(false);
+    expect(cooldownBlocked(undefined, 60, 200)).toBe(false);
   });
 });

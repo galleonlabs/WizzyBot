@@ -20,8 +20,8 @@ export function takeFromFees(amount0: bigint, amount1: bigint, bps = COMPOUND_FE
 }
 
 /**
- * 0.15% of position notional, allocated across token0/token1
- * in proportion to the current in-range amounts (or 50/50 if empty).
+ * 0.15% of each token's current position amount.
+ * That is proportional to the bag; both-zero takes nothing.
  */
 export function takeFromNotional(
   amount0: bigint,

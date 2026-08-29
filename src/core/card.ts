@@ -7,6 +7,7 @@ import {
   holdUsd,
   lpUsd,
   positionNotionalUsd,
+  rawToUsd,
   totalApr,
   type HoldInput,
 } from "./pnl.js";
@@ -38,9 +39,8 @@ export function buildCard(
   const lp = lpUsd(input);
   return {
     ...position,
-    amount0Usd: notional - (notional && input.amount1 ? (Number(input.amount1) / 10 ** input.decimals1) * input.price1Usd : 0) ||
-      (Number(input.amount0) / 10 ** input.decimals0) * input.price0Usd,
-    amount1Usd: (Number(input.amount1) / 10 ** input.decimals1) * input.price1Usd,
+    amount0Usd: rawToUsd(input.amount0, input.decimals0, input.price0Usd),
+    amount1Usd: rawToUsd(input.amount1, input.decimals1, input.price1Usd),
     feesUsd: fees,
     positionUsd: notional,
     feeApr: feeApr({ feesUsd: fees, notionalUsd: notional, ageDays: age }),

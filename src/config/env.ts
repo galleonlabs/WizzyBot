@@ -53,16 +53,30 @@ export type Env = {
   telegramBotToken: string | undefined;
 };
 
+const SECRET_ENV_KEYS = new Set(["UNABOT_PRIVATE_KEY", "UNISWAP_API_KEY", "TELEGRAM_BOT_TOKEN"]);
+
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const env = mergedEnv(source);
-  const parsed = EnvSchema.parse({
-    BASE_RPC_URL: env.BASE_RPC_URL ?? BASE_RPC_DEFAULT,
-    UNISWAP_API_KEY: env.UNISWAP_API_KEY ?? "",
-    UNABOT_PRIVATE_KEY: env.UNABOT_PRIVATE_KEY || undefined,
-    UNABOT_TREASURY: env.UNABOT_TREASURY || undefined,
-    UNABOT_ETH_USD: env.UNABOT_ETH_USD || undefined,
-    TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN ?? "",
-  });
+  let parsed: z.infer<typeof EnvSchema>;
+  try {
+    parsed = EnvSchema.parse({
+      BASE_RPC_URL: env.BASE_RPC_URL ?? BASE_RPC_DEFAULT,
+      UNISWAP_API_KEY: env.UNISWAP_API_KEY ?? "",
+      UNABOT_PRIVATE_KEY: env.UNABOT_PRIVATE_KEY || undefined,
+      UNABOT_TREASURY: env.UNABOT_TREASURY || undefined,
+      UNABOT_ETH_USD: env.UNABOT_ETH_USD || undefined,
+      TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN ?? "",
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const msgs = err.issues.map((i) => {
+        const key = String(i.path[0] ?? "env");
+        return SECRET_ENV_KEYS.has(key) ? `${key}: ${i.message}` : `${key}: ${i.message}`;
+      });
+      throw new Error(`Invalid env: ${msgs.join("; ")}`);
+    }
+    throw err;
+  }
   return {
     rpcUrl: parsed.BASE_RPC_URL,
     uniswapApiKey: parsed.UNISWAP_API_KEY || undefined,

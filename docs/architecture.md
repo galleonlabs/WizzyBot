@@ -14,6 +14,8 @@ Una is self-custodial portfolio software. The wallet owns every LP NFT and signs
 | Cross-chain intent and fill status | Relay quote plus Relay intent status, tied to its request ID |
 | AI explanations and suggestions | Advisory only; never transaction authority |
 
+The six-hour curator produces evidence and policy-valid replacement proposals. The curator agent reviews those outputs, updates `src/config/markets.json`, and ships the normal tested application deployment. There is no onchain publication or registry gas cost in the current launch architecture.
+
 ## Index deposit path
 
 The public product has one fixed index. It does not expose the single-chain allocation APIs, pools, venues, weights, or ranges as consumer controls.

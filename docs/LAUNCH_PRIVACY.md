@@ -26,7 +26,7 @@ This boundary is enforced by a repository test over shipped source and public as
 
 ## Wallet and custody controls
 
-The creator/treasury/registry EOA is a dedicated wallet whose private key is stored as a retrievable, encrypted, production-only Vercel secret. The application does not read it. The same key is installed only in the restricted dappnode curator service so policy-valid registry updates can be autonomous. There is deliberately no multisig.
+The creator/treasury EOA is a dedicated wallet whose private key is stored as a retrievable, encrypted, production-only Vercel secret. The application and dappnode curator do not read it. Centralized index curation changes the version-controlled catalog and does not require the wallet or an onchain signature. There is deliberately no multisig.
 
 Before the wallet controls material value, re-verify the Vercel recovery path, project-administrator list, dappnode file permissions, and public address. The key must never be placed in client variables, source, shell history, logs, screenshots, analytics, or social tooling.
 

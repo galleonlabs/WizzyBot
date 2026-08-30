@@ -1,6 +1,6 @@
 # Una onchain architecture
 
-Status: implementation complete locally; deployment intentionally not authorized.
+Status: deferred. The implementation remains available for later review, but the current product uses centralized, version-controlled curation and must not deploy or sync this registry.
 
 ## Decision
 
@@ -12,9 +12,9 @@ The public MIT-licensed `revert-finance/v3utils` repository contains Auto-Range 
 
 Cross-chain entry still requires a destination-chain action after Relay fills. EIP-5792 batches calls on one chain; it cannot make an asynchronous bridge plus destination execution one atomic transaction. A destination receiver contract could automate that second action later, but it would need tightly constrained calldata, refund behavior, bridge authentication, and an audit before receiving user funds.
 
-## Onchain index registry
+## Deferred onchain index registry
 
-`UnaIndexRegistry` is the canonical current snapshot for the Robinhood Una Index:
+If activated in a later release, `UnaIndexRegistry` could provide an onchain snapshot for the Robinhood Una Index:
 
 - The full index is replaced atomically; partial updates are impossible.
 - Weights must total exactly 10,000 basis points.
@@ -26,9 +26,9 @@ Cross-chain entry still requires a destination-chain action after Relay fills. E
 - Owner and curator rotations are two-step transfers so a mistyped address cannot seize authority.
 - The contract stores the current snapshot; events preserve the version history for indexers and audits.
 
-The deployment owner and curator are intentionally the same dedicated Una EOA: `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`. Its retrievable private key is stored as a production-only Vercel secret and copied only to the restricted dappnode curator environment. This is a user-selected single-key topology; there is no multisig or human co-sign gate.
+The proposed deployment owner and curator are the same dedicated Una EOA: `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`. The funded wallet is not needed for centralized curation and should remain untouched while the registry is deferred.
 
-Every six-hour curator run derives one of three actions: no change, a policy-valid whole-snapshot replacement, or an immediate registry pause on a hard security failure. The sync path is dry-run by default, checks the current version, simulates against Robinhood Chain, verifies the configured signer is the contract curator, and only then broadcasts. A market under `review` remains until an eligible candidate satisfies the replacement policy.
+Every six-hour curator run currently produces evidence and one of three recommendations: no change, a policy-valid whole-index replacement proposal, or an immediate review on a hard security failure. The curator agent applies approved changes to `src/config/markets.json` through the normal tested deployment path. The registry sync command remains a manual, deferred tool and is never called by the curator service.
 
 ## Threat assessment
 
@@ -42,7 +42,7 @@ Every six-hour curator run derives one of three actions: no change, a policy-val
 | Security incident | Curator-or-owner pause; owner-only unpause | Existing positions remain exposed to their underlying pools; pause only stops Una from treating the registry as depositable. |
 | Backend censorship or drift | Product reads the versioned contract state and report hash | RPC availability and chain reorgs still require normal client retry/finality handling. |
 
-## Activation gates
+## Future activation gates
 
 Before deployment:
 
@@ -52,7 +52,7 @@ Before deployment:
 4. Configure `UNA_INDEX_REGISTRY_ADDRESS`, switch planning and UI reads to the registry, and fail closed when it is paused or unavailable.
 5. Run one canary deposit and compare every minted position with the registry version shown at signing.
 
-Mainnet deployment is approved for Robinhood Chain once the dedicated Una address is funded. The current dry-run is about 1.24 million gas; fund at least 0.001 ETH to cover deployment, initial publication, and fee movement. The deploy script raises that minimum automatically if twice the current deployment estimate is higher.
+Mainnet deployment is not part of the current plan. Deployment and each snapshot publication would consume Robinhood Chain gas; funding the dedicated address does not activate or authorize either action. If the registry is reconsidered, refresh the estimate and complete every gate above before requesting explicit deployment approval.
 
 `bun run registry:deploy` estimates the current transaction and predicted address without broadcasting. `bun run registry:deploy -- --live` refuses a signer other than the configured Una treasury, refuses an underfunded address, deploys owner and curator as that same address, and verifies the receipt address. After deployment, set `UNA_INDEX_REGISTRY_ADDRESS` and run `bun run registry:sync` before using `--live`.
 

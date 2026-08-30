@@ -35,7 +35,7 @@ The proposed monthly operating budget is a policy target, not hard-coded routing
 - 25% two-sided protocol-owned market liquidity, subject to liquidity and concentration limits;
 - 15% measured distribution, user education, and capped gas or onboarding support.
 
-Unused budget remains in treasury. Market-liquidity spending must be two-sided and disclosed; it must not be described or operated as price support. The dedicated Vercel-held EOA remains the treasury, token creator, and registry authority. Publish its address and a monthly inflow/outflow ledger without exposing the key or private operational metadata.
+Unused budget remains in treasury. Market-liquidity spending must be two-sided and disclosed; it must not be described or operated as price support. The dedicated Vercel-held EOA remains the treasury and future token creator; centralized index curation does not use it. Publish its address and a monthly inflow/outflow ledger without exposing the key or private operational metadata.
 
 ## Flow mechanics
 

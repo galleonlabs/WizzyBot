@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getCuratorConfig } from "../src/curator/config.js";
 import { evaluateMarket, proposeReplacements, summarizeMarketHistory, type CuratorObservation } from "../src/curator/policy.js";
 import { decodeSolanaMintSecurity } from "../src/curator/sources.js";
+import { renderCuratorMarkdown, type CuratorReport } from "../src/curator/run.js";
 
 const policy = getCuratorConfig().policy;
 
@@ -39,6 +40,22 @@ function history(overrides: Partial<CuratorObservation> = {}, hours = 14 * 24): 
 }
 
 describe("index curator", () => {
+  it("describes centralized catalog curation without claiming automatic onchain publication", () => {
+    const report: CuratorReport = {
+      version: 1,
+      role: "curator",
+      generatedAt: "2026-08-30T17:00:00.000Z",
+      configVersion: 1,
+      snapshotCadenceMinutes: 360,
+      evaluations: [],
+      replacements: [],
+    };
+    const markdown = renderCuratorMarkdown(report);
+    expect(markdown).toContain("version-controlled market catalog remains the live index");
+    expect(markdown).toContain("curator agent");
+    expect(markdown).not.toContain("publish to the onchain registry automatically");
+  });
+
   it("reads Solana mint and freeze authority options without native bindings", () => {
     const immutableMint = new Uint8Array(82);
     expect(decodeSolanaMintSecurity(immutableMint)).toEqual({ mintAuthorityDisabled: true, freezeAuthorityDisabled: true });

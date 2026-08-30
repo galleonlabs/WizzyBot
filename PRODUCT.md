@@ -23,7 +23,7 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 - Privy creates and manages the user's self-custodial EVM and Solana wallets under one identity.
 - There is no public allocation builder, destination-network selector, pool selector, range editor, bridge picker, or portfolio-split control. “Pay from” is a checkout choice only: Relay moves ETH from a supported source network into the single Robinhood Chain product.
 - Una publishes one Robinhood index at launch. Each viable 0.05 ETH unit adds the next curator-ranked market, up to the full six-market index; users never choose the count or allocation.
-- Initial inclusion requires at least 30 days of pool history, at least $75,000 in live liquidity, a WETH quote, and a verified Uniswap v3 execution path. An active market that later crosses a monitoring threshold moves to review; security failures or a liquidity collapse pause the onchain registry. The curator applies deterministic membership and weight policy without an operator vote.
+- Initial inclusion requires at least 30 days of pool history, at least $75,000 in live liquidity, a WETH quote, and a verified Uniswap v3 execution path. An active market that later crosses a monitoring threshold moves to review; security failures or a liquidity collapse cause the curator agent to pause it in the version-controlled catalog and ship the tested deployment. The curator applies deterministic membership and weight policy without an operator vote.
 - Relay moves ETH from the selected supported source network to Robinhood Chain. Una selects the reviewed pool and liquidity range for every market.
 - The product vocabulary is deposit, earn fees, your liquidity, collect, and withdraw. Protocol mechanics belong in receipts and disclosures, not the primary action.
 - Portfolio state should be derived from wallets, LP positions, chain events, and live market data. Avoid a database where onchain or version-controlled state is authoritative.
@@ -33,7 +33,7 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 ## Capabilities and Constraints
 
 - Launch one network-specific index on Robinhood Chain (chain ID 4663). Keep the existing Base, Robinhood, and Solana engines intact for later per-network products; do not present a blended multi-chain index in the MVP.
-- Accept only pools validated by the canonical Uniswap v3 factory and tracked by the curator evidence universe; the onchain registry is authoritative for new deposits.
+- Accept only pools validated by the canonical Uniswap v3 factory and tracked by the curator evidence universe; the version-controlled market catalog is authoritative for new deposits.
 - The active launch set is CASHCAT, PONS, AI, CHUMP, STONKBROKER, and PONSGUY against WETH on reviewed Uniswap v3 pools.
 - Base uses reviewed Uniswap v3 and Aerodrome Slipstream pools; Solana uses Meteora DLMM. Those engines and paused markets remain readable and withdrawable for later network-specific launches.
 - Minimize approvals and confirmations with wallet batching, Relay, Privy embedded wallets, and direct single-token liquidity zaps. Never claim one cryptographic signature when destination networks require additional approvals.
@@ -64,7 +64,7 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 ## Evidence on Hand
 
 - The repository contains Base and Robinhood definitions, Uniswap and Aerodrome Slipstream planning and calldata, Privy authentication/signing, Relay routing, treasury fee logic, position hydration, agent tools, and tests.
-- Robinhood launch statistics and token imagery come from GeckoTerminal's keyless onchain pool API; each market exposes its pool page and a Uniswap trade deep link. Fomo is a discovery surface, not a liquidity venue or product endorsement.
+- Robinhood launch statistics and token imagery come from GeckoTerminal's keyless onchain pool API; each market exposes its GeckoTerminal pool page and the approved Fomo referral action. Fomo is a discovery surface, not a liquidity venue or product endorsement.
 - The Solana path uses Privy Solana wallets, Relay native SOL delivery, and Meteora's maintained DLMM zap SDK.
 - No audited proprietary contracts, verified performance history, testimonials, legal opinion, or third-party endorsements are present. Future work must not fabricate them.
 

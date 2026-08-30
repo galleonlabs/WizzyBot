@@ -16,7 +16,7 @@ Pool capacity is capped at 1% of median TVL. Social data helps discover and veri
 
 Missing provider data is reported as unavailable, not as a failed liquidity or volume threshold. A clean security result remains valid for 24 hours so a transient provider outage cannot manufacture a risk call; any security flag still triggers review immediately.
 
-The curator is the decision-maker. A `review` incumbent remains until an eligible candidate earns a policy-valid replacement; it is not an operator approval queue. A `pause` recommendation stops all new registry-backed deposits immediately. Eligible replacements inherit the outgoing market's weight and range width, preserving a 10,000-basis-point snapshot without exposing arbitrary model-generated calldata.
+The curator is the decision-maker. A `review` incumbent remains until an eligible candidate earns a policy-valid replacement; it is not an operator approval queue. A `pause` recommendation requires the curator agent to mark the market unavailable in the catalog and ship the tested application deployment before new deposits stop using it. Eligible replacements inherit the outgoing market's weight and range width, preserving a 10,000-basis-point catalog without exposing arbitrary model-generated calldata.
 
 ## Robinhood launch index
 
@@ -36,7 +36,6 @@ MICRODUCK, GG, and COPPERINU are tracked as Robinhood candidates but are too new
 ```bash
 bun run curate:index -- --no-write
 bun run curate:index -- --state-dir ~/.local/state/unabot-curator
-bun run registry:sync -- --report=~/.local/state/unabot-curator/latest.json
 ```
 
 The dappnode timer persists:
@@ -45,4 +44,6 @@ The dappnode timer persists:
 - `latest.json` — machine-readable calls and replacements.
 - `latest.md` — the operator review.
 
-Candidate addresses and thresholds live in `src/config/curator.json`. Once deployed, `UnaIndexRegistry` is authoritative for Robinhood membership and weights. `registry:sync` is dry-run by default; the dappnode service adds `--live` only when a registry address and the single Una private key are present in its restricted environment file.
+Candidate addresses and thresholds live in `src/config/curator.json`. Robinhood membership, weights, and availability live in `src/config/markets.json`. The curator report supplies the evidence and policy-valid proposal; the curator agent changes the catalog and ships it through the normal tested deployment path. The dappnode service never signs or broadcasts a registry transaction.
+
+The deferred `registry:sync` command remains available for a future onchain-registry review, but it is manual, dry-run by default, and outside the current operating workflow.

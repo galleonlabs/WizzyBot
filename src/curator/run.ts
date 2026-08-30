@@ -46,7 +46,7 @@ async function writeAtomic(path: string, content: string): Promise<void> {
   await rename(temporary, path);
 }
 
-function markdown(report: CuratorReport): string {
+export function renderCuratorMarkdown(report: CuratorReport): string {
   const rows = [...report.evaluations].sort((a, b) => {
     if (a.chain !== b.chain) return a.chain.localeCompare(b.chain);
     if (a.incumbent !== b.incumbent) return a.incumbent ? -1 : 1;
@@ -61,7 +61,7 @@ function markdown(report: CuratorReport): string {
   const replacements = report.replacements.length
     ? report.replacements.map((row) => `- ${row.chain}: replace ${row.incumbentSymbol} with ${row.candidateSymbol} (${row.aprMultiple.toFixed(1)}× median fee APR)`).join("\n")
     : "- None.";
-  return `# Una index curator\n\nGenerated ${report.generatedAt}. Policy-valid changes publish to the onchain registry automatically.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
+  return `# Una index curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live index. This report supplies evidence and policy-valid proposals for the curator agent to apply through the normal tested deployment path.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
 }
 
 export async function runCurator(options: { stateDir?: string; persist?: boolean; observedAt?: string } = {}): Promise<CuratorReport> {
@@ -95,7 +95,7 @@ export async function runCurator(options: { stateDir?: string; persist?: boolean
     await Promise.all([
       writeAtomic(historyPath, `${history.map((entry) => JSON.stringify(entry)).join("\n")}\n`),
       writeAtomic(join(stateDir, "latest.json"), `${JSON.stringify(report, null, 2)}\n`),
-      writeAtomic(join(stateDir, "latest.md"), markdown(report)),
+      writeAtomic(join(stateDir, "latest.md"), renderCuratorMarkdown(report)),
     ]);
   }
   return report;

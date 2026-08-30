@@ -119,13 +119,13 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 
 Never log env values.
 
-Production EVM authority: Vercel stores the public address and the retrievable production-only private key used by the treasury, token creator, registry owner, and curator. The application does not read the key. The dappnode curator receives the same key through a mode-0600 environment file only after registry deployment.
+Production EVM authority: Vercel stores the public address and the retrievable production-only private key reserved for treasury and future token-creation work. The application and dappnode curator do not read the key. Centralized curation requires no signing key and spends no chain gas.
 
 Production Solana treasury custody: Vercel stores only the public address. The independent private key is in the Mac login Keychain under service `unabot-solana-treasury`.
 
-Before the registry is configured, market allowlist changes fall back to `src/config/markets.json`. After deployment, Robinhood membership and weights come from `UnaIndexRegistry`; metadata for tracked candidates remains version-controlled so existing positions stay readable and withdrawable.
+Robinhood membership and weights come from `src/config/markets.json`. Metadata for tracked candidates remains version-controlled so existing positions stay readable and withdrawable.
 
-The persistent workflow is documented in `docs/CURATION.md`. `bun run curate:index` records evidence and replacement decisions. `bun run registry:sync` converts only policy-valid decisions into simulated or live registry calls.
+The persistent workflow is documented in `docs/CURATION.md`. `bun run curate:index` records evidence and replacement proposals; the curator agent applies valid changes to the catalog and ships the tested deployment. Registry tooling is deferred and is not part of the production workflow.
 
 ## Dry-run vs live
 

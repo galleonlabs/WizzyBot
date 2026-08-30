@@ -29,6 +29,7 @@
   --connect-hover-bg: #30303a;
   --coral-hover: #f45f76;
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Unbounded", "Arial Black", sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -133,10 +134,9 @@ svg {
   gap: 10px;
   min-height: 44px;
   font-family: var(--font-display);
-  font-size: 20px;
-  font-variation-settings: "opsz" 32, "wdth" 92;
-  font-weight: 720;
-  letter-spacing: -.045em;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -.075em;
 }
 
 .una-mark {
@@ -201,14 +201,13 @@ svg {
 .hero-stage { min-width: 0; }
 .hero-copy { min-width: 0; }
 .hero-copy h1 {
-  max-width: 7.5ch;
+  max-width: 8.2ch;
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(58px, 6.4vw, 88px);
-  font-variation-settings: "opsz" 80, "wdth" 96;
-  font-weight: 720;
-  line-height: .94;
-  letter-spacing: -.055em;
+  font-size: clamp(54px, 5.7vw, 78px);
+  font-weight: 700;
+  line-height: .98;
+  letter-spacing: -.07em;
 }
 
 .hero-copy > p {
@@ -260,8 +259,7 @@ svg {
 .empty-copy h3,
 .section-title h2 {
   font-family: var(--font-display);
-  font-variation-settings: "opsz" 48, "wdth" 94;
-  font-weight: 700;
+  font-weight: 650;
 }
 .index-title-row p,
 .position-ledger header p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }

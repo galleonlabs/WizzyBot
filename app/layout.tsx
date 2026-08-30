@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Plus_Jakarta_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans, Unbounded } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -10,7 +10,7 @@ const sans = Plus_Jakarta_Sans({
   display: "swap",
 });
 
-const display = Bricolage_Grotesque({
+const display = Unbounded({
   subsets: ["latin"],
   weight: "variable",
   variable: "--font-display",

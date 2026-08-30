@@ -35,8 +35,9 @@ describe("meme index product UI", () => {
   });
 
   it("pairs a characterful display face with a restrained trading UI", () => {
-    expect(layout).toContain("Bricolage_Grotesque");
+    expect(layout).toContain("Unbounded");
     expect(layout).toContain("Plus_Jakarta_Sans");
+    expect(layout).not.toContain("Bricolage_Grotesque");
     expect(layout).not.toContain("Instrument_Serif");
     expect(css).toContain("font-family: var(--font-display)");
     expect(css).toContain("--coral: #ff6f83");

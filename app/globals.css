@@ -555,19 +555,25 @@ svg {
 .skeleton-row i { display: block; width: 100%; height: 20px; border-radius: 6px; background: var(--surface-2); animation: breathe 1.3s ease-in-out infinite; }
 
 .portfolio-empty {
-  display: flex;
-  min-height: 136px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 0;
   align-items: center;
-  gap: 18px;
-  padding: 28px 4px;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
 }
-.empty-symbol { display: grid; flex: 0 0 auto; width: 46px; height: 46px; place-items: center; border-radius: 12px; background: var(--surface-2); color: var(--ink); }
-.empty-symbol svg { width: 22px; height: 22px; }
+.empty-symbol { display: grid; flex: 0 0 auto; width: 42px; height: 42px; place-items: center; border-radius: 11px; background: var(--surface-2); color: var(--ink); }
+.empty-symbol svg { width: 20px; height: 20px; }
+.empty-symbol img { display: block; width: 28px; height: 28px; object-fit: contain; }
 .empty-copy { display: grid; align-content: center; justify-items: start; min-width: 0; padding: 0; }
-.empty-copy h3 { max-width: 24ch; margin: 0; font-size: clamp(20px, 2.2vw, 27px); line-height: 1.1; letter-spacing: -.035em; text-wrap: balance; }
-.empty-copy p { max-width: 58ch; margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; text-wrap: pretty; }
-.empty-copy button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin-top: 16px; padding: 0 14px; border-radius: 10px; background: var(--coral); color: var(--coral-ink); font-size: 11px; font-weight: 800; }
-.empty-copy button:hover { background: var(--coral-hover); }
+.empty-copy h3 { max-width: 28ch; margin: 0; font-size: 17px; line-height: 1.2; letter-spacing: -.025em; text-wrap: balance; }
+.empty-copy p { max-width: 65ch; margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; text-wrap: pretty; }
+.empty-action { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; padding: 0 15px; border-radius: 10px; background: var(--coral); color: var(--coral-ink); font-size: 11px; font-weight: 800; transition: background 160ms ease, transform 120ms ease; }
+.empty-action:hover { background: var(--coral-hover); }
+.empty-action:active { transform: scale(.975); }
 .portfolio-empty.is-loading .empty-copy h3,
 .portfolio-empty.is-loading .empty-copy p,
 .portfolio-empty.is-loading .empty-symbol { animation: breathe 1.3s ease-in-out infinite; }
@@ -847,10 +853,11 @@ svg {
   .markets-view .index-title-row { display: grid; }
   .index-title-row h1 { font-size: clamp(36px, 11vw, 42px); }
   .index-title-row p { margin-top: 12px; font-size: 15px; }
-  .portfolio-empty { min-height: 0; padding-block: 22px; }
+  .portfolio-empty { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 17px; }
   .portfolio-empty .empty-symbol { display: none; }
-  .empty-copy h3 { font-size: 23px; }
-  .empty-copy p { margin-top: 9px; font-size: 15px; line-height: 1.5; }
+  .empty-copy h3 { font-size: 19px; }
+  .empty-copy p { margin-top: 6px; font-size: 13px; line-height: 1.5; }
+  .empty-action { width: 100%; min-height: 44px; }
   .index-section { margin-top: 34px; padding-top: 26px; }
   .section-title h2 { font-size: 21px; }
   .section-title p { font-size: 13px; }

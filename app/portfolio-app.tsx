@@ -51,10 +51,12 @@ type ViewTransitionDocument = Document & {
 };
 
 const INDEX_MARKET_COUNT = 6;
+const FOMO_URL = "https://fomo.family/r/makemememarkets";
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
   robinhood: "https://assets.relay.link/icons/4663/light.png",
   solana: "https://assets.relay.link/icons/792703809/light.png",
+  fomo: "https://fomo.family/favicon.svg",
   gecko: "https://www.geckoterminal.com/favicon.ico",
 } as const;
 
@@ -729,6 +731,7 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
                   <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
+                  <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a>
                 </span></td>
               </tr>;
             }) : null}
@@ -855,15 +858,15 @@ function PortfolioEmpty({ variant, onPrimary }: {
     : variant === "error"
       ? { title: "We couldn’t load your positions.", body: "Try again to read your wallet.", action: "Try again" }
     : variant === "empty"
-        ? { title: "No positions yet.", body: "Make markets to open positions across the Robinhood Wizzy Index.", action: "Make markets" }
+        ? { title: "Your markets will live here.", body: "Make markets once and Wizzy opens every index position your deposit supports.", action: "Make markets" }
         : { title: "Reading your positions.", body: "Your liquidity will appear here.", action: "" };
   return <section className={`portfolio-empty is-${variant}`} aria-live={variant === "loading" ? "polite" : undefined}>
-    <span className="empty-symbol"><WalletIcon /></span>
+    <span className="empty-symbol">{variant === "empty" ? <img src="/brand/wizzy-mascot-32.png" alt="" /> : <WalletIcon />}</span>
     <div className="empty-copy">
       <h3>{content.title}</h3>
       <p>{content.body}</p>
-      {onPrimary && content.action ? <button type="button" onClick={onPrimary}>{content.action}</button> : null}
     </div>
+    {onPrimary && content.action ? <button className="empty-action" type="button" onClick={onPrimary}>{content.action}</button> : null}
   </section>;
 }
 

@@ -45,7 +45,9 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain("https://www.geckoterminal.com/robinhood/pools");
     expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
-    expect(portfolio).not.toMatch(/fomo\.family|Trade on Fomo/i);
+    expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
+    expect(portfolio).toContain("Trade on Fomo");
+    expect(portfolio).toContain("Trade ${market.symbol}/WETH on Fomo");
     expect(portfolio).not.toContain("market-link-external");
     expect(portfolio).not.toMatch(/app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
@@ -62,6 +64,8 @@ describe("meme index product UI", () => {
     expect(css).toContain(".position-list article { grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(css).toContain(".portfolio-empty .empty-symbol { display: none; }");
     expect(css).toContain(".market-link-label { display: none; }");
+    expect(portfolio).toContain("Your markets will live here.");
+    expect(portfolio).toContain('className="empty-action"');
     expect(css).not.toContain('content: "Explore"');
   });
 
@@ -248,7 +252,7 @@ describe("meme index product UI", () => {
     expect(nextConfig).toContain(
       "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com https://assets.relay.link https://www.geckoterminal.com",
     );
-    expect(nextConfig).not.toContain("https://fomo.family");
+    expect(nextConfig).toContain("https://fomo.family");
     expect(nextConfig).not.toMatch(/avatars\.githubusercontent\.com/);
     expect(nextConfig).not.toContain("img-src *");
   });

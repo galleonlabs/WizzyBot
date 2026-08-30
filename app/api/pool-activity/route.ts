@@ -14,7 +14,7 @@ const getPoolActivity = unstable_cache(async (): Promise<PoolActivityPayload> =>
     console.error("[pool-activity] refresh failed", rpcErrorChain(error));
     return { state: "unavailable", items: [], asOfBlock: null, scannedBlocks: 0, rpcRequests: 2 };
   }
-}, ["wizzy-pool-activity-v1"], { revalidate: 60, tags: ["pool-activity"] });
+}, ["wizzy-pool-activity-v2"], { revalidate: 60, tags: ["pool-activity"] });
 
 export async function GET() {
   return NextResponse.json(await getPoolActivity(), {

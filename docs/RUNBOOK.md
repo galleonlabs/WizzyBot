@@ -21,7 +21,7 @@ A future token is a separate, manually authorized release governed by [Token and
 
 The public rail under the navigation is labelled **Pool activity**. It reports Uniswap V3 `Mint` and `Burn` events from only the active Robinhood pools in the current index; it does not imply that Wizzy vaults user funds.
 
-`GET /api/pool-activity` has a fixed two-request RPC budget per shared cache fill: one block-number read, then one `eth_getLogs` query covering every active pool and both event types over the most recent 2,400 blocks. Do not replace this with per-pool scans or transaction, receipt, or block-detail lookups. The server cache refreshes at most once per 60 seconds and can serve stale data for five minutes. Browsers poll at most once per minute, pause while the tab is hidden, retain the last good result during a transient failure, and never contact the RPC directly.
+`GET /api/pool-activity` has a fixed two-request RPC budget per shared cache fill: one block-number read, then one `eth_getLogs` query covering every active pool and both event types over the most recent 1,000 blocks. Do not replace this with per-pool scans or transaction, receipt, or block-detail lookups. The server cache refreshes at most once per 60 seconds and can serve stale data for five minutes. Browsers poll at most once per minute, pause while the tab is hidden, retain the last good result during a transient failure, and never contact the RPC directly.
 
 ## Install
 

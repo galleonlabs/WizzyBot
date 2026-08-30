@@ -40,7 +40,7 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("More with a larger deposit");
     expect(portfolio).toContain('name="depositAmount"');
     expect(portfolio).toContain("ETH on another chain?");
-    expect(portfolio).toContain("Privy moves it to Robinhood.");
+    expect(portfolio).toContain("Bridge to your Wizzy account.");
     expect(portfolio).toContain("useAddFunds");
     expect(portfolio).toContain('chain: "eip155:4663"');
     expect(portfolio).not.toContain('name="sourceChain"');
@@ -320,6 +320,7 @@ describe("meme index product UI", () => {
     expect(css).toContain("@keyframes pool-activity-scroll");
     expect(css).toContain('.pool-activity-group[aria-hidden="true"]');
     expect(poolActivitySource).toContain('activeMarkets("robinhood")');
+    expect(poolActivitySource).toContain("const BLOCK_WINDOW = 1_000n");
     expect(poolActivitySource).toContain("events: [V3_MINT_EVENT, V3_BURN_EVENT]");
     expect(poolActivitySource).toContain("address: markets.map((market) => market.pool)");
     expect(poolActivitySource).toContain("rpcRequests: 2");

@@ -827,7 +827,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
       </label>
 
       <div className="funding-choice">
-        <span><b>ETH on another chain?</b><small>Privy moves it to Robinhood.</small></span>
+        <span><b>ETH on another chain?</b><small>Bridge to your Wizzy account.</small></span>
         <button className="cross-chain-fund" type="button" disabled={!ready || fundingState.kind === "planning"} onClick={onFund}>
           <EthereumIcon />{fundingState.kind === "planning" ? "Opening Privy…" : "Add ETH"}
         </button>

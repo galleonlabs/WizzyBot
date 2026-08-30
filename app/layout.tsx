@@ -3,6 +3,8 @@ import { Plus_Jakarta_Sans, Unbounded } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
+const themeBootScript = `(()=>{try{const theme=localStorage.getItem("una-theme");if(theme==="light"||theme==="dark"){document.documentElement.dataset.theme=theme;const meta=document.createElement("meta");meta.name="theme-color";meta.id="una-theme-color";meta.content=theme==="dark"?"#09090d":"#f8f5ef";document.head.appendChild(meta)}}catch{}})()`;
+
 const sans = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
@@ -46,7 +48,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeBootScript }} /></head>
       <body className={`${sans.variable} ${display.variable} ${sans.className}`}>
         <Providers>{children}</Providers>
       </body>

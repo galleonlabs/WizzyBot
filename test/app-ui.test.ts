@@ -47,6 +47,9 @@ describe("meme index product UI", () => {
     expect(css).toContain("--canvas: #09090d");
     expect(css).toContain("--surface: #111116");
     expect(css).toContain("@media (prefers-color-scheme: dark)");
+    expect(css).toContain(':root[data-theme="dark"]');
+    expect(layout).toContain('localStorage.getItem("una-theme")');
+    expect(portfolio).toContain('Theme: ${capitalize(theme)}');
     expect(css).not.toMatch(/#FC72FF|#FF37C7|#ff007a/i);
     expect(css).not.toContain("Instrument Serif");
     expect(css).not.toMatch(/gradient/i);
@@ -65,6 +68,13 @@ describe("meme index product UI", () => {
     expect(mascot).not.toContain('rx="9" ry="13"');
   });
 
+  it("keeps Una round and tiny-limbed with an oversized playful staff", () => {
+    expect(mascot).toContain("tiny hands and feet");
+    expect(mascot).toContain("M89 207c-5 5-8 14-3 18");
+    expect(mascot).toContain("m220 14 18 22-19 23-16-24 17-21Z");
+    expect(mascot).not.toContain("M76 203c-11 8-20 22");
+  });
+
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {
     expect(portfolio).toContain("Robinhood Una Index");
     expect(portfolio).toContain("Una agents regularly review which markets qualify.");
@@ -74,6 +84,8 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Self-custodial");
     expect(portfolio).toContain("Two wallet approvals: deposit from");
     expect(portfolio).toContain('useState("1.00")');
+    expect(portfolio).toContain('loading ? "Reading markets"');
+    expect(portfolio).not.toContain("loading ? INDEX_MARKET_COUNT : constituentCount");
     expect(portfolio).toContain("Ready to collect");
     expect(portfolio).not.toContain("Your liquidity and the index, in one place.");
     expect(portfolio).not.toContain("Deposit ETH. Earn trading fees across Base, Robinhood, and Solana.");

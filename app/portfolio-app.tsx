@@ -29,6 +29,7 @@ import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { relaySucceeded, sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
 
 type ViewTab = "overview" | "markets";
+type ThemePreference = "system" | "light" | "dark";
 type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" | "submitted" | "error"; message?: string };
 type AnyPositionActionPlan = PositionActionPlan | SolanaPositionActionPlan;
 type IndexChain = ChainSlug | "solana";
@@ -82,6 +83,7 @@ export function PortfolioApp() {
   const { ready: solanaReady, wallets: solanaWallets } = useSolanaWallets();
   const { signTransaction } = useSignTransaction();
   const [tab, setTab] = useState<ViewTab>("overview");
+  const [theme, setTheme] = useState<ThemePreference>("system");
   const [amount, setAmount] = useState("1.00");
   const [sourceChainId, setSourceChainId] = useState(8453);
   const [markets, setMarkets] = useState<MarketsPayload>(EMPTY_MARKETS);
@@ -138,6 +140,11 @@ export function PortfolioApp() {
   }, [address, authenticated, solanaAddress, solanaReady]);
 
   useEffect(() => {
+    const saved = document.documentElement.dataset.theme;
+    if (saved === "light" || saved === "dark") setTheme(saved);
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("view");
     if (requested === "markets" || requested === "positions") setTab("markets");
@@ -190,6 +197,27 @@ export function PortfolioApp() {
     if (next === "overview") url.searchParams.delete("view");
     else url.searchParams.set("view", next);
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
+
+  function cycleTheme() {
+    const next: ThemePreference = theme === "system" ? "light" : theme === "light" ? "dark" : "system";
+    setTheme(next);
+    if (next === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = next;
+    try {
+      if (next === "system") window.localStorage.removeItem("una-theme");
+      else window.localStorage.setItem("una-theme", next);
+    } catch {
+      // The selected theme still applies for this session when storage is unavailable.
+    }
+    const existingMeta = document.getElementById("una-theme-color");
+    if (next === "system") existingMeta?.remove();
+    else {
+      const meta = existingMeta ?? document.head.appendChild(document.createElement("meta"));
+      meta.id = "una-theme-color";
+      meta.setAttribute("name", "theme-color");
+      meta.setAttribute("content", next === "dark" ? "#09090d" : "#f8f5ef");
+    }
   }
 
   async function prepareIndex() {
@@ -336,8 +364,8 @@ export function PortfolioApp() {
       <header className="index-nav">
         <button className="una-wordmark" type="button" onClick={() => changeTab("overview")} aria-label="Una overview">
           <picture className="una-mark" aria-hidden="true">
-            <source media="(prefers-color-scheme: dark)" srcSet="/brand/una-mascot-dark.svg" />
-            <img src="/brand/una-mascot-light.svg" alt="" />
+            {theme === "system" ? <source media="(prefers-color-scheme: dark)" srcSet="/brand/una-mascot-dark.svg" /> : null}
+            <img src={theme === "dark" ? "/brand/una-mascot-dark.svg" : "/brand/una-mascot-light.svg"} alt="" />
           </picture>
           <span>Una</span>
         </button>
@@ -347,6 +375,9 @@ export function PortfolioApp() {
           ))}
         </nav>
         <div className="nav-actions">
+          <button className="theme-button" type="button" onClick={cycleTheme} aria-label={`Theme: ${capitalize(theme)}. Switch to ${theme === "system" ? "light" : theme === "light" ? "dark" : "system"}.`} title={`Theme: ${capitalize(theme)}`}>
+            <ThemeIcon preference={theme} />
+          </button>
           {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
             <button className="wallet-button" type="button" onClick={() => void logout()} title="Sign out">
               <WalletIcon /> {short(address ?? "Wallet")}
@@ -471,7 +502,7 @@ function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingC
           <span className="market-stack" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
             {loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />) : markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />)}
           </span>
-          <span><b>{loading ? INDEX_MARKET_COUNT : constituentCount} markets</b><small>{constituentCount >= maximumConstituents ? "Full index" : "More with a larger deposit"}</small></span>
+          <span><b>{loading ? "Reading markets" : `${constituentCount} markets`}</b><small>{loading ? "Current index" : constituentCount >= maximumConstituents ? "Full index" : "More with a larger deposit"}</small></span>
         </span>
         <span className="action-economics"><small>24h fee APR</small><b>{formatFeeApr(feeApr)}</b></span>
       </div>
@@ -756,6 +787,16 @@ function trimEth(value: bigint): string {
 
 function short(value: string): string {
   return value.startsWith("0x") && value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
+}
+
+function capitalize(value: string): string {
+  return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
+}
+
+function ThemeIcon({ preference }: { preference: ThemePreference }) {
+  if (preference === "light") return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>;
+  if (preference === "dark") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z" /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2.5" /><path d="M8 21h8M12 17v4M12 4v13" /></svg>;
 }
 
 function TokenIcon({ symbol, src, color }: { symbol: string; src?: string | null; color?: string }) {

@@ -33,7 +33,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     color-scheme: dark;
     --ink: #f7f3ed;
     --ink-soft: #cbc6ca;
@@ -62,6 +62,36 @@
     --connect-hover-bg: #fff;
     --coral-hover: #ff8394;
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #f7f3ed;
+  --ink-soft: #cbc6ca;
+  --muted: #98939d;
+  --muted-2: #8a8690;
+  --canvas: #09090d;
+  --surface: #111116;
+  --surface-2: #17171e;
+  --surface-3: #202029;
+  --line: rgba(255, 255, 255, .08);
+  --line-strong: rgba(255, 255, 255, .14);
+  --mint: #77e8c9;
+  --blue: #78a3ff;
+  --green: #5ee8aa;
+  --orange: #ff936d;
+  --nav-bg: rgba(9, 9, 13, .94);
+  --selection-bg: rgba(255, 111, 131, .3);
+  --preview-bg: rgba(120, 163, 255, .12);
+  --preview-ink: #a9c3ff;
+  --card-shadow: none;
+  --token-shadow: none;
+  --row-hover: rgba(255, 255, 255, .018);
+  --empty-tint: rgba(255, 111, 131, .035);
+  --connect-bg: #f7f3ed;
+  --connect-ink: #141318;
+  --connect-hover-bg: #fff;
+  --coral-hover: #ff8394;
 }
 
 * { box-sizing: border-box; }
@@ -161,7 +191,20 @@ svg {
 .index-nav nav button.is-active { color: var(--ink); }
 .index-nav nav button.is-active { box-shadow: inset 0 -2px var(--coral); }
 
-.nav-actions { display: flex; align-items: center; }
+.nav-actions { display: flex; align-items: center; gap: 4px; }
+
+.theme-button {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--muted);
+}
+
+.theme-button:hover { background: var(--surface-2); color: var(--ink); }
+.theme-button svg { width: 19px; height: 19px; }
 
 .wallet-button,
 .wallet-skeleton {

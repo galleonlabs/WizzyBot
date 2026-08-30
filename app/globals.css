@@ -364,7 +364,7 @@ svg {
 
 .index-showcase { margin-top: 42px; }
 .network-lockup { display: flex; width: min(420px, 100%); min-width: 0; align-items: center; gap: 12px; margin-bottom: 22px; }
-.network-lockup > img { display: block; width: 42px; height: 42px; flex: 0 0 42px; padding: 8px; border-radius: 12px; background: #fff; object-fit: contain; }
+.network-lockup > img { display: block; width: 42px; height: 42px; flex: 0 0 42px; border-radius: 10px; object-fit: contain; }
 .network-name { display: grid; min-width: 0; gap: 2px; }
 .network-name small { color: var(--muted); font-size: 9px; font-weight: 700; }
 .network-name b { color: var(--ink); font-size: 14px; letter-spacing: -.02em; white-space: nowrap; }
@@ -770,7 +770,7 @@ svg {
   .hero-copy > p { max-width: 34ch; margin-top: 17px; font-size: 16px; line-height: 1.5; }
   .index-showcase { margin-top: 28px; }
   .network-lockup { gap: 10px; margin-bottom: 20px; }
-  .network-lockup > img { width: 46px; height: 46px; flex-basis: 46px; padding: 8px; border-radius: 13px; }
+  .network-lockup > img { width: 46px; height: 46px; flex-basis: 46px; border-radius: 11px; }
   .network-name small { font-size: 11px; }
   .network-name b { font-size: 14px; }
   .hero-token-field { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; width: 100%; max-width: 380px; min-height: 48px; padding: 0; }

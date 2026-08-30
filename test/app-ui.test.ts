@@ -26,7 +26,7 @@ describe("meme index product UI", () => {
     expect(page).toContain("PortfolioApp");
     expect(portfolio).toContain("Make Meme Markets");
     expect(portfolio).toContain("Deposit ETH into a curated index of meme markets and earn.");
-    expect(portfolio).toContain("Updated and managed by agents on Robinhood Chain.");
+    expect(portfolio).toContain("Updated and managed by agents.");
     expect(portfolio).toContain("Make markets");
     expect(portfolio).toContain("Fee APR");
     expect(portfolio).toContain("Based on 24h fees");

@@ -520,7 +520,7 @@ export function PortfolioApp() {
                 <div className="hero-stage">
                   <div className="hero-copy">
                     <h1>Make Meme Markets</h1>
-                    <p>Deposit ETH into a curated index of meme markets and earn.<br /><span>Updated and managed by agents on Robinhood Chain.</span></p>
+                    <p>Deposit ETH into a curated index of meme markets and earn.<br /><span>Updated and managed by agents.</span></p>
                   </div>
                   <IndexShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
                 </div>

@@ -7,6 +7,8 @@ const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
 const providers = readFileSync("app/providers.tsx", "utf8");
 const mascot = readFileSync("public/brand/wizzy-mascot.svg", "utf8");
+const socialSource = readFileSync("public/brand/wizzy-social.svg", "utf8");
+const socialRenderer = readFileSync("scripts/render-social-card.mjs", "utf8");
 const socialCard = readFileSync("app/opengraph-image.png");
 const openGraphAlt = readFileSync("app/opengraph-image.alt.txt", "utf8").trim();
 const twitterAlt = readFileSync("app/twitter-image.alt.txt", "utf8").trim();
@@ -158,6 +160,10 @@ describe("meme index product UI", () => {
     expect(socialCard.byteLength).toBeLessThan(5 * 1024 * 1024);
     expect(openGraphAlt).toMatch(/Wizzy mascot.+Make Meme Markets.+earn trading fees/);
     expect(twitterAlt).toBe(openGraphAlt);
+    expect(socialSource).toContain('font-family="Unbounded, sans-serif"');
+    expect(socialSource).toContain('font-family="Plus Jakarta Sans, Arial, sans-serif"');
+    expect(socialRenderer).toContain('"assets", "fonts"');
+    expect(socialRenderer).toContain("process.env.FONTCONFIG_FILE");
   });
 
   it("offers wallet-first login and provisions EVM and Solana wallets for every user", () => {

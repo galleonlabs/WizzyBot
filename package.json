@@ -27,6 +27,7 @@
     "ci": "bash scripts/ci.sh",
     "dev": "next dev",
     "build:web": "node scripts/bundle-hosted.mjs && next build",
+    "social:render": "node scripts/render-social-card.mjs",
     "build:eve": "node scripts/bundle-hosted.mjs && eve build",
     "eve:dev": "node scripts/bundle-hosted.mjs && eve dev",
     "eve:deploy": "eve deploy --project unabot",

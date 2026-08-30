@@ -169,7 +169,7 @@ svg {
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 700;
-  letter-spacing: -.075em;
+  letter-spacing: -.04em;
 }
 
 .wizzy-mark {
@@ -253,7 +253,7 @@ svg {
   font-size: clamp(54px, 5.7vw, 78px);
   font-weight: 700;
   line-height: .98;
-  letter-spacing: -.07em;
+  letter-spacing: -.04em;
 }
 
 .hero-copy > p {
@@ -574,8 +574,8 @@ svg {
 
 @media (max-width: 640px) {
   .index-nav { padding-inline: 12px; }
-  .wizzy-wordmark { font-size: 18px; }
-  .wizzy-wordmark > span:last-child { display: none; }
+  .wizzy-wordmark { gap: 6px; font-size: 15px; }
+  .wizzy-mark { width: 30px; height: 30px; }
   .index-nav nav button { padding-inline: 9px; font-size: 13px; }
   .wallet-button { min-width: 0; }
   .wallet-button svg { display: none; }

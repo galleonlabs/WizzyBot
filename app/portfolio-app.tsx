@@ -9,6 +9,7 @@ import {
 } from "@privy-io/react-auth/solana";
 import { formatEther, parseEther } from "viem";
 import { lightRowToView, priceLabel, type PositionView } from "./lib/cards";
+import { positionValueUsd, summarizePositions } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
 import {
   type CuratedMarket,
@@ -38,7 +39,7 @@ type IndexMarket = {
 };
 
 const INDEX_MARKET_COUNT = 6;
-const FOMO_URL = "https://fomo.family/r/andrewwilkinson";
+const FOMO_URL = "https://fomo.family/";
 const GECKO_URL = "https://www.geckoterminal.com/robinhood/pools";
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
@@ -81,7 +82,7 @@ export function PortfolioApp() {
   const { ready: solanaReady, wallets: solanaWallets } = useSolanaWallets();
   const { signTransaction } = useSignTransaction();
   const [tab, setTab] = useState<ViewTab>("overview");
-  const [amount, setAmount] = useState("1");
+  const [amount, setAmount] = useState("1.00");
   const [sourceChainId, setSourceChainId] = useState(8453);
   const [markets, setMarkets] = useState<MarketsPayload>(EMPTY_MARKETS);
   const [marketsState, setMarketsState] = useState<"loading" | "ready" | "error">("loading");
@@ -334,7 +335,10 @@ export function PortfolioApp() {
     <main className="index-app">
       <header className="index-nav">
         <button className="una-wordmark" type="button" onClick={() => changeTab("overview")} aria-label="Una overview">
-          <span className="una-mark" aria-hidden="true"><i /><b /></span>
+          <picture className="una-mark" aria-hidden="true">
+            <source media="(prefers-color-scheme: dark)" srcSet="/brand/una-mascot-dark.svg" />
+            <img src="/brand/una-mascot-light.svg" alt="" />
+          </picture>
           <span>Una</span>
         </button>
         <nav aria-label="Primary navigation">
@@ -360,8 +364,8 @@ export function PortfolioApp() {
             <section className="index-hero">
                 <div className="hero-stage">
                   <div className="hero-copy">
-                    <h1>Be the market maker.</h1>
-                    <p>Deposit ETH. Una puts it to work across six meme markets on Robinhood Chain.</p>
+                    <h1>Make Meme Markets</h1>
+                    <p>Deposit ETH into a curated index of meme markets, starting with Robinhood Chain.</p>
                   </div>
                   <IndexShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
                 </div>
@@ -388,13 +392,13 @@ export function PortfolioApp() {
           ) : (
             <section className="index-main markets-view">
               <header className="index-title-row">
-                <div><h1>Una meme index on Robinhood Chain</h1><p>{positions.length ? `${positions.length} wallet position${positions.length === 1 ? "" : "s"}, plus every index market.` : "Your liquidity and the index, in one place."}</p></div>
+                <div><h1>Robinhood Una Index</h1><p>{positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Una agents regularly review which markets qualify."}</p></div>
                 <ReferenceLinks />
               </header>
               {positionLedger}
               <section className="index-section">
                 <header className="section-title">
-                  <div><h2>Inside the index</h2><p>{activeMarkets.length || INDEX_MARKET_COUNT} Robinhood markets, chosen for liquidity, age, and trading activity.</p></div>
+                  <div><h2>Inside the index</h2><p>Actively curated as meme markets change.</p></div>
                   <span>v{markets.catalog.version}</span>
                 </header>
                 <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} policy={markets.index} />
@@ -407,7 +411,7 @@ export function PortfolioApp() {
 }
 
 function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {
-  return <div className="index-showcase" aria-label="Una meme index on Robinhood Chain">
+  return <div className="index-showcase" aria-label="Robinhood Una Index">
     <div className={`hero-token-field ${loading ? "is-loading" : ""}`}>
       {(loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
         <span className="hero-token" key={market.id} style={{ "--token-index": index } as CSSProperties}>
@@ -419,7 +423,6 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
     <div className="brand-rail" aria-label="Network and venue">
       <BrandLogo brand="robinhood" label="Robinhood" />
       <BrandLogo brand="uniswap" label="Uniswap" />
-      <span className="index-count">{markets.length || INDEX_MARKET_COUNT} markets</span>
     </div>
     <ReferenceLinks compact />
   </div>;
@@ -576,14 +579,14 @@ function PositionLedger({ authenticated, positions, state, stats, markets, onLog
       {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" markets={markets} stats={stats} onPrimary={onStart} /> : null}
       {showPositions ? <section className="portfolio-summary" aria-label="Portfolio summary">
         <div><span>Position value</span><strong>{summary.priced ? money(summary.valueUsd) : "—"}</strong><small>{summary.priced} of {positions.length} priced</small></div>
-        <div><span>Fees ready</span><strong>{summary.feesPriced ? money(summary.feesUsd) : "—"}</strong><small>Unclaimed across priced positions</small></div>
+        <div><span>Ready to collect</span><strong>{summary.feesPriced ? money(summary.feesUsd) : "—"}</strong><small>Unclaimed fees</small></div>
         <div><span>Earning now</span><strong>{summary.earning}</strong><small>of {positions.length} positions in range</small></div>
         <div><span>Fee APR</span><strong>{formatFeeAprFraction(summary.feeApr)}</strong><small>Across priced positions</small></div>
       </section> : null}
       {showPositions ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
         <span className="position-pair"><TokenIcon symbol={position.symbol0} src={position.marketId ? stats.get(position.marketId)?.tokenImageUrl : undefined} /><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
-        <span><small>Value</small><b>{position.lpUsd === undefined ? "—" : money(position.lpUsd)}</b></span>
-        <span><small>Fees</small><b>{position.feesUsd === undefined ? "—" : money(position.feesUsd)}</b></span>
+        <span><small>Position value</small><b>{positionValueUsd(position) === undefined ? "—" : money(positionValueUsd(position)!)}</b></span>
+        <span><small>Ready to collect</small><b>{position.feesUsd === undefined ? "—" : money(position.feesUsd)}</b></span>
         <span><small>Fee APR</small><b>{formatFeeAprFraction(position.feeApr ?? null)}</b></span>
         <PositionRange position={position} />
         <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed || !position.inRange} title={!position.inRange ? "Rebalancing is required before compounding" : undefined}>Compound</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>Withdraw</button></span>
@@ -611,9 +614,9 @@ function PortfolioEmpty({ variant, markets, stats, onPrimary }: {
       <p>{content.body}</p>
       {onPrimary && content.action ? <button type="button" onClick={onPrimary}>{content.action}<ArrowIcon /></button> : null}
     </div>
-    <div className="empty-route" aria-label={`${markets.length || INDEX_MARKET_COUNT} Robinhood markets`}>
+    <div className="empty-route" aria-label="Robinhood Una Index">
       <span className="route-source"><WalletIcon /><small>Wallet</small></span>
-      <span className="route-line"><i /><small>{markets.length || INDEX_MARKET_COUNT} markets</small></span>
+      <span className="route-line"><i /><small>Curated index</small></span>
       <span className="route-destination">
         <span className="market-stack">
           {markets.length ? markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />) : Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />)}
@@ -639,21 +642,6 @@ function PositionRange({ position }: { position: PositionView }) {
     <span className="range-track"><i /><b /></span>
     <span className="range-prices"><small>{priceLabel(position.priceMin)}</small><strong>{priceLabel(position.price)}</strong><small>{priceLabel(position.priceMax, position.priceMax === null)}</small></span>
   </span>;
-}
-
-function summarizePositions(positions: PositionView[]) {
-  const priced = positions.filter((position) => position.lpUsd !== undefined);
-  const feesPriced = positions.filter((position) => position.feesUsd !== undefined);
-  const aprPositions = positions.filter((position) => position.feeApr !== undefined);
-  const aprWeight = aprPositions.reduce((sum, position) => sum + (position.lpUsd ?? 1), 0);
-  return {
-    priced: priced.length,
-    valueUsd: priced.reduce((sum, position) => sum + position.lpUsd!, 0),
-    feesPriced: feesPriced.length,
-    feesUsd: feesPriced.reduce((sum, position) => sum + position.feesUsd!, 0),
-    earning: positions.filter((position) => position.status === "in-range").length,
-    feeApr: aprWeight ? aprPositions.reduce((sum, position) => sum + position.feeApr! * (position.lpUsd ?? 1), 0) / aprWeight : null,
-  };
 }
 
 function weightedFeeApr(markets: IndexMarket[], stats: Map<string, MarketStats>): number | null {

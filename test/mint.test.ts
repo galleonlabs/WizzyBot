@@ -38,7 +38,7 @@ describe("mint planning", () => {
     expect(receipt.actions.map((a) => a.kind)).toEqual(expect.arrayContaining(["approve", "mint"]));
     expect(receipt.txs.some((t) => t.to === ADDRESSES.nfpm)).toBe(true);
     expect(receipt.txs.every((t) => t.data !== "0x")).toBe(true);
-    expect(TREASURY).toBe("0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD");
+    expect(TREASURY).toBe("0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42");
   });
 
   it("plans a single-sided mint from amount1 only", () => {

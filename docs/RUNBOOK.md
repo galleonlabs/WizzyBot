@@ -104,6 +104,8 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 | `UNISWAP_API_KEY` | Optional. Write paths use Uniswap LP + Trading APIs when set. Never commit. |
 | `UNABOT_PRIVATE_KEY` | CLI `--live` signer. `0x` + 32-byte hex. Never commit. Hosted agent does **not** use this. |
 | `UNABOT_TREASURY` | Optional override. Product fees go here. |
+| `UNA_TREASURY_PRIVATE_KEY` | Retrievable production custody backup for the Una EVM treasury and future token-creation wallet. The app does not read it. Never expose it to client code or logs. |
+| `UNA_TOKEN_CREATOR_ADDRESS` | Public address reserved for a future Una token launch. |
 | `UNABOT_SOLANA_TREASURY` | Public Solana fee recipient. Required to prepare Solana withdraw and reinvest actions. |
 | `UNABOT_ETH_USD` | Optional USD/ETH fallback for skip math. |
 | `TELEGRAM_BOT_TOKEN` | Telegram surface. Never commit. |
@@ -117,7 +119,9 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 
 Never log env values.
 
-Production Solana treasury custody: Vercel stores only the public address. The independent private key is in the Mac login Keychain under service `unabot-solana-treasury`, account `andrewwilkinson`.
+Production EVM treasury custody: Vercel stores the public address and a retrievable production-only private-key backup. Access is limited to Vercel project administrators; the application does not read the key. Rotate to a hardware-backed multisig before the wallet holds material value.
+
+Production Solana treasury custody: Vercel stores only the public address. The independent private key is in the Mac login Keychain under service `unabot-solana-treasury`.
 
 Market allowlist changes ship through `src/config/markets.json` and `src/config/solana-markets.json`. Never delete an entry that may still have open positions. Mark it `paused` or `watch` so wallet positions remain discoverable and withdrawable; only `active` entries receive new liquidity.
 

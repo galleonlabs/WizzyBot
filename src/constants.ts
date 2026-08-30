@@ -13,7 +13,7 @@ export const TRADE_API_URL = "https://trade-api.gateway.uniswap.org/v1";
 
 /** All product fees. Do not change without an explicit treasury rotation. */
 export const TREASURY: Address = getAddress(
-  "0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD",
+  "0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42",
 );
 
 export const ADDRESSES = {

@@ -79,14 +79,14 @@ ACP is how a tokenized UnaBot would sell work (range advice, keeper-as-a-service
 
 Goal: if/when UnaBot is tokenized, creator-fee 70% lands in the product treasury, not in a personal hot wallet.
 
-Treasury (product constant): 0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD
+Treasury (product constant): 0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42
 
 Concrete steps (Launchpad + FAQ; no invented URLs):
 
 1. Decide the launch is a later step. Do not put a token address in this repo until it exists on-chain.
-2. Use a treasury-controlled wallet at https://app.virtuals.io — the same 0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD (or a dedicated launch signer whose Fee Delegation identity is that address).
+2. Use a treasury-controlled wallet at https://app.virtuals.io — the same 0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42 (or a dedicated launch signer whose Fee Delegation identity is that address).
 3. Create the agent. Toggle only the modules the launch brief names. Default recommendation: no Capital Formation module (avoids the 10 VIRTUAL fee and the 25% team-stack / staged-sell machinery) unless fundraising is the point.
-4. If someone other than treasury clicks Launch, use Fee Delegation: launcher identifies the builder by wallet 0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD. The 70% creator share accrues to that identity; the launcher cannot claim it. Treasury then verifies the linked profile and claims.
+4. If someone other than treasury clicks Launch, use Fee Delegation: launcher identifies the builder by wallet 0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42. The 70% creator share accrues to that identity; the launcher cannot claim it. Treasury then verifies the linked profile and claims.
 5. Publish. Trading opens on the VIRTUAL bonding curve. Do not pre-announce a CA before the tx confirms.
 6. Watch the curve through 42,000 VIRTUAL. On graduation, confirm the Uniswap v2 pair and that LP is locked/staked (FAQ: staked LP is transferred back to the creator wallet but cannot be withdrawn for 10 years).
 7. Confirm Tax Manager (0x7e26173192d72fd6d75a759f888d61c2cdbb64b1) is routing the 70% leg to treasury via the Tax Checker dashboard.
@@ -100,4 +100,3 @@ Do not point a Virtuals creator field at an EOA that also holds user LP NFTs.
 - Confirm VIRTUAL token address from an official Virtuals deployments page at launch time.
 - Confirm claim asset (VIRTUAL vs USDC) against the Tax Checker the week of launch.
 - Older 30/20/50 split is still on the IAO page — screenshot the Capital Formation 70/30 line into the launch folder when we execute.
-

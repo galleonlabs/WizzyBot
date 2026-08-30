@@ -88,7 +88,7 @@ Two generations exist. Do not mix them up.
 1. **Legacy API-key fee.** A static take configured on the key by Uniswap Labs, always from the output token. Requires a Labs contact. Quoted input/output amounts do **not** include the take; inspect `portionBips` / `portionAmount`.
 2. **Per-request integrator fee (live 17 Mar 2026).** `/quote` accepts an `integratorFee` (changelog) / `integratorFees[]` (OpenAPI) object: `bips` in (0, 500] and a 0x recipient. The fee is encoded into `/swap` calldata. Fractional bips (two decimals) need `x-universal-router-version: 2.1.1`. Only one fee entry is supported. Labs recommends moving off the key-static fee.
 
-**UnaBot product decision:** no extra swap take. Rebalance swaps pay the pool fee only. If a later version adds an integrator fee, send it to treasury `0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD` and never exceed 500 bips.
+**UnaBot product decision:** no extra swap take. Rebalance swaps pay the pool fee only. If a later version adds an integrator fee, send it to treasury `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42` and never exceed 500 bips.
 
 ## 3. LP API endpoints
 

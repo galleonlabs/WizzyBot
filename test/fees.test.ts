@@ -54,7 +54,7 @@ describe("2% fee-to-treasury math", () => {
       token1,
     });
     expect(fee.recipient).toBe(TREASURY);
-    expect(fee.recipient).toBe("0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD");
+    expect(fee.recipient).toBe("0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42");
     expect(fee.bps).toBe(200);
     expect(fee.amount0).toBe(200n);
     expect(fee.skipped).toBe(false);
@@ -111,11 +111,11 @@ describe("2% fee-to-treasury math", () => {
     expect(fee.bps).toBe(200);
     expect(fee.amount0).toBe(200n);
     expect(fee.amount1).toBe(100n);
-    expect(fee.recipient).toBe("0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD");
+    expect(fee.recipient).toBe("0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42");
   });
 
   it("labels the recipient as TREASURY without org branding", () => {
-    expect(TREASURY).toBe("0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD");
+    expect(TREASURY).toBe("0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42");
     expect(`${TREASURY} treasury`).not.toMatch(/galleon/i);
   });
 

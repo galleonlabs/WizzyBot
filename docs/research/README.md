@@ -21,7 +21,7 @@ Durable SME notes for UnaBot. Written 29 Aug 2026 (Europe/London). Product knowl
 - v2, v3, and v4. You keep the position.
 - Compound, re-range, exit.
 - Chain: Base `8453`
-- Treasury: `0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD`
+- Treasury: `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`
 - No vault custody. No Revert Lend. No Aerodrome.
 - Dry-run is the default. `--live` is the only broadcast path.
 

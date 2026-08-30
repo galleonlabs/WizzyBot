@@ -1,8 +1,8 @@
 # Una
 
-The one-click market maker for memes.
+Make Meme Markets.
 
-Deposit ETH. Una opens the reviewed Robinhood Chain meme index. You own every position.
+Deposit ETH into the actively curated Robinhood Una Index. You own every position.
 
 - One amount. No pool, range, bridge, or allocation builder.
 - Privy creates the self-custodial wallet under one login.
@@ -10,4 +10,4 @@ Deposit ETH. Una opens the reviewed Robinhood Chain meme index. You own every po
 - Pool fees, position value, range health, reinvestment, and withdrawals stay visible in one portfolio.
 - The dappnode curator checks the index and its candidate bench every six hours. Market changes stay code-reviewed.
 
-[Production runbook](docs/RUNBOOK.md)
+[Production runbook](docs/RUNBOOK.md) · [Token and index flywheel](docs/TOKEN_FLYWHEEL.md)

@@ -15,7 +15,7 @@ Not a trading desk, not an Aerodrome yield vault, not a bot that silent-signs fr
 - Writes go through the official Uniswap LP API (https://liquidity.api.uniswap.org) when an API key is present, or through SDK + viem calldata when it is not. Swaps (rebalance legs only) use https://trade-api.gateway.uniswap.org/v1.
 - Default is **dry-run**. --live broadcasts and requires typing yes.
 
-Treasury (all product fees): 0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD (TREASURY in src/constants.ts). Optional override: UNABOT_TREASURY.
+Treasury (all product fees): 0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42 (TREASURY in src/constants.ts). Optional override: UNABOT_TREASURY.
 
 ## 3. What it is not
 
@@ -100,7 +100,7 @@ Without an API key the agent still does full read / PnL / dry-run and builds cal
 7. No Aerodrome / Lend path. v4 hooks and gauge-transform flows are how the NFT still exists but the value is gone happens. Review hooks before entering a hooked pool.
 8. Fee-on-transfer / rebase tokens are unsupported (Revert states this; we inherit it).
 9. API key stays off the client. A leaked key cannot steal the position; it can burn rate limit or, if we ever set integratorFee, redirect a swap take. Do not put the key in a browser skill.
-10. Treasury is a fee sink, not a custodian. Users should never send the position or principal to 0xC141Cbe4f4a9CAbc3cc78159a9268a4e008922CD.
+10. Treasury is a fee sink, not a custodian. Users should never send the position or principal to 0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42.
 
 ### Residual risk (accepted)
 

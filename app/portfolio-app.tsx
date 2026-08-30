@@ -9,7 +9,7 @@ import {
 } from "@privy-io/react-auth/solana";
 import { formatEther, parseEther } from "viem";
 import { lightRowToView, priceLabel, type PositionView } from "./lib/cards";
-import { positionValueUsd, summarizePositions } from "./lib/portfolio-summary";
+import { positionFeesEth, positionValueEth, positionValueUsd, summarizePositions } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
 import {
   type CuratedMarket,
@@ -942,6 +942,8 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
   onCancelMigration: () => void;
 }) {
   const summary = summarizePositions(positions);
+  const summaryValueEth = positions.reduce((total, position) => total + (positionValueEth(position) ?? 0), 0);
+  const summaryFeesEth = positions.reduce((total, position) => total + (positionFeesEth(position) ?? 0), 0);
   const showPositions = authenticated && positions.length > 0;
   const settlement = actionPlan && "settlement" in actionPlan ? actionPlan.settlement : undefined;
   return (
@@ -960,15 +962,15 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
       {authenticated && state === "error" ? <PortfolioEmpty variant="error" onPrimary={onRetry} /> : null}
       {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" onPrimary={onStart} /> : null}
       {showPositions ? <section className="portfolio-summary" aria-label="Portfolio summary">
-        <div><span>Position value</span><strong>{summary.priced ? money(summary.valueUsd) : "—"}</strong><small>{summary.priced} of {positions.length} priced</small></div>
-        <div><span>Ready to collect</span><strong>{summary.feesPriced ? money(summary.feesUsd) : "—"}</strong><small>Unclaimed fees</small></div>
+        <div><span>Position value</span><strong>{summary.valueUsd > 0 ? money(summary.valueUsd) : summaryValueEth > 0 ? ethValue(summaryValueEth) : "—"}</strong><small>{summary.valueUsd > 0 ? `${summary.priced} of ${positions.length} priced` : "From live token balances"}</small></div>
+        <div><span>Ready to collect</span><strong>{summary.feesUsd > 0 ? money(summary.feesUsd) : ethValue(summaryFeesEth)}</strong><small>Unclaimed fees</small></div>
         <div><span>Earning now</span><strong>{summary.earning}</strong><small>of {positions.length} positions in range</small></div>
         <div><span>Fee APR</span><strong>{formatFeeAprFraction(summary.feeApr)}</strong><small>Across priced positions</small></div>
       </section> : null}
       {showPositions ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
         <span className="position-pair"><TokenIcon symbol={position.symbol0} src={position.marketId ? stats.get(position.marketId)?.tokenImageUrl : undefined} /><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
-        <span><small>Position value</small><b>{positionValueUsd(position) === undefined ? "—" : money(positionValueUsd(position)!)}</b></span>
-        <span><small>Ready to collect</small><b>{position.feesUsd === undefined ? "—" : money(position.feesUsd)}</b></span>
+        <span><small>Position value</small><b>{positionValueLabel(position)}</b></span>
+        <span><small>Ready to collect</small><b>{positionFeesLabel(position)}</b></span>
         <span><small>Fee APR</small><b>{formatFeeAprFraction(position.feeApr ?? null)}</b></span>
         <PositionRange position={position} />
         <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed || !position.inRange} title={!position.inRange ? "Rebalancing is required before compounding" : undefined}>Compound</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{position.chain === "robinhood" ? "Withdraw to ETH" : "Withdraw"}</button></span>
@@ -1088,6 +1090,23 @@ function chainLabel(chain: IndexChain): string {
 
 function money(value: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
+}
+
+function positionValueLabel(position: PositionView): string {
+  const usdValue = positionValueUsd(position);
+  if (usdValue !== undefined && usdValue > 0) return money(usdValue);
+  const eth = positionValueEth(position);
+  return eth === undefined ? "—" : ethValue(eth);
+}
+
+function positionFeesLabel(position: PositionView): string {
+  if (position.feesUsd !== undefined && position.feesUsd > 0) return money(position.feesUsd);
+  const eth = positionFeesEth(position);
+  return eth === undefined ? "—" : ethValue(eth);
+}
+
+function ethValue(value: number): string {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(value)} ETH`;
 }
 
 function compactMoney(value?: number | null): string {

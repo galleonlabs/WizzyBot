@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PositionView } from "../app/lib/cards.js";
-import { positionValueUsd, summarizePositions } from "../app/lib/portfolio-summary.js";
+import { positionFeesEth, positionValueEth, positionValueUsd, summarizePositions } from "../app/lib/portfolio-summary.js";
 
 function position(overrides: Partial<PositionView> = {}): PositionView {
   return {
@@ -52,5 +52,24 @@ describe("portfolio fee summary", () => {
   it("does not invent values for an empty or unpriced wallet", () => {
     expect(summarizePositions([])).toEqual({ priced: 0, valueUsd: 0, feesPriced: 0, feesUsd: 0, earning: 0, feeApr: null });
     expect(summarizePositions([position()])).toEqual({ priced: 0, valueUsd: 0, feesPriced: 0, feesUsd: 0, earning: 1, feeApr: null });
+  });
+
+  it("derives an honest ETH value when Robinhood USD pricing is unavailable", () => {
+    const live = position({
+      amount0: "106.7467",
+      amount1: "0.009853",
+      uncollected0: "0.5",
+      uncollected1: "0.0001",
+      price: 0.000091395,
+      positionUsd: 0,
+      feesUsd: 0,
+    });
+    expect(positionValueEth(live)).toBeCloseTo(0.019609, 5);
+    expect(positionFeesEth(live)).toBeCloseTo(0.0001457, 6);
+  });
+
+  it("supports WETH as token0 without guessing non-ETH pairs", () => {
+    expect(positionValueEth(position({ symbol0: "WETH", symbol1: "MEME", amount0: "0.01", amount1: "100", price: 10_000 }))).toBeCloseTo(0.02);
+    expect(positionValueEth(position({ symbol0: "MEME", symbol1: "USDC" }))).toBeUndefined();
   });
 });

@@ -4,7 +4,7 @@ import { fetchRecentPoolActivity } from "../../lib/portfolio-server";
 import type { PoolActivityPayload } from "../../lib/portfolio-types";
 
 export const runtime = "nodejs";
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 const getPoolActivity = unstable_cache(async (): Promise<PoolActivityPayload> => {
   try {

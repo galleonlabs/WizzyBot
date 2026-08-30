@@ -301,6 +301,7 @@ describe("meme index product UI", () => {
     expect(marketsRoute).toContain("unstable_cache");
     expect(marketsRoute).toContain("s-maxage=30, stale-while-revalidate=300");
     expect(poolActivityRoute).toContain("unstable_cache");
+    expect(poolActivityRoute).toContain('dynamic = "force-dynamic"');
     expect(poolActivityRoute).toContain("s-maxage=60, stale-while-revalidate=300");
     expect(apiBoundary).toContain("same-origin request required");
     expect(apiBoundary).toContain("Buffer.byteLength");

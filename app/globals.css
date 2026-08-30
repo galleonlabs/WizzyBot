@@ -285,11 +285,10 @@ svg {
 
 .preview-banner { padding: 7px 24px; background: var(--preview-bg); color: var(--preview-ink); text-align: center; font-size: 11px; font-weight: 700; }
 
-.index-shell { width: min(1280px, 100%); margin: 0 auto; padding: 0 24px 72px; view-transition-name: wizzy-view; }
+.index-shell { width: min(1280px, 100%); margin: 0 auto; padding: 0 24px 72px; }
 .index-main { min-width: 0; }
-
-::view-transition-old(wizzy-view) { animation: view-fold-out 180ms var(--motion-standard) both; }
-::view-transition-new(wizzy-view) { animation: view-fold-in 420ms var(--motion-out) both; }
+.index-hero,
+.markets-view { animation: view-arrive 180ms var(--motion-out) both; }
 
 @media (hover: hover) {
   .index-nav nav button:hover { transform: translateY(-1px); }
@@ -459,10 +458,6 @@ svg {
 .plan-preview > p { margin: 9px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .plan-preview > p.approval-note { padding-top: 11px; border-top: 1px solid var(--line); }
 .plan-preview > p.risk-note { color: var(--orange); }
-.review-amount { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-top: 14px; padding: 14px 0; border-block: 1px solid var(--line); }
-.review-amount > span { color: var(--muted); font-size: 10px; }
-.review-amount strong { font-size: 26px; letter-spacing: -.04em; }
-.review-amount strong small { color: var(--muted); font-size: 11px; letter-spacing: 0; }
 .plan-preview dl { display: grid; gap: 8px; margin: 14px 0 0; }
 .plan-preview dl div { display: flex; justify-content: space-between; gap: 12px; }
 .plan-preview dt { color: var(--muted-2); font-size: 10px; }
@@ -665,8 +660,7 @@ svg {
 @keyframes loading-dot { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-4px); opacity: 1; } }
 @keyframes token-arrive { from { opacity: 0; transform: translateY(18px) scale(.88); filter: blur(5px); } }
 @keyframes theme-turn { from { opacity: .35; transform: rotate(-28deg) scale(.82); } }
-@keyframes view-fold-out { to { opacity: .2; clip-path: inset(0 48% 0 48% round 14px); filter: blur(3px); } }
-@keyframes view-fold-in { from { opacity: .2; clip-path: inset(0 48% 0 48% round 14px); filter: blur(4px); } }
+@keyframes view-arrive { from { opacity: .78; transform: translateY(4px); filter: blur(1px); } }
 @keyframes popover-open { from { opacity: 0; transform: scale(.975); clip-path: inset(0 0 18% 0 round 14px); } }
 @keyframes panel-open { from { opacity: .35; clip-path: inset(0 0 22% 0 round 12px); filter: blur(2px); } }
 @keyframes index-segment-assemble { from { opacity: .2; transform: scaleX(0); } }
@@ -685,8 +679,6 @@ svg {
   .index-update-panel,
   .composition-segment,
   .composition-item { animation: none; }
-  ::view-transition-old(wizzy-view),
-  ::view-transition-new(wizzy-view) { animation: none; }
 }
 
 .fatal-error {

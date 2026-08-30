@@ -45,10 +45,6 @@ type AvailableIndexUpdate = {
   fromSymbol: string;
   toSymbol: string;
 };
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (update: () => void | Promise<void>) => { finished: Promise<void> };
-};
-
 const INDEX_MARKET_COUNT = 6;
 const FOMO_URL = "https://fomo.family/r/makemememarkets";
 const BRAND_ASSETS = {
@@ -235,22 +231,11 @@ export function PortfolioApp() {
 
   function changeTab(next: ViewTab) {
     if (next === tab) return;
-    const update = () => {
-      setTab(next);
-      const url = new URL(window.location.href);
-      if (next === "overview") url.searchParams.delete("view");
-      else url.searchParams.set("view", next);
-      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-    };
-    const transitionDocument = document as ViewTransitionDocument;
-    if (transitionDocument.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      transitionDocument.startViewTransition(async () => {
-        update();
-        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-      });
-    } else {
-      update();
-    }
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === "overview") url.searchParams.delete("view");
+    else url.searchParams.set("view", next);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
   }
 
   function cycleTheme() {
@@ -698,7 +683,6 @@ function PlanPreview({ plan, state, onExecute, onCancel }: { plan: RobinhoodInde
       <header><span>{title}</span><button type="button" onClick={onCancel} disabled={busy}>Cancel</button></header>
       <p>{state.message}</p>
       {plan ? <>
-        <div className="review-amount"><span>You deposit</span><strong>{trimEth(BigInt(plan.totalAmountWei))}<small> ETH</small></strong></div>
         <dl>
           <div><dt>Pay from</dt><dd><img src={relayChainIcon(plan.sourceChainId)} alt="" />{plan.sourceChainLabel}</dd></div>
           <div><dt>You’ll open</dt><dd>{plan.constituentCount} Robinhood position{plan.constituentCount === 1 ? "" : "s"}</dd></div>

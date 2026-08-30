@@ -153,15 +153,15 @@ describe("meme index product UI", () => {
     expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
   });
 
-  it("gives navigation and market state changes a playful motion system", () => {
-    expect(portfolio).toContain("startViewTransition");
-    expect(portfolio).toContain("window.requestAnimationFrame");
-    expect(portfolio).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
-    expect(css).toContain("view-transition-name: wizzy-view");
-    expect(css).toContain("@keyframes view-fold-in");
+  it("switches navigation immediately while keeping lightweight state motion", () => {
+    expect(portfolio).not.toContain("startViewTransition");
+    expect(portfolio).not.toContain("window.requestAnimationFrame");
+    expect(portfolio).toContain("setTab(next)");
+    expect(css).toContain("@keyframes view-arrive");
     expect(css).toContain("@keyframes index-segment-assemble");
     expect(css).toContain("@keyframes popover-open");
-    expect(css).toContain("::view-transition-new(wizzy-view) { animation: none; }");
+    expect(css).not.toContain("view-transition-name: wizzy-view");
+    expect(portfolio).not.toContain('className="review-amount"');
   });
 
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {

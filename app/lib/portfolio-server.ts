@@ -30,6 +30,7 @@ type HostedPortfolioSurface = {
   }) => Promise<unknown>;
   getMemeIndexBreadthPolicy: () => unknown;
   getRobinhoodIndexBreadthPolicy: () => unknown;
+  getRobinhoodIndexState: () => Promise<unknown>;
   planPositionAction: (input: {
     owner: string;
     chain: "base" | "robinhood";
@@ -65,6 +66,7 @@ export const planMemeIndex = hosted.planMemeIndex;
 export const planRobinhoodIndex = hosted.planRobinhoodIndex;
 export const getMemeIndexBreadthPolicy = hosted.getMemeIndexBreadthPolicy;
 export const getRobinhoodIndexBreadthPolicy = hosted.getRobinhoodIndexBreadthPolicy;
+export const getRobinhoodIndexState = hosted.getRobinhoodIndexState;
 export const planPositionAction = hosted.planPositionAction;
 export const quoteBaseToRobinhoodEth = hosted.quoteBaseToRobinhoodEth;
 export const quoteEthToRobinhood = hosted.quoteEthToRobinhood;

@@ -88,6 +88,7 @@ export async function planAllocation(input: {
   chain: ChainSlug;
   amountWei: bigint;
   marketIds?: readonly string[];
+  markets?: readonly CuratedMarket[];
 }): Promise<AllocationPlan> {
   if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
   const owner = getAddress(input.owner);
@@ -96,7 +97,7 @@ export async function planAllocation(input: {
   if (input.amountWei < BigInt(configured.minimumAllocationWei)) {
     throw new Error(`Minimum ${configured.label} allocation is ${configured.minimumAllocationWei} wei`);
   }
-  const markets = activeMarkets(input.chain, input.marketIds);
+  const markets = input.markets ? [...input.markets] : activeMarkets(input.chain, input.marketIds);
   const activeWeight = markets.reduce((sum, market) => sum + market.weightBps, 0);
   if (activeWeight <= 0) throw new Error("selected market weights must be positive");
 

@@ -105,8 +105,8 @@ export function selectMemeIndexMarkets(totalAmountWei: bigint): IndexBreadthTier
  * The launch index is intentionally network-specific. Each viable 0.05 ETH
  * unit adds the next code-reviewed Robinhood market by curator weight.
  */
-export function getRobinhoodIndexBreadthPolicy(): RobinhoodIndexBreadthPolicy {
-  const markets = activeMarkets("robinhood")
+export function getRobinhoodIndexBreadthPolicy(indexMarkets: Array<{ id: string; weightBps: number }> = activeMarkets("robinhood")): RobinhoodIndexBreadthPolicy {
+  const markets = indexMarkets
     .slice()
     .sort((a, b) => b.weightBps - a.weightBps || a.id.localeCompare(b.id));
   const tiers = markets.map((_, index) => ({
@@ -130,8 +130,8 @@ export function getRobinhoodIndexBreadthPolicy(): RobinhoodIndexBreadthPolicy {
   };
 }
 
-export function selectRobinhoodIndexMarkets(totalAmountWei: bigint): RobinhoodIndexBreadthTier {
-  const policy = getRobinhoodIndexBreadthPolicy();
+export function selectRobinhoodIndexMarkets(totalAmountWei: bigint, indexMarkets?: Array<{ id: string; weightBps: number }>): RobinhoodIndexBreadthTier {
+  const policy = getRobinhoodIndexBreadthPolicy(indexMarkets);
   if (totalAmountWei < BigInt(policy.minimumAmountWei)) {
     throw new Error(`Minimum Robinhood index deposit is ${trimEth(BigInt(policy.minimumAmountWei))} ETH`);
   }

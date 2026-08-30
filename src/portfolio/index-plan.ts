@@ -9,6 +9,7 @@ import { ethFundingChain } from "../relay/origins.js";
 import { nativeTransferTx } from "../uniswap/calldata.js";
 import { planAllocation, weightedBudgets, type AllocationPlan, type SerializableTx } from "./allocation.js";
 import { INDEX_CHAIN_SHARES_BPS, selectMemeIndexMarkets, selectRobinhoodIndexMarkets } from "./index-selection.js";
+import { getRobinhoodIndexState } from "../index/registry.js";
 
 const BPS = 10_000n;
 const BASE_SHARE_BPS = BigInt(INDEX_CHAIN_SHARES_BPS.base);
@@ -119,7 +120,10 @@ export async function planRobinhoodIndex(input: {
   if (input.totalAmountWei <= 0n) throw new Error("amount must be positive");
   const owner = getAddress(input.owner);
   const source = ethFundingChain(input.originChainId ?? 8453);
-  const selection = selectRobinhoodIndexMarkets(input.totalAmountWei);
+  const indexState = await getRobinhoodIndexState();
+  const selection = selectRobinhoodIndexMarkets(input.totalAmountWei, indexState.markets);
+  const selectedIds = new Set(selection.marketIds);
+  const selectedMarkets = indexState.markets.filter((market) => selectedIds.has(market.id));
   const bridge = source.id === 4663
     ? null
     : await quoteEthToRobinhood({ owner, amountInWei: input.totalAmountWei, originChainId: source.id });
@@ -130,7 +134,7 @@ export async function planRobinhoodIndex(input: {
     owner,
     chain: "robinhood",
     amountWei: allocatable,
-    marketIds: selection.marketIds,
+    markets: selectedMarkets,
   });
   const now = new Date();
   const expiresAt = bridge
@@ -149,7 +153,7 @@ export async function planRobinhoodIndex(input: {
     kind: "robinhood-index",
     owner,
     totalAmountWei: input.totalAmountWei.toString(),
-    indexVersion: getMarketCatalog().version,
+    indexVersion: indexState.registry?.version ?? getMarketCatalog().version,
     constituentCount: selection.constituentCount,
     sourceChainId: source.id,
     sourceChainLabel: source.label,

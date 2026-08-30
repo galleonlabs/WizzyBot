@@ -26,6 +26,7 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Pay from");
     expect(portfolio).toContain('name="depositAmount"');
     expect(portfolio).toContain('name="sourceChain"');
+    expect(portfolio).toContain('className="market-stack" role="img"');
     expect(portfolio).toContain("Choose where your ETH is now");
     expect(portfolio).not.toContain("<select");
     expect(portfolio).toContain("Your market positions");

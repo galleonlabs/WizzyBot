@@ -583,7 +583,7 @@ function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingC
 
       <div className={`market-output ${loading ? "is-loading" : ""}`} aria-label="Index markets">
         <span className="market-breadth">
-          <span className="market-stack" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
+          <span className="market-stack" role="img" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
             {loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />) : markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />)}
           </span>
           <span><b>{loading ? "Reading markets" : `${constituentCount} markets`}</b><small>{loading ? "Current index" : constituentCount >= maximumConstituents ? "Full index" : "More with a larger deposit"}</small></span>

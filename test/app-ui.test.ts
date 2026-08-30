@@ -103,9 +103,9 @@ describe("meme index product UI", () => {
     expect(providers).toContain('"solana:mainnet"');
   });
 
-  it("allows every reviewed market-image host without weakening the rest of the image policy", () => {
+  it("allows every reviewed market and product-image host without weakening the rest of the image policy", () => {
     expect(nextConfig).toContain(
-      "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com",
+      "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com https://assets.relay.link https://avatars.githubusercontent.com https://fomo.family https://www.geckoterminal.com",
     );
     expect(nextConfig).not.toContain("img-src *");
   });

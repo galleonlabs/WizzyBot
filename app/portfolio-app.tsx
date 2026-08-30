@@ -16,6 +16,8 @@ import {
   type AllocationMarketPlan,
   type MarketsPayload,
   type MarketStats,
+  type PoolActivityItem,
+  type PoolActivityPayload,
   type RobinhoodIndexBreadthPolicy,
   type RobinhoodIndexBreadthTier,
   type RobinhoodIndexPlan,
@@ -49,6 +51,12 @@ type AvailableIndexUpdate = {
 const INDEX_MARKET_COUNT = 6;
 const FOMO_URL = "https://fomo.family/r/makemememarkets";
 const ROBINHOOD_NATIVE_ETH = "0x0000000000000000000000000000000000000000";
+const POOL_ACTIVITY_REFRESH_MS = 60_000;
+const PREVIEW_POOL_ACTIVITY: PoolActivityItem[] = [
+  { id: "preview-1", kind: "added", marketId: "robinhood-pons", symbol: "PONS", pair: "PONS/WETH", wethAmount: "9.34", transactionHash: "0xpreview", transactionUrl: "#", blockNumber: "3" },
+  { id: "preview-2", kind: "removed", marketId: "robinhood-ai", symbol: "AI", pair: "AI/WETH", wethAmount: "0.61", transactionHash: "0xpreview", transactionUrl: "#", blockNumber: "2" },
+  { id: "preview-3", kind: "added", marketId: "robinhood-cashcat", symbol: "CASHCAT", pair: "CASHCAT/WETH", wethAmount: "1.82", transactionHash: "0xpreview", transactionUrl: "#", blockNumber: "1" },
+];
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
   robinhood: "https://assets.relay.link/icons/4663/light.png",
@@ -618,33 +626,36 @@ export function PortfolioApp() {
         <span className="wizzy-ghost wizzy-ghost-5" />
         <span className="wizzy-ghost wizzy-ghost-6" />
       </div>
-      <header className="index-nav">
-        <button className="wizzy-wordmark" type="button" onClick={() => changeTab("overview")} aria-label="Wizzy overview">
-          <picture className="wizzy-mark" aria-hidden="true">
-            {theme === "system" ? <source media="(prefers-color-scheme: dark)" srcSet="/brand/wizzy-mascot-dark.svg" /> : null}
-            <img src={theme === "dark" ? "/brand/wizzy-mascot-dark.svg" : "/brand/wizzy-mascot-light.svg"} alt="" />
-          </picture>
-          <span>Wizzy</span>
-        </button>
-        <nav aria-label="Primary navigation">
-          {([{ id: "overview", label: "Make" }, { id: "markets", label: "Markets" }] as const).map((item) => (
-            <button key={item.id} type="button" className={tab === item.id ? "is-active" : ""} onClick={() => changeTab(item.id)}>{item.label}</button>
-          ))}
-        </nav>
-        <div className="nav-actions">
-          <a className="social-button" href="https://x.com/wizzydotmeme" target="_blank" rel="noreferrer" aria-label="Follow Wizzy on X" title="@wizzydotmeme on X" onClick={() => trackProductEvent("X Opened", { location: "header" })}>
-            <XIcon />
-          </a>
-          <button className="theme-button" type="button" onClick={cycleTheme} aria-label={`Theme: ${capitalize(theme)}. Switch to ${theme === "dark" ? "light" : theme === "light" ? "system" : "dark"}.`} title={`Theme: ${capitalize(theme)}`}>
-            <ThemeIcon preference={theme} />
+      <div className="nav-stack">
+        <header className="index-nav">
+          <button className="wizzy-wordmark" type="button" onClick={() => changeTab("overview")} aria-label="Wizzy overview">
+            <picture className="wizzy-mark" aria-hidden="true">
+              {theme === "system" ? <source media="(prefers-color-scheme: dark)" srcSet="/brand/wizzy-mascot-dark.svg" /> : null}
+              <img src={theme === "dark" ? "/brand/wizzy-mascot-dark.svg" : "/brand/wizzy-mascot-light.svg"} alt="" />
+            </picture>
+            <span>Wizzy</span>
           </button>
-          {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
-            <WalletMenu address={address ?? "Wallet"} onDisconnect={() => { trackProductEvent("Logout Started"); void logout(); }} />
-          ) : (
-            <button className="wallet-button wallet-connect" type="button" onClick={() => startLogin("header")} aria-label="Connect wallet"><WalletIcon /><span>Connect</span></button>
-          )}
-        </div>
-      </header>
+          <nav aria-label="Primary navigation">
+            {([{ id: "overview", label: "Make" }, { id: "markets", label: "Markets" }] as const).map((item) => (
+              <button key={item.id} type="button" className={tab === item.id ? "is-active" : ""} onClick={() => changeTab(item.id)}>{item.label}</button>
+            ))}
+          </nav>
+          <div className="nav-actions">
+            <a className="social-button" href="https://x.com/wizzydotmeme" target="_blank" rel="noreferrer" aria-label="Follow Wizzy on X" title="@wizzydotmeme on X" onClick={() => trackProductEvent("X Opened", { location: "header" })}>
+              <XIcon />
+            </a>
+            <button className="theme-button" type="button" onClick={cycleTheme} aria-label={`Theme: ${capitalize(theme)}. Switch to ${theme === "dark" ? "light" : theme === "light" ? "system" : "dark"}.`} title={`Theme: ${capitalize(theme)}`}>
+              <ThemeIcon preference={theme} />
+            </button>
+            {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
+              <WalletMenu address={address ?? "Wallet"} onDisconnect={() => { trackProductEvent("Logout Started"); void logout(); }} />
+            ) : (
+              <button className="wallet-button wallet-connect" type="button" onClick={() => startLogin("header")} aria-label="Connect wallet"><WalletIcon /><span>Connect</span></button>
+            )}
+          </div>
+        </header>
+        <PoolActivityStrip preview={previewMode} />
+      </div>
 
       {previewMode ? <div className="preview-banner">Illustrative preview · development only</div> : null}
 
@@ -693,6 +704,79 @@ export function PortfolioApp() {
       </div>
     </main>
   );
+}
+
+function PoolActivityStrip({ preview }: { preview: boolean }) {
+  const [activity, setActivity] = useState<PoolActivityPayload>({ state: "ready", items: [], asOfBlock: null, scannedBlocks: 0, rpcRequests: 2 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (preview) {
+      setActivity({ state: "ready", items: PREVIEW_POOL_ACTIVITY, asOfBlock: "preview", scannedBlocks: 0, rpcRequests: 2 });
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    let request: AbortController | null = null;
+    let pending = false;
+
+    const load = async () => {
+      if (document.visibilityState === "hidden" || pending) return;
+      pending = true;
+      request?.abort();
+      request = new AbortController();
+      const timeout = window.setTimeout(() => request?.abort(), 8_000);
+      try {
+        const response = await fetch("/api/pool-activity", { signal: request.signal });
+        const payload = await response.json() as PoolActivityPayload;
+        if (!response.ok) throw new Error("Could not load pool activity");
+        if (active) setActivity((current) => payload.state === "ready" || !current.items.length ? payload : current);
+      } catch {
+        if (active) setActivity((current) => current.items.length ? current : { state: "unavailable", items: [], asOfBlock: null, scannedBlocks: 0, rpcRequests: 2 });
+      } finally {
+        window.clearTimeout(timeout);
+        pending = false;
+        if (active) setLoading(false);
+      }
+    };
+    const refresh = window.setInterval(() => { void load(); }, POOL_ACTIVITY_REFRESH_MS);
+    const onVisibility = () => { if (document.visibilityState === "visible") void load(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    void load();
+    return () => {
+      active = false;
+      request?.abort();
+      window.clearInterval(refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [preview]);
+
+  const duration = `${Math.max(36, activity.items.length * 7)}s`;
+  return <section className={`pool-activity is-${activity.state}`} aria-label="Pool activity">
+    <span className="pool-activity-label">Pool activity</span>
+    <div className="pool-activity-window">
+      {activity.items.length ? <div className="pool-activity-track" style={{ "--activity-duration": duration } as CSSProperties}>
+        <PoolActivityGroup items={activity.items} />
+        <PoolActivityGroup items={activity.items} duplicate />
+      </div> : <span className="pool-activity-status">{loading ? "Reading active pools" : activity.state === "unavailable" ? "Temporarily unavailable" : "No recent adds or removals"}</span>}
+    </div>
+  </section>;
+}
+
+function PoolActivityGroup({ items, duplicate = false }: { items: PoolActivityItem[]; duplicate?: boolean }) {
+  return <span className="pool-activity-group" aria-hidden={duplicate ? "true" : undefined}>
+    {items.map((item) => {
+      const content = <>
+        <span className="pool-activity-kind"><i aria-hidden="true">{item.kind === "added" ? "+" : "−"}</i>{item.kind === "added" ? "Added" : "Removed"}</span>
+        <strong>{item.pair}</strong>
+        {item.wethAmount ? <span>{item.wethAmount} ETH</span> : null}
+        {!duplicate ? <ExternalLinkIcon /> : null}
+      </>;
+      return duplicate
+        ? <span className="pool-activity-item" data-kind={item.kind} key={`duplicate-${item.id}`}>{content}</span>
+        : <a className="pool-activity-item" data-kind={item.kind} href={item.transactionUrl} target="_blank" rel="noreferrer" title={`View ${item.kind} liquidity transaction for ${item.pair}`} key={item.id}>{content}</a>;
+    })}
+  </span>;
 }
 
 function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {

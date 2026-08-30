@@ -148,10 +148,9 @@ Bankr later docs now describe the right controls: wallet-level daily / per-tx US
 - Trading-desk scope. Swaps, perps, Polymarket, tokenized stocks, browser checkout, x402 image gens — out of v1.
 - A 0.8% (or any) user-swap fee. UnaBot takes protocol fees on compound / range / exit only.
 - Aerodrome routing, Hyperliquid, Robinhood Chain. Base Uniswap v2, v3, and v4.
-- Token launch in v1. Virtuals is a later step (virtuals.md). Do not Doppler-launch from this repo.
+- Token launch in the initial application release. Any later token follows [the staged token plan](../TOKEN_FLYWHEEL.md); Bankr, Virtuals, Pools, and other providers remain unselected options until the go/no-go review.
 
 ## 10. Open items
 
 - Bankr has not published a single canonical post-mortem URL for 19 May 2026. If they do, replace the secondary citations.
 - Help-center Club copy (unlimited terminal messages) still disagrees with the docs table (1,000/day). Re-check before quoting Club in public.
-

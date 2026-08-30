@@ -32,7 +32,7 @@ Before the wallet controls material value, re-verify the Vercel recovery path, p
 
 Assume every funding transaction is publicly attributable through chain analysis. Use a documented lawful funding path and accurate accounting. Do not use mixers, circular transfers, false counterparties, or obfuscation to manufacture anonymity.
 
-## Pools and X separation
+## Future token-launch separation
 
 - Use dedicated Wizzy credentials and recovery channels, stored in the password manager and protected with passkeys or hardware keys.
 - Do not reuse personal usernames, biographies, profile images, recovery email addresses, phone numbers, browser autofill, or public wallet labels.
@@ -41,17 +41,28 @@ Assume every funding transaction is publicly attributable through chain analysis
 - Do not claim affiliation with Robinhood, Uniswap, Fomo, Pools, or any constituent token.
 - Do not imply that pseudonymity removes related-party conflicts. Publish treasury, creator, allocations, vesting, and index-sleeve control.
 
-## Operational launch checklist
+These controls apply to the separate future token launch. They are not part of the initial application launch and do not imply that a token is scheduled.
+
+## Application launch checklist
 
 - [ ] Private repository and production deployment contain no personal or Galleon public strings.
 - [ ] No public source map, error payload, analytics event, or response header exposes an operator or account slug.
 - [ ] Creator and treasury addresses are dedicated and independently verified.
 - [ ] No secret is present in Git history, build output, Vercel client variables, logs, or browser storage.
-- [ ] Pools and X identities use dedicated credentials and hardened recovery.
+- [ ] Product copy makes no token date, index-inclusion, buyback, fee-support, yield, or appreciation promise.
+- [ ] The application, curator, and deployment path cannot create a token, add a related-party sleeve, or route fees into token/WETH liquidity.
+- [ ] Public language says pseudonymous, not anonymous.
+- [ ] Legal, tax, sanctions, KYC, financial-promotion, and record-keeping requirements are handled where applicable.
+
+## Future token launch checklist
+
+- [ ] The token go/no-go record in [Token and index plan](TOKEN_FLYWHEEL.md) is complete after at least 30 days of application evidence.
+- [ ] Launch-provider and X identities use dedicated credentials and hardened recovery.
 - [ ] Connected-wallet account, chain, recipients, permissions, and full transaction simulation are reviewed before signing.
 - [ ] Token contract, allocation, vesting, treasury, related-party sleeve, and risk disclosures are public.
 - [ ] Public language says pseudonymous, not anonymous.
-- [ ] Legal, tax, sanctions, KYC, and record-keeping requirements are handled where applicable.
+- [ ] Independent legal review covers the launch jurisdictions, public communications, related-party sleeve, treasury policy, and financial-promotion requirements.
+- [ ] The token launches at 0% index weight; sleeve activation remains a later, separately evidenced release.
 
 ## Incident response
 

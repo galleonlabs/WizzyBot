@@ -4,6 +4,25 @@ How to run Wizzy. The consumer web index covers Base, Robinhood Chain, and Solan
 
 **Never commit `.env`.** Copy `.env.example` locally. `.env` is gitignored. Do not paste secrets into git, Vercel project settings screenshots, or this file.
 
+## Current release scope
+
+The initial application launch does not deploy, buy, list, or include a Wizzy token. Its related-party sleeve is 0%, and all implemented product fees continue to accumulate in the Wizzy treasury.
+
+No application, curator, CLI, keeper, or ordinary deployment path may:
+
+- create or announce a Wizzy token;
+- add or increase a related-party index sleeve;
+- route product fees into token/WETH liquidity;
+- describe treasury revenue as a buyback, yield, price floor, or token-holder entitlement.
+
+A future token is a separate, manually authorized release governed by [Token and index plan](TOKEN_FLYWHEEL.md). Token launch and later sleeve activation are also separate releases.
+
+## Pool activity
+
+The public rail under the navigation is labelled **Pool activity**. It reports Uniswap V3 `Mint` and `Burn` events from only the active Robinhood pools in the current index; it does not imply that Wizzy vaults user funds.
+
+`GET /api/pool-activity` has a fixed two-request RPC budget per shared cache fill: one block-number read, then one `eth_getLogs` query covering every active pool and both event types over the most recent 2,400 blocks. Do not replace this with per-pool scans or transaction, receipt, or block-detail lookups. The server cache refreshes at most once per 60 seconds and can serve stale data for five minutes. Browsers poll at most once per minute, pause while the tab is hidden, retain the last good result during a transient failure, and never contact the RPC directly.
+
 ## Install
 
 ```

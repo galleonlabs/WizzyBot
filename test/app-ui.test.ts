@@ -19,6 +19,8 @@ const nextConfig = readFileSync("next.config.ts", "utf8");
 const solanaWallet = readFileSync("app/lib/solana-wallet.ts", "utf8");
 const solanaBroadcast = readFileSync("app/api/portfolio/solana/broadcast/route.ts", "utf8");
 const marketsRoute = readFileSync("app/api/markets/route.ts", "utf8");
+const poolActivityRoute = readFileSync("app/api/pool-activity/route.ts", "utf8");
+const poolActivitySource = readFileSync("src/markets/activity.ts", "utf8");
 const apiBoundary = readFileSync("app/lib/api-request-server.ts", "utf8");
 const balanceRoute = readFileSync("app/api/balance/route.ts", "utf8");
 
@@ -298,11 +300,27 @@ describe("meme index product UI", () => {
     expect(solanaBroadcast).toContain("verifySignatures: true");
     expect(marketsRoute).toContain("unstable_cache");
     expect(marketsRoute).toContain("s-maxage=30, stale-while-revalidate=300");
+    expect(poolActivityRoute).toContain("unstable_cache");
+    expect(poolActivityRoute).toContain("s-maxage=60, stale-while-revalidate=300");
     expect(apiBoundary).toContain("same-origin request required");
     expect(apiBoundary).toContain("Buffer.byteLength");
     expect(apiBoundary).toContain("redactServerError");
     expect(nextConfig).not.toContain("https://api.mainnet-beta.solana.com");
     expect(nextConfig).not.toContain("wss://api.mainnet-beta.solana.com");
+  });
+
+  it("shows restrained activity from one shared multi-pool RPC scan", () => {
+    expect(portfolio).toContain('aria-label="Pool activity"');
+    expect(portfolio).toContain('fetch("/api/pool-activity"');
+    expect(portfolio).toContain("POOL_ACTIVITY_REFRESH_MS = 60_000");
+    expect(portfolio).toContain('document.visibilityState === "hidden"');
+    expect(css).toContain("@keyframes pool-activity-scroll");
+    expect(css).toContain('.pool-activity-group[aria-hidden="true"]');
+    expect(poolActivitySource).toContain('activeMarkets("robinhood")');
+    expect(poolActivitySource).toContain("events: [V3_MINT_EVENT, V3_BURN_EVENT]");
+    expect(poolActivitySource).toContain("address: markets.map((market) => market.pool)");
+    expect(poolActivitySource).toContain("rpcRequests: 2");
+    expect(poolActivitySource).not.toMatch(/getTransaction|getBlock\(/);
   });
 
   it("allows remote asset artwork without weakening executable or connection policies", () => {

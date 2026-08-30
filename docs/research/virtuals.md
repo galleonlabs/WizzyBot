@@ -1,4 +1,4 @@
-# Virtuals — tokenized agent (later launch step)
+# Virtuals option research — not the current token plan
 
 Last verified: 29 Aug 2026.
 
@@ -10,7 +10,7 @@ Sources (official):
 - ACP CLI: https://github.com/Virtual-Protocol/acp-cli
 - Older IAO page (historical split; superseded for the 70/30 figure): https://whitepaper.virtuals.io/about-virtuals-1/the-protocol/virtual-agents-as-programmable-decentralized-entities/initial-agent-offering-iao-for-ai-agent-token-launches
 
-A Virtuals token is **not part of the UnaBot v1 repo**. This file exists so a later launch does not invent parameters.
+A Virtuals token is **not part of the initial Wizzy application release**, and Virtuals is not the selected launch provider. This file preserves provider-specific research only. Any token decision must first pass [the token and index plan](../TOKEN_FLYWHEEL.md); do not execute the steps below merely because they are documented.
 
 ## 1. What a tokenized agent is
 
@@ -75,7 +75,7 @@ Typical CLI path (Privy / acp-cli docs): acp configure (browser OAuth, token in 
 
 ACP is how a tokenized UnaBot would sell work (range advice, keeper-as-a-service) to other agents. It is not how v1 manages Uniswap NFTs. Do not wire ACP into the keeper.
 
-## 6. Launch steps — point the creator wallet at treasury
+## 6. Hypothetical Virtuals path — only if selected later
 
 Goal: if/when UnaBot is tokenized, creator-fee 70% lands in the product treasury, not in a personal hot wallet.
 

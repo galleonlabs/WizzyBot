@@ -4,6 +4,22 @@ type HostedPortfolioSurface = {
   getMarketCatalog: () => unknown;
   getSolanaMarketCatalog: () => unknown;
   fetchMarketStats: () => Promise<unknown>;
+  fetchRecentPoolActivity: () => Promise<{
+    items: Array<{
+      id: string;
+      kind: "added" | "removed";
+      marketId: string;
+      symbol: string;
+      pair: string;
+      wethAmount: string | null;
+      transactionHash: `0x${string}`;
+      transactionUrl: string;
+      blockNumber: string;
+    }>;
+    asOfBlock: string;
+    scannedBlocks: number;
+    rpcRequests: 2;
+  }>;
   fetchSolanaMarketStats: () => Promise<unknown>;
   planAllocation: (input: {
     owner: string;
@@ -64,6 +80,7 @@ const hosted = loadHostedPortfolio();
 export const getMarketCatalog = hosted.getMarketCatalog;
 export const getSolanaMarketCatalog = hosted.getSolanaMarketCatalog;
 export const fetchMarketStats = hosted.fetchMarketStats;
+export const fetchRecentPoolActivity = hosted.fetchRecentPoolActivity;
 export const fetchSolanaMarketStats = hosted.fetchSolanaMarketStats;
 export const planAllocation = hosted.planAllocation;
 export const planDualChainAllocation = hosted.planDualChainAllocation;

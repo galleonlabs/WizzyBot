@@ -1,20 +1,94 @@
-# Wizzy token and index flywheel
+# Wizzy token and index plan
+
+Decision recorded: 30 August 2026.
 
 ## Decision
 
-Treat the Wizzy token as a **10% target sleeve**, not an asset that is guaranteed to remain exactly 10% at every moment.
+Launch the Wizzy application without a Wizzy token. A token is a separate, later launch that must earn its place in the product.
 
-- Target weight: 10%
-- No-trade band: 8–12%
-- Rebalance destination: 10%
-- Review cadence: weekly, with an emergency risk review at any time
-- Remaining 90%: allocated by the existing independent market-selection policy
+| Item | Initial application launch | Earliest later state |
+| --- | --- | --- |
+| Wizzy token | Not launched | Separate reviewed token launch |
+| Wizzy index weight | 0% | 5% related-party sleeve after every activation gate passes |
+| Maximum index weight | 0% | 10% after a later expansion review |
+| Protocol fees sent to token/WETH liquidity | 0% | Up to 25% of protocol revenue under a published treasury policy |
+| Token-holder revenue right | None | None unless separately implemented and legally reviewed |
 
-This creates genuine buy flow from net index deposits after the sleeve is activated. It also creates sell flow from redemptions. A rising token price can move the sleeve above 12%, causing a sale back toward 10%; a falling price can move it below 8%, causing a purchase only when the liquidity and execution gates remain healthy. This is not a guaranteed bid, price floor, or promise of appreciation.
+This sequencing preserves two clear launches. The application must prove that people want the curated index without relying on token appreciation. The token can then add community participation and liquidity without making the initial product look like a distribution mechanism for an operator-controlled asset.
+
+## Non-negotiable boundaries
+
+- The ordinary curator never ranks, selects, promotes, or increases the Wizzy token.
+- The token's price, fee APR, or treasury-funded liquidity never determines its target weight. Genuine volume and liquidity are safety gates, not ranking signals.
+- Index deposits are not a guaranteed bid. Redemptions sell the sleeve proportionally.
+- Protocol-owned liquidity is two-sided liquidity, not a buyback, dividend, yield, price floor, or promise of appreciation.
+- No token transaction, funding transfer, Pools signature, custody migration, or fee-routing change happens as a side effect of an application deployment.
+- The product must remain useful if the token falls substantially or the sleeve is paused permanently.
+
+## Why the token does not launch with the application
+
+At the current 0.15% create fee, a `1 ETH` deposit produces about `0.0015 ETH` of protocol revenue. If a future 5% sleeve is active, the same deposit buys about `0.05 ETH` of the token. If half of the create fee were swapped into the token to form balanced token/WETH liquidity, that swap would buy only `0.00075 ETH` of the token.
+
+The index-directed purchase would therefore be about 67 times larger than the fee-funded purchase at a 5% sleeve, and about 133 times larger at a 10% sleeve. The meaningful demand comes from index allocation, not from routing fees into liquidity. Launching both together would give early token holders a predictable source of exit liquidity before the product has proved independent demand.
+
+## Staged rollout
+
+### Stage 0 — application launch
+
+- Launch the curated Robinhood Chain index with no Wizzy token and no related-party sleeve.
+- Route all implemented product fees to the Wizzy treasury under the current fee schedule.
+- Make no public promise about a token date, index inclusion, buybacks, fee support, yield, or appreciation.
+- Publish the treasury address and keep a monthly inflow/outflow ledger.
+- Measure deposits, withdrawals, retained wallets, realized protocol revenue, support load, execution quality, and security incidents for at least 30 days.
+
+### Stage 1 — token decision
+
+After at least 30 days of application evidence, make an explicit go/no-go decision. Proceed only if:
+
+- the product has demonstrated use independent of a token;
+- expected revenue can fund security, infrastructure, legal work, and runway without putting all fees into liquidity;
+- the token has a concrete community or product role beyond expected price appreciation;
+- independent legal advice covers the intended jurisdictions, public communications, token distribution, related-party index inclusion, and treasury policy;
+- supply, allocations, vesting, contract controls, launch mode, treasury authority, and public disclosures are complete.
+
+A no-go decision leaves the application and treasury policy unchanged.
+
+### Stage 2 — token launch without index inclusion
+
+- Launch the token as a separate event.
+- Use a fixed-supply contract with no transfer tax, blacklist, hidden mint, or upgradeable transfer logic.
+- Publish verified source, bytecode, supply, allocations, vesting contracts, creator and treasury wallets, initial liquidity, and every wallet controlling more than 1% of supply.
+- Record the contract address and confirmed transaction before any public announcement.
+- Build genuine, independently observable liquidity and distribution. Do not count wash trading, treasury self-trading, circular volume, or undisclosed incentives.
+- Keep the index target at 0% throughout this stage.
+
+### Stage 3 — activate a 5% sleeve
+
+After every activation gate passes, activate the token as a fixed **5% related-party sleeve**:
+
+- target weight: 5%;
+- no-trade band: 3–7%;
+- rebalance destination: 5%;
+- review cadence: weekly, with an emergency risk review at any time;
+- remaining 95%: allocated by the independent market-selection policy.
+
+This creates buy flow from net index deposits and sell flow from redemptions. A rising token price can move the sleeve above 7%, causing a sale toward 5%. A falling price can move it below 3%, causing a purchase only while every liquidity and execution gate remains healthy.
+
+### Stage 4 — optional expansion to a 10% maximum
+
+The sleeve can move from 5% to a maximum 10% only after:
+
+- at least 90 days of stable 5% operation;
+- no unresolved security, disclosure, execution, concentration, or market-integrity incident;
+- published evidence that deposits and retention remain healthy after sleeve activation;
+- a fresh liquidity, treasury, conflict, and legal review;
+- a reviewed product change and advance public notice.
+
+At 10%, use an 8–12% no-trade band and rebalance toward 10%. Ten percent is a hard maximum, not the default next step.
 
 ## Current product fees
 
-All currently implemented consumer fees route to the dedicated Wizzy treasury at `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`. They do not route to token holders and do not automatically buy the future token.
+All currently implemented consumer fees route to the dedicated Wizzy treasury at `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`. They do not route to token holders and do not automatically buy a future token.
 
 | Action | Implemented charge | Current destination |
 | --- | --- | --- |
@@ -23,103 +97,107 @@ All currently implemented consumer fees route to the dedicated Wizzy treasury at
 | Withdraw a position | 0.15% of the conservative, slippage-adjusted withdrawal basis | Wizzy treasury |
 | Rebalance | 0.15% is reserved in the catalog, but the launch web product does not expose or collect it yet | No launch-web collection |
 
-Relay and network fees are separate third-party costs and are shown in the plan before signing. Changing any Wizzy fee requires a code change, tests, user-facing disclosure, and a treasury review.
+Relay and network fees are separate third-party costs and are shown in the plan before signing. Changing a Wizzy fee requires a code change, tests, user-facing disclosure, and a treasury review.
 
-## Treasury policy before token activation
+## Treasury and liquidity policy
 
-Until a reviewed token policy is approved, 100% of protocol revenue accumulates in the treasury. There is no automatic buyback, burn, dividend, staking yield, or token-holder revenue claim.
+Until Stage 3 is activated, 100% of protocol revenue accumulates in the treasury. There is no automatic buyback, burn, dividend, staking yield, token-holder revenue claim, or token/WETH liquidity route.
 
-The proposed monthly operating budget is a policy target, not hard-coded routing:
+After Stage 3, the proposed monthly allocation is:
 
-- 60% product operations, security reviews, infrastructure, legal work, and runway;
-- 25% two-sided protocol-owned market liquidity, subject to liquidity and concentration limits;
-- 15% measured distribution, user education, and capped gas or onboarding support.
+- 60% for product operations, security, infrastructure, legal work, taxes, and runway;
+- up to 25% for disclosed, treasury-owned, two-sided token/WETH liquidity;
+- up to 15% for measured distribution, user education, and capped onboarding support.
 
-Unused budget remains in treasury. Market-liquidity spending must be two-sided and disclosed; it must not be described or operated as price support. The dedicated Vercel-held EOA remains the treasury and future token creator; centralized index curation does not use it. Publish its address and a monthly inflow/outflow ledger without exposing the key or private operational metadata.
+These are policy ceilings, not automatic contract routes. Unused budget remains in treasury. Liquidity spending pauses when operations or security reserves fall below their published minimum.
 
-## Flow mechanics
+The treasury keeps the LP position; it is not burned or irreversibly locked by default. Treasury reports must distinguish:
 
-For a net deposit `D`, the intended Wizzy-token purchase is approximately `D × 10%`, subject to liquidity, the 8–12% band, and execution limits. Redemptions unwind the sleeve proportionally. Weight drift inside the band does not trigger a trade.
+- product fees received;
+- tokens purchased, if any, and realized execution price;
+- treasury tokens paired rather than purchased;
+- WETH contributed;
+- LP positions, fees, withdrawals, and realized divergence;
+- operating and distribution spending.
 
-The token's price must not determine its own eligibility or target weight. Wizzy's curator can pause or remove the sleeve for a security failure, broken market, or insufficient liquidity, but cannot increase the weight to defend price.
+Calling liquidity provision a buyback is inaccurate unless the treasury actually buys tokens on the market. No public communication may imply that 25% of revenue produces 25% of equivalent token-buying pressure.
 
-The flywheel is therefore:
+## Sleeve activation gates
 
-1. Users deposit into the index and receive self-custodied market positions.
-2. Wizzy earns the disclosed product fees above; trading fees remain with users except for the disclosed reinvest or withdrawal charge.
-3. Treasury funds product quality, security, two-sided liquidity, and measured distribution.
-4. After every activation gate passes, net index deposits allocate roughly 10% to the Wizzy sleeve; redemptions sell the corresponding share.
-5. Better product utility and distribution can bring more deposits and fee revenue, but the product must remain useful without token appreciation.
-
-## Activation gates
-
-Launching the token does not automatically add it to the index. Activation requires all of the following:
+Launching the token does not add it to the index. Stage 3 requires all of the following:
 
 - a reviewed token contract with immutable or tightly constrained owner powers;
 - verified source and public supply, allocation, vesting, and treasury disclosures;
-- at least 30 days of live market history;
+- at least 30 days of live token-market history;
 - at least $250,000 of usable onchain liquidity;
 - at least $100,000 of genuine rolling seven-day volume;
 - execution capacity for the proposed index order without exceeding 1% of usable pool depth;
 - no unresolved transfer restrictions, blacklist powers, tax mechanics, mutable supply, or concentration risk;
-- an independent legal review of the token, index inclusion, related-party disclosure, and marketing copy.
+- an independent legal review of the token, index inclusion, related-party disclosure, treasury policy, and marketing copy;
+- a product release that shows the sleeve target, current weight, band, realized slippage, last review, next review, and any pause reason.
 
 No wash trading, treasury self-trading, circular volume, or undisclosed volume incentives count toward these gates.
 
 ## Rebalance execution
 
-- Trade only after the observed weight closes outside 8–12%.
-- Return toward 10% using time-weighted orders.
+- Trade only after the observed weight closes outside the active sleeve's band.
+- Return toward the active target using time-weighted orders.
 - Cap a day's index order at the lower of 1% of usable pool depth or 10% of genuine average daily volume.
 - Enforce a 24-hour cooldown between index-directed trades.
-- Pause rather than force a rebalance when slippage, oracle quality, or liquidity is outside policy.
-- Publish the target, band, last review, next review, realized slippage, and any pause reason in the product.
+- Pause rather than force a rebalance when slippage, oracle quality, market integrity, or liquidity is outside policy.
+- Redemptions unwind the sleeve proportionally even when ordinary rebalancing is paused, unless execution cannot be performed safely.
+- Publish the target, band, last review, next review, realized slippage, and pause reason.
 
-## Token contract and allocation constraints
+The curator can pause or remove the sleeve for a security failure, broken market, or insufficient liquidity. It cannot add the sleeve, restore it, increase its weight, or trade to defend its price.
 
-The preferred contract is deliberately boring: fixed supply, no transfer tax, no blacklist, no hidden mint, no upgradeable transfer logic, and no marketing-dependent mechanics. If Pools deploys a standard contract, verify the deployed bytecode and owner powers before announcing it.
+## Token launch sequence
 
-The final supply and allocation remain open decisions. Before launch, publish one table covering team, treasury, liquidity, community distribution, vesting contracts, cliffs, and every wallet that controls more than 1% of supply. Team and treasury allocations need onchain vesting rather than promises in copy.
+1. Complete the Stage 1 go/no-go record.
+2. Finalize name, ticker, supply, allocations, vesting, contract controls, risk disclosure, jurisdictions, and launch mode.
+3. Keep the dedicated creator address as the only launch signer; do not use it for ordinary product operations.
+4. Verify the creator/treasury address and recovery path before material value is present.
+5. Review the current Pools or alternative launch-provider terms using the connected transaction as the source of truth.
+6. Simulate and independently review creation, initial liquidity, recipient wallets, creator permissions, and vesting contracts.
+7. Launch without index inclusion and record the confirmed contract and pool addresses.
+8. Verify source, bytecode, supply, holders, owner powers, pool, and usable liquidity from independent chain data.
+9. Publish the canonical contract and disclosures, then collect at least 30 days of market evidence.
+10. Activate the 5% sleeve only after every gate passes and the required product code has shipped.
 
-## Pools launch sequence
+## Public communication
 
-1. Finalize name, ticker, supply, allocations, vesting, contract controls, risk disclosure, and launch mode.
-2. Keep the dedicated creator address as the only launch signer; do not use it for ordinary product operations.
-3. Verify the dedicated creator/treasury address and its Vercel recovery path before material value is present.
-4. Connect the creator wallet to Pools and review the current Robinhood Chain transaction terms. Pools currently presents ordinary and crowd-launch paths; the connected transaction is the source of truth.
-5. Simulate and independently review the creation transaction, initial liquidity, recipient wallets, creator permissions, and any vesting contracts.
-6. Launch without index inclusion. Record the contract address and transaction hash before any social announcement.
-7. Verify source, bytecode, supply, holders, owner powers, pool address, and usable liquidity from independent chain data.
-8. Publish the canonical contract address and disclosures, then build genuine liquidity and distribution.
-9. Activate the 10% sleeve only after every gate passes and the required policy code has shipped.
+Before the token exists, Wizzy may explain the application and publish risk education without implying that a token is scheduled. After onchain verification, pin one canonical token post containing the contract address, chain, pool, supply disclosure, treasury links, related-party sleeve status, and anti-scam warning.
 
-No token transaction, funding transfer, Pools signature, or custody migration should happen as a side effect of product deployment.
+Never describe the flywheel as guaranteed demand, price support, revenue sharing, yield, or a floor. Never announce a contract address obtained only from an unconfirmed creation screen.
 
-## X account sequence
+The Wizzy token is a related-party asset. Public disclosures must state that the operator controls the product treasury, may hold tokens, controls whether to propose sleeve activation, and may provide or withdraw disclosed treasury-owned liquidity under policy.
 
-Create the Wizzy X account as a separate public identity using dedicated recovery details, a password-manager-generated credential, passkey or hardware key, and no reused profile copy or avatars. The account must not claim Robinhood, Uniswap, Pools, or Fomo affiliation.
+## Regulatory review scope
 
-Before launch, it may explain Wizzy's product and publish risk education without implying that a token already exists. After onchain verification, pin one canonical post containing the contract address, chain, pool, supply disclosure, treasury links, and anti-scam warning. Never announce a contract address obtained only from an unconfirmed creation screen.
+This plan is an operating decision, not a legal conclusion. The independent review must use the law and product facts current at the time of each later stage, including:
 
-## Conflict controls
+- the [FCA cryptoasset financial-promotion regime](https://www.fca.org.uk/publications/fg23-3-finalised-non-handbook-guidance-cryptoasset-financial-promotions), which covers websites, apps, and social communications capable of affecting UK consumers;
+- the UK cryptoasset regime scheduled to come into force on 25 October 2027, including public-offer, dealing, arranging, conflict, disclosure, and market-abuse questions ([official impact assessment](https://www.legislation.gov.uk/uksi/2026/102/pdfs/uksiod_20260102_en_001.pdf));
+- [MiCA Article 4](https://www.esma.europa.eu/publications-and-data/interactive-single-rulebook/mica/article-4-offers-public-crypto-assets-other) for any EU offer or intended admission to trading;
+- the fact-specific US analysis described in the [SEC staff statement on meme coins](https://www.sec.gov/newsroom/speeches-statements/staff-statement-meme-coins), which does not cover every product labeled a meme coin and has no legal force by itself.
 
-The Wizzy token is a related-party constituent. The product must disclose that the operator controls the product treasury and may hold tokens. Treasury wallets, creator wallets, team allocation, vesting, fees, and any future buyback policy must be public before activation.
+A disclaimer does not replace a lawful promotion route, required disclosures, product controls, or jurisdictional restrictions.
 
-Index inclusion must not be presented as an investment guarantee. The token qualifies through a separate, auditable sleeve policy rather than being ranked against ordinary meme markets by an operator-controlled score.
+## Evidence and abort conditions
 
-## Launch evidence and abort conditions
+The token launch record must contain the go/no-go decision, legal review, transaction simulation, deployed contract and pool, verified bytecode, supply and holder snapshot, vesting addresses, treasury and creator addresses, and initial liquidity.
 
-The launch record must contain the reviewed transaction simulation, deployed contract and pool, verified bytecode, supply and holder snapshot, vesting addresses, treasury and creator addresses, liquidity depth, first 30 days of genuine volume, legal approval, and the exact product commit that can activate the sleeve.
+The sleeve activation record must additionally contain 30 days of genuine market history, volume and depth evidence, concentration analysis, expected and simulated index orders, the treasury policy, conflict disclosures, and the exact product commit that activates the sleeve.
 
-Abort or pause on any unexpected owner power, tax, mint authority, recipient, liquidity lock, contract mismatch, misleading social account, concentrated undisclosed holder, abnormal volume, or inability to keep the sleeve within execution limits.
+Abort or pause on any unexpected owner power, tax, mint authority, recipient, liquidity lock, contract mismatch, misleading social account, concentrated undisclosed holder, abnormal volume, missing disclosure, or inability to keep the sleeve within execution limits.
 
 ## Open decisions
 
 - token name and ticker;
-- Pools crowd launch versus ordinary launch;
+- launch provider and launch mode;
 - total supply, team and community allocations, and vesting;
-- whether the token has utility beyond being a disclosed index sleeve;
+- the token's community or product role beyond being a disclosed index sleeve;
 - the official X handle and launch communications;
-- whether protocol revenue ever accrues to token holders. No value-accrual claim should be made until it is implemented and independently reviewed.
+- the minimum operating and security reserve that must be funded before liquidity spending;
+- whether protocol revenue ever accrues to token holders. No value-accrual claim may be made until it is implemented and independently reviewed.
 
-Public-identity separation and launch-account controls are defined in [Launch privacy](LAUNCH_PRIVACY.md).
+Public-identity separation and the two distinct launch checklists are defined in [Launch privacy](LAUNCH_PRIVACY.md). Ordinary constituent selection is defined in [Index curation](CURATION.md).

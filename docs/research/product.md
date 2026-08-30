@@ -26,7 +26,7 @@ Treasury (all product fees): 0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42 (TREASUR
 | A Revert clone that takes the NFT | We copy Revert jobs and fees, not v1 Compoundor custody and not Lend. |
 | Silent-sign from X | Bankr May 2026. No social scanner that can reach the signer. Chat is local CLI / MCP. |
 | A no-IL product | Concentrated liquidity diverges from HOLD. The position card must show it. |
-| A Virtuals launchpad | Tokenizing the agent is a later step (virtuals.md). This repo does not deploy a token. |
+| A token launchpad | A token is a separate future decision governed by [the token and index plan](../TOKEN_FLYWHEEL.md). This repo does not deploy one in the initial application release. |
 
 ## 4. Fee schedule
 
@@ -116,7 +116,7 @@ Without an API key the agent still does full read / PnL / dry-run and builds cal
 4. Surfaces are CLI, local NL, MCP, and a skill — Bankr good shape without Bankr social signer.
 5. v2, v3, and v4. v3 NFTs are enumerable; v4 hooks are untrusted code until reviewed; v2 fees are realized via decrease.
 6. Official Uniswap LP + Trading APIs at 6 RPS, x-api-key, no integrator swap take.
-7. Virtuals (1% tax, 70/30, 42k graduation, 10y lock) is how the agent may later fund itself; creator wallet = treasury.
+7. A future token is a separate launch, starts at 0% index weight, and follows the staged token plan; no provider is selected yet.
 8. We do not silent-sign from X; May 2026 is the corpus, not a vibe.
 9. We do not take Aerodrome or Lend; January 2026 is why.
 10. Dry-run default, allowlisted signer, policy file, honest divergence vs HOLD.

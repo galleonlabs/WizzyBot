@@ -18,6 +18,14 @@ Missing provider data is reported as unavailable, not as a failed liquidity or v
 
 The curator is the decision-maker. A `review` incumbent remains until an eligible candidate earns a policy-valid replacement; it is not an operator approval queue. A `pause` recommendation requires the curator agent to mark the market unavailable in the catalog and ship the tested application deployment before new deposits stop using it. Eligible replacements inherit the outgoing market's weight and range width, preserving a 10,000-basis-point catalog without exposing arbitrary model-generated calldata.
 
+## Related-party Wizzy sleeve
+
+The initial application launches with no Wizzy token and a 0% related-party sleeve. A future Wizzy token is never an ordinary candidate and is never scored against constituent markets.
+
+If the separately reviewed [token and index plan](TOKEN_FLYWHEEL.md) reaches its activation stage, a product release may reserve a fixed 5% sleeve. Ordinary constituents then share the remaining 95%. The sleeve can rise to a hard 10% maximum only through the plan's later expansion review; the curator cannot propose or authorize that change.
+
+The curator may recommend pausing or removing an active Wizzy sleeve for a security failure, broken market, insufficient liquidity, or failed execution gate. It cannot add or restore the sleeve, increase its target, treat treasury-funded liquidity as qualifying evidence, or trade to defend the token's price. Ordinary replacements inherit only the outgoing ordinary constituent's weight and never change the related-party sleeve.
+
 ## Robinhood launch index
 
 The 2026-08-30 launch review selected six Robinhood Uniswap v3 WETH markets with at least 30 days of pool history:
@@ -46,7 +54,7 @@ The dappnode timer persists:
 
 Candidate addresses, identity state, and thresholds live in `src/config/curator.json`. Robinhood membership, weights, and replacement migrations live in `src/config/markets.json`; this version-controlled catalog is the production registry.
 
-Every constituent replacement inherits the outgoing weight and range width. The catalog keeps the outgoing market inactive and records a migration to its active successor, allowing Markets to offer affected wallets a one-approval migration without touching unrelated positions.
+Every ordinary constituent replacement inherits the outgoing weight and range width. The catalog keeps the outgoing market inactive and records a migration to its active successor, allowing Markets to offer affected wallets a one-approval migration without touching unrelated positions.
 
 The dappnode timer runs a two-layer curator every six hours:
 

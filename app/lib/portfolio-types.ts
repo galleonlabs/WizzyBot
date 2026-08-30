@@ -79,6 +79,26 @@ export type MarketsPayload = {
   source: string;
 };
 
+export type PoolActivityItem = {
+  id: string;
+  kind: "added" | "removed";
+  marketId: string;
+  symbol: string;
+  pair: string;
+  wethAmount: string | null;
+  transactionHash: `0x${string}`;
+  transactionUrl: string;
+  blockNumber: string;
+};
+
+export type PoolActivityPayload = {
+  state: "ready" | "unavailable";
+  items: PoolActivityItem[];
+  asOfBlock: string | null;
+  scannedBlocks: number;
+  rpcRequests: 2;
+};
+
 export type EthFundingChain = {
   id: number;
   label: string;

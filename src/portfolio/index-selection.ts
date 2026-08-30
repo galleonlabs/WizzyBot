@@ -46,7 +46,7 @@ export type RobinhoodIndexBreadthPolicy = {
   };
 };
 
-const ROBINHOOD_BREADTH_UNIT_WEI = parseEther("0.05");
+const ROBINHOOD_BREADTH_UNIT_WEI = parseEther("0.02");
 
 type RankedMarket = {
   chain: IndexChain;
@@ -102,7 +102,7 @@ export function selectMemeIndexMarkets(totalAmountWei: bigint): IndexBreadthTier
 }
 
 /**
- * The launch index is intentionally network-specific. Each viable 0.05 ETH
+ * The launch index is intentionally network-specific. Each viable 0.02 ETH
  * unit adds the next onchain Robinhood market by curator weight.
  */
 export function getRobinhoodIndexBreadthPolicy(indexMarkets: Array<{ id: string; weightBps: number }> = activeMarkets("robinhood")): RobinhoodIndexBreadthPolicy {

@@ -1,4 +1,4 @@
-import { getAddress, isAddress, type Address } from "viem";
+import { getAddress, isAddress, type Address, type PublicClient } from "viem";
 import { addressesFor, chainOf, type ChainSlug } from "../chains.js";
 import { V3Adapter } from "../chain/positions.js";
 import { AerodromeSlipstreamAdapter } from "../aerodrome/positions.js";
@@ -21,12 +21,16 @@ import {
   erc20ApproveTx,
   erc20TransferTx,
   increaseCalldata,
+  unwrapEthTx,
 } from "../uniswap/calldata.js";
+import { exactInV3Tx } from "../uniswap/router.js";
+import { quoterV2Abi } from "../chain/abi.js";
 import type { SerializableTx } from "./allocation.js";
 
 const PLAN_TTL_MS = 8 * 60_000;
 const WITHDRAW_FEE_SAFETY_BPS = 9_800n;
 const BPS = 10_000n;
+const WITHDRAW_SWAP_SLIPPAGE_BPS = 150n;
 
 export type PositionActionPlan = {
   kind: "compound" | "withdraw";
@@ -40,6 +44,7 @@ export type PositionActionPlan = {
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: Address; symbol: string; amount: string }>;
+  settlement?: { asset: "ETH"; minimumAmountWei: string; marketSymbol: string };
   transactions: SerializableTx[];
   allowedTargets: Address[];
   createdAt: string;
@@ -78,9 +83,79 @@ export async function planPositionAction(input: {
   const configuredMarkets = input.chain === "robinhood"
     ? (await getRobinhoodIndexState()).catalog.chains.find((catalogChain) => catalogChain.slug === "robinhood")?.markets ?? []
     : chainCatalog(input.chain).markets;
-  const configured = positionPoolIsConfigured(snapshot, configuredMarkets);
+  const configured = configuredMarkets.find((market) => positionPoolIsConfigured(snapshot, [market]));
   if (!configured) throw new Error("position pool is not in Wizzy's curated market catalog");
-  return buildPositionActionPlan(snapshot, owner, input.chain, input.action, env.treasury);
+  const plan = buildPositionActionPlan(snapshot, owner, input.chain, input.action, env.treasury);
+  if (input.action !== "withdraw" || input.chain !== "robinhood" || configured.protocol !== "V3") return plan;
+  return addRobinhoodEthSettlement(plan, snapshot, configured, client);
+}
+
+async function addRobinhoodEthSettlement(
+  plan: PositionActionPlan,
+  snapshot: PositionSnapshot,
+  market: CuratedMarket,
+  client: PublicClient,
+): Promise<PositionActionPlan> {
+  const addresses = addressesFor("robinhood");
+  if (market.quoteToken.toLowerCase() !== addresses.weth.toLowerCase()) {
+    throw new Error("This market cannot currently settle to Robinhood ETH");
+  }
+  const quoteIsToken0 = snapshot.token0.address.toLowerCase() === market.quoteToken.toLowerCase();
+  const quoteGrossFloor = ((quoteIsToken0 ? snapshot.amount0 + snapshot.uncollected0 : snapshot.amount1 + snapshot.uncollected1) * 9_850n) / BPS;
+  const memeGrossFloor = ((quoteIsToken0 ? snapshot.amount1 + snapshot.uncollected1 : snapshot.amount0 + snapshot.uncollected0) * 9_850n) / BPS;
+  const feeByToken = new Map(plan.serviceFee.map((fee) => [fee.token.toLowerCase(), BigInt(fee.amount)]));
+  const wethFloor = quoteGrossFloor - (feeByToken.get(market.quoteToken.toLowerCase()) ?? 0n);
+  const memeToSwap = memeGrossFloor - (feeByToken.get(market.token.toLowerCase()) ?? 0n);
+  if (wethFloor < 0n || memeToSwap < 0n || (wethFloor === 0n && memeToSwap === 0n)) {
+    throw new Error("This position is too small to withdraw to ETH");
+  }
+
+  const settlementTransactions: PlannedTx[] = [];
+  let minimumSwapOut = 0n;
+  if (memeToSwap > 0n) {
+    const quote = await client.simulateContract({
+      address: addresses.quoterV2,
+      abi: quoterV2Abi,
+      functionName: "quoteExactInputSingle",
+      args: [{
+        tokenIn: market.token,
+        tokenOut: market.quoteToken,
+        amountIn: memeToSwap,
+        fee: market.fee,
+        sqrtPriceLimitX96: 0n,
+      }],
+    });
+    minimumSwapOut = (quote.result[0] * (BPS - WITHDRAW_SWAP_SLIPPAGE_BPS)) / BPS;
+    if (minimumSwapOut <= 0n) throw new Error("The market returned no usable ETH withdrawal quote");
+    settlementTransactions.push(
+      erc20ApproveTx(market.token, addresses.swapRouter02, memeToSwap),
+      exactInV3Tx({
+        tokenIn: market.token,
+        tokenOut: market.quoteToken,
+        fee: market.fee,
+        amountIn: memeToSwap,
+        amountOutMin: minimumSwapOut,
+        recipient: plan.owner,
+        chainId: 4663,
+      }),
+    );
+  }
+  const minimumEth = wethFloor + minimumSwapOut;
+  settlementTransactions.push(unwrapEthTx(minimumEth, 4663));
+  const transactions = [...plan.transactions, ...settlementTransactions.map(serialize)];
+  const allowedTargets = uniqueAddresses([...plan.allowedTargets, addresses.swapRouter02, addresses.weth, market.token]);
+  assertAllowed(transactions.map(deserialize), allowedTargets);
+  return {
+    ...plan,
+    transactions,
+    allowedTargets,
+    settlement: { asset: "ETH", minimumAmountWei: minimumEth.toString(), marketSymbol: market.symbol },
+    notices: [
+      `Your ${market.symbol} position closes and converts to native ETH in one atomic wallet approval.`,
+      "If any step fails, the entire withdrawal reverts and your LP position remains yours.",
+      "The quote includes 1.5% swap protection. Small execution surplus or token dust remains in your wallet.",
+    ],
+  };
 }
 
 export function positionPoolIsConfigured(
@@ -226,6 +301,10 @@ function managerFor(snapshot: PositionSnapshot, chain?: ChainSlug): Address {
 
 function serialize(tx: PlannedTx): SerializableTx {
   return { ...tx, value: tx.value.toString() };
+}
+
+function deserialize(tx: SerializableTx): PlannedTx {
+  return { ...tx, value: BigInt(tx.value) };
 }
 
 function uniqueAddresses(addresses: readonly Address[]): Address[] {

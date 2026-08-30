@@ -21,6 +21,10 @@ export type CallsSubmission = {
   callCount: number;
 };
 
+export type ConfirmedCallsSubmission = CallsSubmission & {
+  status: unknown;
+};
+
 /** Request one self-custodial EIP-5792/7702 batch through the connected wallet. */
 export async function sendWalletCalls(input: {
   wallet: ConnectedEvmWallet;
@@ -61,11 +65,72 @@ export async function walletCallsStatus(provider: EthereumProvider, id: string):
   return provider.request({ method: "wallet_getCallsStatus", params: [id] });
 }
 
+/** Submit one atomic batch and resolve only after the wallet reports a confirmed receipt. */
+export async function sendWalletCallsAndWait(input: {
+  wallet: ConnectedEvmWallet;
+  owner: string;
+  chainId: number;
+  transactions: readonly WalletTransaction[];
+  onSubmitted?: (submission: CallsSubmission) => void;
+  timeoutMs?: number;
+  pollingIntervalMs?: number;
+}): Promise<ConfirmedCallsSubmission> {
+  const submission = await sendWalletCalls(input);
+  input.onSubmitted?.(submission);
+  const provider = await input.wallet.getEthereumProvider();
+  const status = await waitForWalletCalls({
+    provider,
+    id: submission.id,
+    timeoutMs: input.timeoutMs,
+    pollingIntervalMs: input.pollingIntervalMs,
+  });
+  return { ...submission, status };
+}
+
+export async function waitForWalletCalls(input: {
+  provider: EthereumProvider;
+  id: string;
+  timeoutMs?: number;
+  pollingIntervalMs?: number;
+}): Promise<unknown> {
+  const timeoutMs = input.timeoutMs ?? 120_000;
+  const pollingIntervalMs = input.pollingIntervalMs ?? 1_200;
+  const startedAt = Date.now();
+  let lastStatus: unknown;
+  while (Date.now() - startedAt < timeoutMs) {
+    lastStatus = await walletCallsStatus(input.provider, input.id);
+    const terminal = callsTerminalState(lastStatus);
+    if (terminal === "success") return lastStatus;
+    if (terminal === "failure") throw new Error("The wallet batch failed onchain. No success state was shown; review the transaction and try again.");
+    await delay(pollingIntervalMs);
+  }
+  throw new Error("The wallet is still confirming this transaction. Check your wallet activity before trying again.");
+}
+
 export function relaySucceeded(status: unknown): boolean {
   if (!status || typeof status !== "object") return false;
   const record = status as Record<string, unknown>;
   const value = String(record.status ?? record.state ?? "").toLowerCase();
   return value === "success" || value === "completed" || value === "filled";
+}
+
+export function callsTerminalState(status: unknown): "pending" | "success" | "failure" {
+  if (!status || typeof status !== "object") return "pending";
+  const record = status as Record<string, unknown>;
+  const receipts = Array.isArray(record.receipts) ? record.receipts : [];
+  if (receipts.some((receipt) => receipt && typeof receipt === "object" && String((receipt as Record<string, unknown>).status).toLowerCase() === "0x0")) {
+    return "failure";
+  }
+  const raw = record.status ?? record.statusCode ?? record.state;
+  if (typeof raw === "number") {
+    if (raw >= 200 && raw < 300) return "success";
+    if (raw >= 300) return "failure";
+    return "pending";
+  }
+  const value = String(raw ?? "").toLowerCase();
+  if (["200", "0xc8", "confirmed", "success", "completed", "filled"].includes(value)) return "success";
+  if (["400", "500", "0x190", "0x1f4", "failed", "failure", "reverted", "rejected"].includes(value)) return "failure";
+  return "pending";
 }
 
 function toQuantity(value: string): `0x${string}` {
@@ -85,4 +150,8 @@ function callsId(value: unknown): string | null {
     if (typeof data.id === "string") return data.id;
   }
   return null;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

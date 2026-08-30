@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { relaySucceeded, sendWalletCalls } from "../app/lib/wallet-calls.js";
+import { callsTerminalState, relaySucceeded, sendWalletCalls, sendWalletCallsAndWait } from "../app/lib/wallet-calls.js";
 
 describe("client wallet batches", () => {
   it("switches chain and asks the wallet for one atomic batch", async () => {
@@ -56,5 +56,31 @@ describe("client wallet batches", () => {
     expect(relaySucceeded({ status: "success" })).toBe(true);
     expect(relaySucceeded({ state: "filled" })).toBe(true);
     expect(relaySucceeded({ status: "pending" })).toBe(false);
+  });
+
+  it("waits for a Robinhood batch to confirm before resolving", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce("0xbundle")
+      .mockResolvedValueOnce({ status: 100 })
+      .mockResolvedValueOnce({ status: 200, receipts: [{ status: "0x1" }] });
+    const result = await sendWalletCallsAndWait({
+      wallet: {
+        address: "0x1111111111111111111111111111111111111111",
+        switchChain: async () => undefined,
+        getEthereumProvider: async () => ({ request }),
+      },
+      owner: "0x1111111111111111111111111111111111111111",
+      chainId: 4663,
+      transactions: [{ to: "0x2222222222222222222222222222222222222222", data: "0x1234", value: "0", description: "test" }],
+      pollingIntervalMs: 0,
+    });
+    expect(result.id).toBe("0xbundle");
+    expect(request).toHaveBeenLastCalledWith({ method: "wallet_getCallsStatus", params: ["0xbundle"] });
+  });
+
+  it("never treats a reverted receipt as success", () => {
+    expect(callsTerminalState({ status: 200, receipts: [{ status: "0x0" }] })).toBe("failure");
+    expect(callsTerminalState({ status: 100 })).toBe("pending");
+    expect(callsTerminalState({ status: "CONFIRMED", receipts: [{ status: "0x1" }] })).toBe("success");
   });
 });

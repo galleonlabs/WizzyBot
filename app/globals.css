@@ -485,6 +485,21 @@ svg {
 .plan-loading i:nth-child(2) { animation-delay: .14s; }
 .plan-loading i:nth-child(3) { animation-delay: .28s; }
 
+.success-celebration { position: relative; display: grid; width: 88px; height: 76px; place-items: center; margin: 7px auto 2px; }
+.success-celebration > img { width: 62px; height: 62px; object-fit: contain; filter: drop-shadow(0 12px 22px rgba(0, 0, 0, .14)); animation: success-mascot 700ms var(--motion-out) both; }
+.success-check { position: absolute; right: 4px; bottom: 3px; display: grid; width: 25px; height: 25px; place-items: center; border: 3px solid var(--surface); border-radius: 50%; background: var(--mint); color: var(--surface); animation: success-check 520ms var(--motion-out) 180ms both; }
+.success-check svg { width: 14px; stroke-width: 2.6; }
+.success-spark { position: absolute; width: 6px; height: 6px; border-radius: 2px; background: var(--coral); animation: success-spark 720ms var(--motion-out) both; }
+.success-spark-1 { top: 7px; left: 7px; --spark-x: -8px; --spark-y: -6px; --spark-r: 32deg; }
+.success-spark-2 { top: 5px; right: 7px; background: var(--mint); --spark-x: 9px; --spark-y: -5px; --spark-r: -26deg; }
+.success-spark-3 { bottom: 9px; left: 3px; background: var(--blue); --spark-x: -7px; --spark-y: 7px; --spark-r: -38deg; }
+.success-spark-4 { right: 1px; bottom: 15px; --spark-x: 8px; --spark-y: 7px; --spark-r: 24deg; }
+.action-preview.is-submitted { grid-template-columns: auto 1fr auto auto; border-color: color-mix(in srgb, var(--mint) 30%, var(--line)); }
+.action-preview .success-celebration { width: 56px; height: 48px; margin: 0; }
+.action-preview .success-celebration > img { width: 43px; height: 43px; }
+.action-preview .success-check { right: 0; bottom: 0; width: 20px; height: 20px; border-width: 2px; }
+.action-preview .success-spark { display: none; }
+
 .position-ledger { padding-top: 36px; }
 .position-ledger { scroll-margin-top: 82px; }
 .position-ledger > header { align-items: flex-end; margin-bottom: 16px; }
@@ -680,6 +695,9 @@ svg {
 @keyframes panel-open { from { opacity: .35; clip-path: inset(0 0 22% 0 round 12px); filter: blur(2px); } }
 @keyframes index-segment-assemble { from { opacity: .2; transform: scaleX(0); } }
 @keyframes composition-label-in { from { opacity: 0; transform: scale(.88); filter: blur(2px); } }
+@keyframes success-mascot { from { opacity: 0; transform: translateY(8px) scale(.72) rotate(-5deg); } 72% { transform: translateY(-2px) scale(1.04) rotate(1deg); } }
+@keyframes success-check { from { opacity: 0; transform: scale(.35) rotate(-18deg); } }
+@keyframes success-spark { from { opacity: 0; transform: translate3d(calc(var(--spark-x) * -1), calc(var(--spark-y) * -1), 0) scale(.25) rotate(0); } 45% { opacity: 1; } to { opacity: 0; transform: translate3d(var(--spark-x), var(--spark-y), 0) scale(1) rotate(var(--spark-r)); } }
 @keyframes wizzy-drift {
   from { transform: translate3d(0, 0, 0) rotate(var(--ghost-rotation)); }
   to { transform: translate3d(var(--ghost-x), var(--ghost-y), 0) rotate(var(--ghost-rotation-end)); }

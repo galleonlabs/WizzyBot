@@ -251,6 +251,7 @@ export type PositionActionPlan = {
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: `0x${string}`; symbol: string; amount: string }>;
+  settlement?: { asset: "ETH"; minimumAmountWei: string; marketSymbol: string };
   transactions: WalletTransaction[];
   createdAt: string;
   expiresAt: string;

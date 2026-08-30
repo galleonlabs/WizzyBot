@@ -1,0 +1,57 @@
+1/7
+Wizzy is live.
+
+One amount. Six meme markets. Every LP position stays in your wallet.
+
+Make Meme Markets → https://wizzy.meme
+
+2/7
+LP fees can be attractive. The setup is not.
+
+Pick the tokens. Check the pool. Choose a fee tier and range. Bridge. Approve. Monitor. Rebalance.
+
+Wizzy turns that into one amount and one review.
+
+3/7
+How it works:
+
+1. Sign in with Privy
+2. Fund your Wizzy account
+3. Enter an ETH amount
+4. Review the current index
+5. Approve the transaction batch
+
+No vault. The Uniswap v3 position NFTs go to your wallet.
+
+4/7
+The launch index is six WETH markets on Robinhood Chain:
+
+CASHCAT 35%
+PONS 22%
+AI 17%
+CHUMP 12%
+STONKBROKER 9%
+PONSGUY 5%
+
+The curator reviews liquidity, volume, security and capacity every six hours.
+
+5/7
+Then Wizzy keeps the work visible: position value, unclaimed fees, range health and pool activity.
+
+Compound, rebalance or withdraw back to ETH when you choose.
+
+6/7
+Built on Robinhood Chain (@RobinhoodCrypto) with @Uniswap v3. @privy_io provides the embedded wallet. @RelayProtocol provides fast cross-chain funding.
+
+Constituent trade links open in @fomo.
+
+No affiliation or endorsement is implied.
+
+7/7
+Wizzy starts with meme-market LPs on Robinhood Chain.
+
+The direction: more protocols, more chains and the easiest LP experience for memes.
+
+LPing still carries price, range and smart-contract risk. Wizzy removes setup work, not market risk.
+
+https://wizzy.meme

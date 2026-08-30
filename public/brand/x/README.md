@@ -1,4 +1,4 @@
-# @wizzydotfun X profile kit
+# @wizzydotmeme X profile kit
 
 Ready-to-upload files:
 

@@ -314,12 +314,15 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain('fetch("/api/pool-activity"');
     expect(portfolio).toContain("POOL_ACTIVITY_REFRESH_MS = 60_000");
     expect(portfolio).toContain('document.visibilityState === "hidden"');
+    expect(css).toMatch(/\.index-nav \{[\s\S]*?z-index: 2;/);
+    expect(css).toMatch(/\.pool-activity \{[\s\S]*?z-index: 1;/);
     expect(css).toContain("@keyframes pool-activity-scroll");
     expect(css).toContain('.pool-activity-group[aria-hidden="true"]');
     expect(poolActivitySource).toContain('activeMarkets("robinhood")');
     expect(poolActivitySource).toContain("events: [V3_MINT_EVENT, V3_BURN_EVENT]");
     expect(poolActivitySource).toContain("address: markets.map((market) => market.pool)");
     expect(poolActivitySource).toContain("rpcRequests: 2");
+    expect(poolActivitySource).not.toContain("batch:");
     expect(poolActivitySource).not.toMatch(/getTransaction|getBlock\(/);
   });
 

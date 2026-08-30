@@ -1,12 +1,13 @@
 import {
+  createPublicClient,
   formatEther,
+  http,
   parseAbiItem,
   type Address,
   type Hash,
 } from "viem";
 import { ROBINHOOD_RPC_DEFAULT, viemChainFor } from "../chains.js";
 import { loadEnv } from "../config/env.js";
-import { makePublicClient } from "../signer/broadcast.js";
 import { activeMarkets, type CuratedMarket } from "./catalog.js";
 
 export const V3_MINT_EVENT = parseAbiItem(
@@ -101,7 +102,10 @@ export async function fetchRecentPoolActivity(options: {
 } = {}): Promise<PoolActivityPayload> {
   const markets = activeMarkets("robinhood").filter((market) => market.protocol === "V3");
   const rpcUrl = loadEnv().rpcByChain.robinhood || ROBINHOOD_RPC_DEFAULT;
-  const client = options.client ?? makePublicClient(rpcUrl, viemChainFor("robinhood")) as unknown as PoolActivityClient;
+  const client = options.client ?? createPublicClient({
+    chain: viemChainFor("robinhood"),
+    transport: http(rpcUrl, { retryCount: 3, retryDelay: 500, timeout: 15_000 }),
+  }) as unknown as PoolActivityClient;
   const toBlock = await client.getBlockNumber();
   const blockWindow = options.blockWindow ?? BLOCK_WINDOW;
   const fromBlock = toBlock >= blockWindow ? toBlock - blockWindow + 1n : 0n;

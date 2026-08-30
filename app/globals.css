@@ -197,6 +197,7 @@ svg {
 
 .index-nav {
   position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -208,6 +209,8 @@ svg {
 }
 
 .pool-activity {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;

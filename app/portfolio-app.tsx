@@ -40,16 +40,10 @@ type IndexMarket = {
 };
 
 const INDEX_MARKET_COUNT = 6;
-const FOMO_URL = "https://fomo.family/";
-const GECKO_URL = "https://www.geckoterminal.com/robinhood/pools";
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
   robinhood: "https://assets.relay.link/icons/4663/light.png",
   solana: "https://assets.relay.link/icons/792703809/light.png",
-  uniswap: "https://avatars.githubusercontent.com/u/36115574?v=4",
-  aerodrome: "https://avatars.githubusercontent.com/u/139490796?v=4",
-  meteora: "https://avatars.githubusercontent.com/u/126859799?v=4",
-  fomo: "https://fomo.family/favicon.svg",
   gecko: "https://www.geckoterminal.com/favicon.ico",
 } as const;
 
@@ -83,9 +77,9 @@ export function PortfolioApp() {
   const { ready: solanaReady, wallets: solanaWallets } = useSolanaWallets();
   const { signTransaction } = useSignTransaction();
   const [tab, setTab] = useState<ViewTab>("overview");
-  const [theme, setTheme] = useState<ThemePreference>("system");
+  const [theme, setTheme] = useState<ThemePreference>("dark");
   const [amount, setAmount] = useState("1.00");
-  const [sourceChainId, setSourceChainId] = useState(8453);
+  const [sourceChainId, setSourceChainId] = useState(4663);
   const [markets, setMarkets] = useState<MarketsPayload>(EMPTY_MARKETS);
   const [marketsState, setMarketsState] = useState<"loading" | "ready" | "error">("loading");
   const [positions, setPositions] = useState<PositionView[]>([]);
@@ -140,8 +134,8 @@ export function PortfolioApp() {
   }, [address, authenticated, solanaAddress, solanaReady]);
 
   useEffect(() => {
-    const saved = document.documentElement.dataset.theme;
-    if (saved === "light" || saved === "dark") setTheme(saved);
+    const saved = window.localStorage.getItem("una-theme");
+    if (saved === "system" || saved === "light" || saved === "dark") setTheme(saved);
   }, []);
 
   useEffect(() => {
@@ -200,13 +194,12 @@ export function PortfolioApp() {
   }
 
   function cycleTheme() {
-    const next: ThemePreference = theme === "system" ? "light" : theme === "light" ? "dark" : "system";
+    const next: ThemePreference = theme === "dark" ? "light" : theme === "light" ? "system" : "dark";
     setTheme(next);
     if (next === "system") delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = next;
     try {
-      if (next === "system") window.localStorage.removeItem("una-theme");
-      else window.localStorage.setItem("una-theme", next);
+      window.localStorage.setItem("una-theme", next);
     } catch {
       // The selected theme still applies for this session when storage is unavailable.
     }
@@ -347,11 +340,9 @@ export function PortfolioApp() {
       positions={positions}
       state={positionsState}
       stats={stats}
-      onLogin={() => void login()}
       onStart={() => changeTab("overview")}
       onRetry={() => void loadPositions()}
       onAction={preparePositionAction}
-      markets={selectedMarkets}
       actionPlan={actionPlan}
       actionState={actionState}
       onExecute={executePositionAction}
@@ -375,7 +366,7 @@ export function PortfolioApp() {
           ))}
         </nav>
         <div className="nav-actions">
-          <button className="theme-button" type="button" onClick={cycleTheme} aria-label={`Theme: ${capitalize(theme)}. Switch to ${theme === "system" ? "light" : theme === "light" ? "dark" : "system"}.`} title={`Theme: ${capitalize(theme)}`}>
+          <button className="theme-button" type="button" onClick={cycleTheme} aria-label={`Theme: ${capitalize(theme)}. Switch to ${theme === "dark" ? "light" : theme === "light" ? "system" : "dark"}.`} title={`Theme: ${capitalize(theme)}`}>
             <ThemeIcon preference={theme} />
           </button>
           {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
@@ -424,13 +415,11 @@ export function PortfolioApp() {
             <section className="index-main markets-view">
               <header className="index-title-row">
                 <div><h1>Robinhood Una Index</h1><p>{positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Una agents regularly review which markets qualify."}</p></div>
-                <ReferenceLinks />
               </header>
               {positionLedger}
               <section className="index-section">
                 <header className="section-title">
                   <div><h2>Inside the index</h2><p>Actively curated as meme markets change.</p></div>
-                  <span>v{markets.catalog.version}</span>
                 </header>
                 <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} policy={markets.index} />
               </section>
@@ -451,11 +440,9 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
         </span>
       ))}
     </div>
-    <div className="brand-rail" aria-label="Network and venue">
+    <div className="brand-rail" aria-label="Network">
       <BrandLogo brand="robinhood" label="Robinhood" />
-      <BrandLogo brand="uniswap" label="Uniswap" />
     </div>
-    <ReferenceLinks compact />
   </div>;
 }
 
@@ -564,11 +551,11 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
             {state === "ready" ? orderedMarkets.map(({ market, chain }) => {
               const row = stats.get(market.id);
               return <tr key={market.id}>
-                <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/WETH</b><VenueTrail chain={chain} protocol={market.protocol} /></span></span></td>
+                <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/WETH</b><VenueTrail chain={chain} /></span></span></td>
                 <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b><small className="cell-note">Based on 24h fees</small></td>
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
-                <td><span className="market-links"><a href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer">Gecko</a><a href={uniswapSwapUrl(market.token)} target="_blank" rel="noreferrer">Trade</a></span></td>
+                <td><a className="gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" />GeckoTerminal <span aria-hidden="true">↗</span></a></td>
               </tr>;
             }) : null}
           </tbody>
@@ -578,13 +565,11 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
   );
 }
 
-function PositionLedger({ authenticated, positions, state, stats, markets, onLogin, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel }: {
+function PositionLedger({ authenticated, positions, state, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel }: {
   authenticated: boolean;
   positions: PositionView[];
   state: "idle" | "loading" | "ready" | "error";
   stats: Map<string, MarketStats>;
-  markets: IndexMarket[];
-  onLogin: () => void;
   onStart: () => void;
   onRetry: () => void;
   onAction: (position: PositionView, action: "compound" | "withdraw") => void;
@@ -604,10 +589,10 @@ function PositionLedger({ authenticated, positions, state, stats, markets, onLog
           <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>Approve</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing"}>Close</button></div>
         </section>
       ) : null}
-      {!authenticated ? <PortfolioEmpty variant="disconnected" markets={markets} stats={stats} onPrimary={onLogin} /> : null}
-      {authenticated && (state === "idle" || state === "loading") ? <PortfolioEmpty variant="loading" markets={markets} stats={stats} /> : null}
-      {authenticated && state === "error" ? <PortfolioEmpty variant="error" markets={markets} stats={stats} onPrimary={onRetry} /> : null}
-      {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" markets={markets} stats={stats} onPrimary={onStart} /> : null}
+      {!authenticated ? <PortfolioEmpty variant="disconnected" /> : null}
+      {authenticated && (state === "idle" || state === "loading") ? <PortfolioEmpty variant="loading" /> : null}
+      {authenticated && state === "error" ? <PortfolioEmpty variant="error" onPrimary={onRetry} /> : null}
+      {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" onPrimary={onStart} /> : null}
       {showPositions ? <section className="portfolio-summary" aria-label="Portfolio summary">
         <div><span>Position value</span><strong>{summary.priced ? money(summary.valueUsd) : "—"}</strong><small>{summary.priced} of {positions.length} priced</small></div>
         <div><span>Ready to collect</span><strong>{summary.feesPriced ? money(summary.feesUsd) : "—"}</strong><small>Unclaimed fees</small></div>
@@ -626,34 +611,23 @@ function PositionLedger({ authenticated, positions, state, stats, markets, onLog
   );
 }
 
-function PortfolioEmpty({ variant, markets, stats, onPrimary }: {
+function PortfolioEmpty({ variant, onPrimary }: {
   variant: "disconnected" | "loading" | "error" | "empty";
-  markets: IndexMarket[];
-  stats: Map<string, MarketStats>;
   onPrimary?: () => void;
 }) {
   const content = variant === "disconnected"
-    ? { title: "One wallet. Your markets.", body: "Connect to see every market position you own.", action: "Connect" }
+    ? { title: "Your positions, in one place.", body: "Connect your wallet from the header to see value, fees, and range status across the index.", action: "" }
     : variant === "error"
       ? { title: "We couldn’t load your positions.", body: "Try again to read your wallet.", action: "Try again" }
-      : variant === "empty"
-        ? { title: "Start making markets.", body: "Deposit ETH to open positions across Una’s index on Robinhood Chain.", action: "Make markets" }
+    : variant === "empty"
+        ? { title: "No positions yet.", body: "Make markets to open positions across the Robinhood Una Index.", action: "Make markets" }
         : { title: "Reading your positions.", body: "Your liquidity will appear here.", action: "" };
   return <section className={`portfolio-empty is-${variant}`} aria-live={variant === "loading" ? "polite" : undefined}>
+    <span className="empty-symbol"><WalletIcon /></span>
     <div className="empty-copy">
       <h3>{content.title}</h3>
       <p>{content.body}</p>
       {onPrimary && content.action ? <button type="button" onClick={onPrimary}>{content.action}<ArrowIcon /></button> : null}
-    </div>
-    <div className="empty-route" aria-label="Robinhood Una Index">
-      <span className="route-source"><WalletIcon /><small>Wallet</small></span>
-      <span className="route-line"><i /><small>Curated index</small></span>
-      <span className="route-destination">
-        <span className="market-stack">
-          {markets.length ? markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />) : Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />)}
-        </span>
-        <span className="empty-networks"><BrandLogo brand="robinhood" label="Robinhood" compact /><BrandLogo brand="uniswap" label="Uniswap" compact /></span>
-      </span>
     </div>
   </section>;
 }
@@ -812,28 +786,14 @@ function BrandLogo({ brand, label, compact = false }: { brand: keyof typeof BRAN
   </span>;
 }
 
-function ReferenceLinks({ compact = false }: { compact?: boolean }) {
-  return <nav className={`reference-links ${compact ? "is-compact" : ""}`} aria-label="Robinhood market research">
-    <a href={FOMO_URL} target="_blank" rel="noreferrer"><img src={BRAND_ASSETS.fomo} alt="" />Discover on Fomo <span aria-hidden="true">↗</span></a>
-    <a href={GECKO_URL} target="_blank" rel="noreferrer"><img src={BRAND_ASSETS.gecko} alt="" />Live pools <span aria-hidden="true">↗</span></a>
-  </nav>;
-}
-
 function geckoPoolUrl(pool: string): string {
   return `https://www.geckoterminal.com/robinhood/pools/${pool.toLowerCase()}`;
 }
 
-function uniswapSwapUrl(token: string): string {
-  return `https://app.uniswap.org/swap?chain=robinhood&inputCurrency=NATIVE&outputCurrency=${token}`;
-}
-
-function VenueTrail({ chain, protocol }: { chain: IndexChain; protocol: IndexMarket["market"]["protocol"] }) {
-  const venue = chain === "solana" ? "meteora" : protocol === "AERODROME_SLIPSTREAM" ? "aerodrome" : "uniswap";
-  const venueLabel = venue === "meteora" ? "Meteora" : venue === "aerodrome" ? "Aerodrome" : "Uniswap";
+function VenueTrail({ chain }: { chain: IndexChain }) {
   return <span className="venue-trail">
     <BrandLogo brand={chain} label={chainLabel(chain)} compact />
-    <BrandLogo brand={venue} label={venueLabel} compact />
-    <span>{venueLabel}</span>
+    <span>{chainLabel(chain)}</span>
   </span>;
 }
 

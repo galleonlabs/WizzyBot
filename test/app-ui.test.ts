@@ -25,12 +25,16 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Pay from");
     expect(portfolio).toContain('name="depositAmount"');
     expect(portfolio).toContain('name="sourceChain"');
-    expect(portfolio).toContain("One wallet. Your markets.");
+    expect(portfolio).toContain("Your positions, in one place.");
+    expect(portfolio).toContain("Connect your wallet from the header to see value, fees, and range status across the index.");
+    expect(portfolio).not.toContain("One wallet. Your markets.");
+    expect(portfolio).not.toContain("empty-route");
     expect(portfolio).not.toContain('label: "Positions"');
     expect(portfolio).not.toContain("scrollIntoView");
-    expect(portfolio).toContain('const FOMO_URL = "https://fomo.family/"');
     expect(portfolio).toContain("https://www.geckoterminal.com/robinhood/pools");
-    expect(portfolio).toContain("https://app.uniswap.org/swap?chain=robinhood");
+    expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
+    expect(portfolio).toContain('<img src={BRAND_ASSETS.gecko} alt="" />GeckoTerminal');
+    expect(portfolio).not.toMatch(/fomo\.family|app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
     expect(portfolio).not.toMatch(/autopilot|guaranteed returns|UnaBot/i);
     expect(portfolio).not.toMatch(/Observed, not forecast|Positions stay yours|Ask Una/i);
@@ -50,6 +54,9 @@ describe("meme index product UI", () => {
     expect(css).toContain("@media (prefers-color-scheme: dark)");
     expect(css).toContain(':root[data-theme="dark"]');
     expect(layout).toContain('localStorage.getItem("una-theme")');
+    expect(layout).toContain('saved==="system"||saved==="light"||saved==="dark"?saved:"dark"');
+    expect(portfolio).toContain('useState<ThemePreference>("dark")');
+    expect(portfolio).toContain('window.localStorage.setItem("una-theme", next)');
     expect(portfolio).toContain('Theme: ${capitalize(theme)}');
     expect(css).not.toMatch(/#FC72FF|#FF37C7|#ff007a/i);
     expect(css).not.toContain("Instrument Serif");
@@ -85,10 +92,11 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Una agents regularly review which markets qualify.");
     expect(portfolio).toContain("Actively curated as meme markets change.");
     expect(portfolio).toContain('brand="robinhood"');
-    expect(portfolio).toContain('uniswap: "https://');
     expect(portfolio).toContain("Self-custodial");
     expect(portfolio).toContain("Two wallet approvals: deposit from");
     expect(portfolio).toContain('useState("1.00")');
+    expect(portfolio).toContain("useState(4663)");
+    expect(portfolio).not.toContain("v{markets.catalog.version}");
     expect(portfolio).toContain('loading ? "Reading markets"');
     expect(portfolio).not.toContain("loading ? INDEX_MARKET_COUNT : constituentCount");
     expect(portfolio).toContain("Ready to collect");
@@ -107,8 +115,9 @@ describe("meme index product UI", () => {
 
   it("allows every reviewed market and product-image host without weakening the rest of the image policy", () => {
     expect(nextConfig).toContain(
-      "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com https://assets.relay.link https://avatars.githubusercontent.com https://fomo.family https://www.geckoterminal.com",
+      "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com https://assets.relay.link https://www.geckoterminal.com",
     );
+    expect(nextConfig).not.toMatch(/fomo\.family|avatars\.githubusercontent\.com/);
     expect(nextConfig).not.toContain("img-src *");
   });
 });

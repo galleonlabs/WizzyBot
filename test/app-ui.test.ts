@@ -259,6 +259,18 @@ describe("meme index product UI", () => {
     expect(providers).not.toContain("createSolanaRpc");
   });
 
+  it("opens an accessible wallet menu for Privy management and disconnect", () => {
+    expect(portfolio).toContain('aria-haspopup="menu"');
+    expect(portfolio).toContain('role="menu"');
+    expect(portfolio).toContain('role="menuitem"');
+    expect(portfolio).toContain('href="https://home.privy.io/"');
+    expect(portfolio).toContain("Send funds or export keys");
+    expect(portfolio).toContain("Disconnect");
+    expect(portfolio).toContain('event.key !== "Escape"');
+    expect(portfolio).toContain("handleMenuNavigation");
+    expect(css).toContain(".wallet-menu-popover");
+  });
+
   it("keeps custom RPC credentials on the server and caches the public market snapshot", () => {
     expect(solanaWallet).not.toContain("NEXT_PUBLIC_SOLANA_RPC_URL");
     expect(solanaWallet).toContain('/api/portfolio/solana/broadcast');

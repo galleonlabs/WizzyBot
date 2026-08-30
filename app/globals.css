@@ -283,6 +283,32 @@ svg {
 .wallet-connect:hover { background: var(--connect-hover-bg); color: var(--connect-ink); }
 .wallet-skeleton { width: 116px; animation: breathe 1.3s ease-in-out infinite; }
 
+.wallet-menu-root { position: relative; }
+.wallet-menu-root > .wallet-button { min-width: 142px; }
+.wallet-menu-root > .wallet-button > svg:last-child { width: 14px; transition: transform 160ms var(--motion-out); }
+.wallet-menu-root > .wallet-button[aria-expanded="true"] > svg:last-child { transform: rotate(180deg); }
+.wallet-menu-popover { position: absolute; z-index: 60; top: calc(100% + 8px); right: 0; width: 280px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--popover-shadow); transform-origin: top right; animation: popover-open 200ms var(--motion-out) both; }
+.wallet-menu-popover > header { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid var(--line); }
+.wallet-menu-popover > header img { width: 32px; height: 32px; object-fit: contain; }
+.wallet-menu-popover > header span { display: grid; min-width: 0; gap: 2px; }
+.wallet-menu-popover > header small { color: var(--muted); font-size: 10px; }
+.wallet-menu-popover > header b { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.wallet-menu-actions { display: grid; gap: 2px; padding: 6px; }
+.wallet-menu-actions > a,
+.wallet-menu-actions > button { display: grid; grid-template-columns: 32px minmax(0, 1fr) 18px; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 8px 10px; border-radius: 10px; color: var(--ink-soft); text-align: left; text-decoration: none; transition: background 150ms ease, color 150ms ease, transform 120ms ease; }
+.wallet-menu-actions > button { grid-template-columns: 32px minmax(0, 1fr); }
+.wallet-menu-actions > a:hover,
+.wallet-menu-actions > button:hover { background: var(--surface-2); color: var(--ink); }
+.wallet-menu-actions > a:active,
+.wallet-menu-actions > button:active { transform: scale(.985); }
+.wallet-menu-actions > a > svg:first-child,
+.wallet-menu-actions > button > svg:first-child { width: 20px; height: 20px; justify-self: center; }
+.wallet-menu-actions > a > svg:last-child { width: 15px; height: 15px; color: var(--muted); }
+.wallet-menu-actions span { display: grid; gap: 2px; }
+.wallet-menu-actions b { font-size: 12px; }
+.wallet-menu-actions small { color: var(--muted); font-size: 10px; }
+.wallet-menu-actions > button:hover > svg { color: var(--coral); }
+
 .preview-banner { padding: 7px 24px; background: var(--preview-bg); color: var(--preview-ink); text-align: center; font-size: 11px; font-weight: 700; }
 
 .index-shell { width: min(1280px, 100%); margin: 0 auto; padding: 0 24px 72px; }
@@ -674,6 +700,7 @@ svg {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .wizzy-ghost { animation: none; transform: rotate(var(--ghost-rotation)); will-change: auto; }
   .chain-picker-popover,
+  .wallet-menu-popover,
   .plan-preview,
   .action-preview,
   .index-update-panel,
@@ -762,6 +789,7 @@ svg {
   .chain-picker-trigger b { font-size: 13px; }
   .chain-picker-trigger small { font-size: 10px; }
   .chain-picker-popover { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; width: auto; max-height: min(520px, calc(100dvh - 24px)); }
+  .wallet-menu-popover { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; width: auto; }
   .chain-picker-options { max-height: min(410px, calc(100dvh - 112px)); }
   .market-output { display: grid; gap: 15px; padding: 17px 8px 10px; }
   .market-stack > * { width: 30px; height: 30px; }
@@ -859,6 +887,8 @@ svg {
   .social-button,
   .theme-button { width: 38px; height: 38px; flex-basis: 38px; border-radius: 10px; }
   .wallet-button { width: 40px; min-width: 40px; min-height: 40px; padding: 0; }
+  .wallet-menu-root > .wallet-button { min-width: 40px; }
   .wallet-button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
   .wallet-button svg { display: block; width: 18px; }
+  .wallet-menu-root > .wallet-button > svg:last-child { display: none; }
 }

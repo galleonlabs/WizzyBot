@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import {
   useSignTransaction,
@@ -505,9 +505,7 @@ export function PortfolioApp() {
             <ThemeIcon preference={theme} />
           </button>
           {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
-            <button className="wallet-button" type="button" onClick={() => { trackProductEvent("Logout Started"); void logout(); }} aria-label={`Sign out ${short(address ?? "wallet")}`} title="Sign out">
-              <WalletIcon /><span>{short(address ?? "Wallet")}</span>
-            </button>
+            <WalletMenu address={address ?? "Wallet"} onDisconnect={() => { trackProductEvent("Logout Started"); void logout(); }} />
           ) : (
             <button className="wallet-button wallet-connect" type="button" onClick={() => startLogin("header")} aria-label="Connect wallet"><WalletIcon /><span>Connect</span></button>
           )}
@@ -634,6 +632,7 @@ function ChainPicker({ value, chains, onChange }: { value: number; chains: EthFu
   const selected = chains.find((chain) => chain.id === value) ?? chains[0];
   useEffect(() => {
     if (!open) return;
+    rootRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
     const close = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -667,6 +666,60 @@ function ChainPicker({ value, chains, onChange }: { value: number; chains: EthFu
     </div> : null}
     <input type="hidden" id="source-chain" name="sourceChain" value={value} />
   </div>;
+}
+
+function WalletMenu({ address, onDisconnect }: { address: string; onDisconnect: () => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
+
+  return <div className="wallet-menu-root" ref={rootRef}>
+    <button ref={triggerRef} className="wallet-button" type="button" onClick={() => setOpen((current) => !current)} aria-label={`Wallet ${short(address)}`} aria-haspopup="menu" aria-expanded={open} aria-controls="wallet-menu">
+      <WalletIcon /><span>{short(address)}</span><ChevronIcon />
+    </button>
+    {open ? <div className="wallet-menu-popover" id="wallet-menu" role="menu" aria-label="Wallet menu" onKeyDown={handleMenuNavigation}>
+      <header>
+        <img src="/brand/wizzy-mascot-32.png" alt="" />
+        <span><small>Your Wizzy wallet</small><b>{short(address)}</b></span>
+      </header>
+      <div className="wallet-menu-actions">
+        <a href="https://home.privy.io/" target="_blank" rel="noreferrer" role="menuitem" onClick={() => setOpen(false)}>
+          <WalletIcon /><span><b>Manage</b><small>Send funds or export keys</small></span><ExternalLinkIcon />
+        </a>
+        <button type="button" role="menuitem" onClick={() => { setOpen(false); onDisconnect(); }}>
+          <DisconnectIcon /><span><b>Disconnect</b><small>Sign out of Wizzy</small></span>
+        </button>
+      </div>
+    </div> : null}
+  </div>;
+}
+
+function handleMenuNavigation(event: ReactKeyboardEvent<HTMLDivElement>) {
+  if (!(["ArrowDown", "ArrowUp", "Home", "End"] as string[]).includes(event.key)) return;
+  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+  if (!items.length) return;
+  event.preventDefault();
+  const current = items.indexOf(document.activeElement as HTMLElement);
+  const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : event.key === "ArrowUp" ? (current - 1 + items.length) % items.length : (current + 1) % items.length;
+  items[next]?.focus();
 }
 
 function PlanPreview({ plan, state, onExecute, onCancel }: { plan: RobinhoodIndexPlan | null; state: PlanState; onExecute: () => void; onCancel: () => void }) {
@@ -1034,6 +1087,8 @@ function VenueTrail({ chain }: { chain: IndexChain }) {
 
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }
 function ChevronIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" /></svg>; }
+function ExternalLinkIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M17 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" /></svg>; }
+function DisconnectIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3M14 8l4 4-4 4M18 12H9" /></svg>; }
 function CheckIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>; }
 function RefreshIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.2-2L20 12M4 12l2.7 5a7 7 0 0 0 11.2-2" /></svg>; }
 function XIcon() { return <svg className="x-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" /></svg>; }

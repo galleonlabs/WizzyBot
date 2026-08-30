@@ -10,4 +10,4 @@ Deposit ETH into the actively curated Robinhood Una Index. You own every positio
 - Pool fees, position value, range health, reinvestment, and withdrawals stay visible in one portfolio.
 - The dappnode curator checks the index and its candidate bench every six hours. Market changes stay code-reviewed.
 
-[Production runbook](docs/RUNBOOK.md) · [Token and index flywheel](docs/TOKEN_FLYWHEEL.md)
+[Production runbook](docs/RUNBOOK.md) · [Token and index flywheel](docs/TOKEN_FLYWHEEL.md) · [Launch privacy](docs/LAUNCH_PRIVACY.md)

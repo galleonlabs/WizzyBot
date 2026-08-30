@@ -7,6 +7,9 @@ const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
 const providers = readFileSync("app/providers.tsx", "utf8");
 const mascot = readFileSync("public/brand/wizzy-mascot.svg", "utf8");
+const socialCard = readFileSync("app/opengraph-image.png");
+const openGraphAlt = readFileSync("app/opengraph-image.alt.txt", "utf8").trim();
+const twitterAlt = readFileSync("app/twitter-image.alt.txt", "utf8").trim();
 const nextConfig = readFileSync("next.config.ts", "utf8");
 
 describe("meme index product UI", () => {
@@ -135,13 +138,26 @@ describe("meme index product UI", () => {
   });
 
   it("ships the Wizzy identity and canonical domain without stale public Una assets", () => {
-    expect(layout).toContain('new URL("https://wizzy.meme")');
-    expect(layout).toContain('title: "Wizzy: Make Meme Markets"');
+    expect(layout).toContain('const siteUrl = "https://wizzy.meme"');
+    expect(layout).toContain('const socialTitle = "Wizzy: Make Meme Markets"');
     expect(layout).toContain('siteName: "Wizzy"');
     expect(portfolio).toContain('aria-label="Wizzy overview"');
     expect(portfolio).toContain('/brand/wizzy-mascot-dark.svg');
     expect(portfolio).not.toContain('/brand/una-mascot');
     expect(mascot).toContain("Wizzy mascot");
+  });
+
+  it("ships a complete large social-share contract", () => {
+    expect(layout).toContain('card: "summary_large_image"');
+    expect(layout).toContain('url: "/"');
+    expect(layout).toContain('locale: "en_GB"');
+    expect(layout).toContain('"max-image-preview": "large"');
+    expect(layout).toContain("earn trading fees, managed by agents on Robinhood Chain");
+    expect(socialCard.readUInt32BE(16)).toBe(1200);
+    expect(socialCard.readUInt32BE(20)).toBe(630);
+    expect(socialCard.byteLength).toBeLessThan(5 * 1024 * 1024);
+    expect(openGraphAlt).toMatch(/Wizzy mascot.+Make Meme Markets.+earn trading fees/);
+    expect(twitterAlt).toBe(openGraphAlt);
   });
 
   it("offers wallet-first login and provisions EVM and Solana wallets for every user", () => {

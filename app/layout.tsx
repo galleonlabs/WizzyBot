@@ -21,21 +21,40 @@ const display = Unbounded({
   display: "swap",
 });
 
+const siteUrl = "https://wizzy.meme";
+const socialTitle = "Wizzy: Make Meme Markets";
+const socialDescription =
+  "Deposit ETH into a curated index of meme markets and earn trading fees, managed by agents on Robinhood Chain.";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://wizzy.meme"),
+  metadataBase: new URL(siteUrl),
+  applicationName: "Wizzy",
   alternates: { canonical: "/" },
-  title: "Wizzy: Make Meme Markets",
-  description: "Deposit ETH into a curated index of meme markets and earn, updated and managed by agents on Robinhood Chain.",
+  title: socialTitle,
+  description: socialDescription,
+  authors: [{ name: "Wizzy", url: siteUrl }],
+  creator: "Wizzy",
+  publisher: "Wizzy",
+  category: "finance",
+  keywords: ["meme markets", "Robinhood Chain", "liquidity index", "DeFi", "Wizzy"],
+  formatDetection: { email: false, address: false, telephone: false },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
   openGraph: {
-    title: "Wizzy: Make Meme Markets",
-    description: "The actively curated Robinhood Wizzy Index.",
+    title: socialTitle,
+    description: socialDescription,
+    url: "/",
     siteName: "Wizzy",
+    locale: "en_GB",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Wizzy: Make Meme Markets",
-    description: "The actively curated Robinhood Wizzy Index.",
+    title: socialTitle,
+    description: socialDescription,
   },
 };
 

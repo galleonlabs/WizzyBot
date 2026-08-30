@@ -7,6 +7,8 @@ const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
 const providers = readFileSync("app/providers.tsx", "utf8");
 const mascot = readFileSync("public/brand/wizzy-mascot.svg", "utf8");
+const ghostLight = readFileSync("public/brand/wizzy-ghost-light.svg", "utf8");
+const ghostDark = readFileSync("public/brand/wizzy-ghost-dark.svg", "utf8");
 const socialSource = readFileSync("public/brand/wizzy-social.svg", "utf8");
 const socialRenderer = readFileSync("scripts/render-social-card.mjs", "utf8");
 const socialCard = readFileSync("public/brand/wizzy-social-unbounded-v1.png");
@@ -111,6 +113,22 @@ describe("meme index product UI", () => {
     expect(mascot).not.toContain("M72 44C77 23 93 10 113 10");
     expect(mascot).not.toContain("M89 219c-3 3-4 8-1 11");
     expect(mascot).not.toContain("m221 11 20 23-20 25-18-25 18-23Z");
+  });
+
+  it("carries the ghostly Wizzy pattern into both themes without competing with the product", () => {
+    expect(portfolio).toContain('className="wizzy-atmosphere" aria-hidden="true"');
+    expect(portfolio.match(/className="wizzy-ghost wizzy-ghost-/g)).toHaveLength(6);
+    expect(css).toContain('--wizzy-ghost-image: url("/brand/wizzy-ghost-light.svg")');
+    expect(css).toContain('--wizzy-ghost-image: url("/brand/wizzy-ghost-dark.svg")');
+    expect(css).toContain("@keyframes wizzy-drift");
+    expect(css).toContain(".wizzy-ghost-2,\n  .wizzy-ghost-4 { display: none; }");
+    expect(css).toContain(".wizzy-ghost { animation: none; transform: rotate(var(--ghost-rotation)); will-change: auto; }");
+    expect(ghostLight).toContain('fill="#202029"');
+    expect(ghostDark).toContain('fill="#f7f3ed"');
+    expect(ghostLight.match(/<path /g)).toHaveLength(2);
+    expect(ghostDark.match(/<path /g)).toHaveLength(2);
+    expect(ghostLight).not.toMatch(/gradient|filter|text/i);
+    expect(ghostDark).not.toMatch(/gradient|filter|text/i);
   });
 
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {

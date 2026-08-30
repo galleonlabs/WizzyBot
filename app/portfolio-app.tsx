@@ -456,6 +456,14 @@ export function PortfolioApp() {
 
   return (
     <main className="index-app">
+      <div className="wizzy-atmosphere" aria-hidden="true">
+        <span className="wizzy-ghost wizzy-ghost-1" />
+        <span className="wizzy-ghost wizzy-ghost-2" />
+        <span className="wizzy-ghost wizzy-ghost-3" />
+        <span className="wizzy-ghost wizzy-ghost-4" />
+        <span className="wizzy-ghost wizzy-ghost-5" />
+        <span className="wizzy-ghost wizzy-ghost-6" />
+      </div>
       <header className="index-nav">
         <button className="wizzy-wordmark" type="button" onClick={() => changeTab("overview")} aria-label="Wizzy overview">
           <picture className="wizzy-mark" aria-hidden="true">

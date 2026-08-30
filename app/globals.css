@@ -29,6 +29,8 @@
   --connect-ink: #fff;
   --connect-hover-bg: #30303a;
   --coral-hover: #f45f76;
+  --wizzy-ghost-image: url("/brand/wizzy-ghost-light.svg");
+  --wizzy-ghost-opacity: .032;
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Unbounded", "Arial Black", sans-serif;
 }
@@ -63,6 +65,8 @@
     --connect-ink: #141318;
     --connect-hover-bg: #fff;
     --coral-hover: #ff8394;
+    --wizzy-ghost-image: url("/brand/wizzy-ghost-dark.svg");
+    --wizzy-ghost-opacity: .038;
   }
 }
 
@@ -95,6 +99,8 @@
   --connect-ink: #141318;
   --connect-hover-bg: #fff;
   --coral-hover: #ff8394;
+  --wizzy-ghost-image: url("/brand/wizzy-ghost-dark.svg");
+  --wizzy-ghost-opacity: .038;
 }
 
 * { box-sizing: border-box; }
@@ -142,8 +148,43 @@ svg {
 }
 
 .index-app {
+  position: relative;
+  isolation: isolate;
   min-height: 100dvh;
   background: var(--canvas);
+  overflow: clip;
+}
+
+.wizzy-atmosphere {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.wizzy-ghost {
+  position: absolute;
+  display: block;
+  width: var(--ghost-size);
+  aspect-ratio: 1;
+  background: var(--wizzy-ghost-image) center / contain no-repeat;
+  opacity: var(--wizzy-ghost-opacity);
+  animation: wizzy-drift var(--ghost-duration) ease-in-out var(--ghost-delay) infinite alternate;
+  will-change: transform;
+}
+
+.wizzy-ghost-1 { --ghost-size: clamp(104px, 10vw, 154px); --ghost-duration: 27s; --ghost-delay: -8s; --ghost-rotation: -9deg; --ghost-rotation-end: -6deg; --ghost-x: 14px; --ghost-y: -18px; top: 14%; left: -2%; }
+.wizzy-ghost-2 { --ghost-size: clamp(76px, 7vw, 108px); --ghost-duration: 33s; --ghost-delay: -21s; --ghost-rotation: 7deg; --ghost-rotation-end: 4deg; --ghost-x: -11px; --ghost-y: 15px; top: 10%; left: 34%; }
+.wizzy-ghost-3 { --ghost-size: clamp(96px, 9vw, 138px); --ghost-duration: 30s; --ghost-delay: -14s; --ghost-rotation: -5deg; --ghost-rotation-end: -2deg; --ghost-x: 16px; --ghost-y: 12px; top: 28%; right: 3%; }
+.wizzy-ghost-4 { --ghost-size: clamp(82px, 8vw, 120px); --ghost-duration: 35s; --ghost-delay: -26s; --ghost-rotation: 6deg; --ghost-rotation-end: 9deg; --ghost-x: 12px; --ghost-y: -14px; top: 61%; left: 15%; }
+.wizzy-ghost-5 { --ghost-size: clamp(110px, 11vw, 166px); --ghost-duration: 32s; --ghost-delay: -18s; --ghost-rotation: -7deg; --ghost-rotation-end: -10deg; --ghost-x: -12px; --ghost-y: -18px; right: 24%; bottom: 4%; }
+.wizzy-ghost-6 { --ghost-size: clamp(150px, 15vw, 220px); --ghost-duration: 37s; --ghost-delay: -29s; --ghost-rotation: 9deg; --ghost-rotation-end: 5deg; --ghost-x: -14px; --ghost-y: -20px; right: -3%; bottom: -6%; }
+
+.preview-banner,
+.index-shell {
+  position: relative;
+  z-index: 1;
 }
 
 .index-nav {
@@ -546,9 +587,14 @@ svg {
 @keyframes breathe { 0%, 100% { opacity: .45; } 50% { opacity: .9; } }
 @keyframes loading-dot { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-4px); opacity: 1; } }
 @keyframes token-arrive { from { opacity: 0; transform: translateY(18px) scale(.88); filter: blur(5px); } }
+@keyframes wizzy-drift {
+  from { transform: translate3d(0, 0, 0) rotate(var(--ghost-rotation)); }
+  to { transform: translate3d(var(--ghost-x), var(--ghost-y), 0) rotate(var(--ghost-rotation-end)); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .wizzy-ghost { animation: none; transform: rotate(var(--ghost-rotation)); will-change: auto; }
 }
 
 .fatal-error {
@@ -594,6 +640,12 @@ svg {
 }
 
 @media (max-width: 640px) {
+  .wizzy-ghost-2,
+  .wizzy-ghost-4 { display: none; }
+  .wizzy-ghost-1 { --ghost-size: 92px; top: 16%; left: -34px; }
+  .wizzy-ghost-3 { --ghost-size: 86px; top: 38%; right: -26px; }
+  .wizzy-ghost-5 { --ghost-size: 108px; right: 34%; bottom: 8%; }
+  .wizzy-ghost-6 { --ghost-size: 142px; right: -42px; bottom: -22px; }
   .index-nav { padding-inline: 12px; }
   .wizzy-wordmark { gap: 6px; font-size: 15px; }
   .wizzy-mark { width: 30px; height: 30px; }

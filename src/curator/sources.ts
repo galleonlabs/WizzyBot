@@ -154,12 +154,7 @@ async function dexPair(chain: MarketDefinition["chain"], pool: string): Promise<
   return payload?.pair ?? payload?.pairs?.[0] ?? null;
 }
 
-async function geckoPair(definition: MarketDefinition): Promise<DexPair | null> {
-  const payload = await getJson<{ data?: GeckoPool[] }>(
-    `https://api.geckoterminal.com/api/v2/networks/robinhood/pools/multi/${definition.pool.toLowerCase()}?include=base_token%2Cquote_token%2Cdex`,
-  );
-  const pool = payload?.data?.[0];
-  if (!pool) return null;
+function geckoPoolToPair(definition: MarketDefinition, pool: GeckoPool): DexPair {
   const tokenSuffix = `_${definition.token.toLowerCase()}`;
   const memeIsBase = pool.relationships.base_token.data.id.toLowerCase().endsWith(tokenSuffix);
   const createdAt = pool.attributes.pool_created_at ? Date.parse(pool.attributes.pool_created_at) : Number.NaN;
@@ -172,6 +167,46 @@ async function geckoPair(definition: MarketDefinition): Promise<DexPair | null> 
     marketCap: numberOrNull(pool.attributes.market_cap_usd ?? pool.attributes.fdv_usd) ?? undefined,
     pairCreatedAt: Number.isFinite(createdAt) ? createdAt : undefined,
   };
+}
+
+async function geckoPairs(definitions: MarketDefinition[]): Promise<Map<string, DexPair>> {
+  if (!definitions.length) return new Map();
+  const addresses = definitions.map((definition) => definition.pool.toLowerCase()).join(",");
+  const payload = await getJson<{ data?: GeckoPool[] }>(
+    `https://api.geckoterminal.com/api/v2/networks/robinhood/pools/multi/${addresses}?include=base_token%2Cquote_token%2Cdex`,
+  );
+  const definitionsByPool = new Map(definitions.map((definition) => [definition.pool.toLowerCase(), definition]));
+  return new Map((payload?.data ?? []).flatMap((pool) => {
+    const address = pool.attributes.address?.toLowerCase();
+    const definition = address ? definitionsByPool.get(address) : undefined;
+    return address && definition ? [[address, geckoPoolToPair(definition, pool)] as const] : [];
+  }));
+}
+
+async function goPlusTokens(definitions: MarketDefinition[], chainId: number): Promise<Map<string, GoPlusToken>> {
+  if (!definitions.length) return new Map();
+  const requested = [...new Set(definitions.map((definition) => definition.token.toLowerCase()))];
+  const addresses = requested.join(",");
+  const url = `https://api.gopluslabs.io/api/v1/token_security/${chainId}?contract_addresses=${addresses}`;
+  const tokens = new Map<string, GoPlusToken>();
+  const batch = await getJson<{ result?: Record<string, GoPlusToken> }>(url);
+  for (const [address, token] of Object.entries(batch?.result ?? {})) tokens.set(address.toLowerCase(), token);
+
+  // Robinhood support currently returns only the first result for some batch
+  // requests. Fill gaps at the public 30-request/minute limit instead of
+  // treating an upstream partial response as a token risk signal.
+  for (const address of requested.filter((candidate) => !tokens.has(candidate))) {
+    await new Promise((resolve) => setTimeout(resolve, 2_100));
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const payload = await getJson<{ code?: number; result?: Record<string, GoPlusToken> }>(
+        `https://api.gopluslabs.io/api/v1/token_security/${chainId}?contract_addresses=${address}`,
+      );
+      for (const [resultAddress, token] of Object.entries(payload?.result ?? {})) tokens.set(resultAddress.toLowerCase(), token);
+      if (payload?.code !== 2 && payload?.code !== 4029) break;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 15_000));
+    }
+  }
+  return tokens;
 }
 
 export function decodeSolanaMintSecurity(data: Uint8Array): SolanaMintSecurity | null {
@@ -235,13 +270,16 @@ function evmSecurityFlags(token: GoPlusToken | null): string[] {
   return flags;
 }
 
-async function collectEvm(definition: MarketDefinition, observedAt: string): Promise<CuratorObservation> {
-  const chainId = definition.chain === "robinhood" ? 4663 : 8453;
-  const [pair, securityPayload] = await Promise.all([
-    definition.chain === "robinhood" ? geckoPair(definition) : dexPair(definition.chain, definition.pool),
-    getJson<{ result?: Record<string, GoPlusToken> }>(`https://api.gopluslabs.io/api/v1/token_security/${chainId}?contract_addresses=${definition.token}`),
-  ]);
-  const security = securityPayload?.result?.[definition.token.toLowerCase()] ?? null;
+async function collectEvm(
+  definition: MarketDefinition,
+  observedAt: string,
+  robinhoodPairs: Map<string, DexPair>,
+  securityByToken: Map<string, GoPlusToken>,
+): Promise<CuratorObservation> {
+  const pair = definition.chain === "robinhood"
+    ? robinhoodPairs.get(definition.pool.toLowerCase()) ?? null
+    : await dexPair(definition.chain, definition.pool);
+  const security = securityByToken.get(definition.token.toLowerCase()) ?? null;
   const topExternallyOwnedHolder = security?.holders
     ?.filter((holder) => holder.is_contract !== 1)
     .map((holder) => numberOrNull(holder.percent))
@@ -307,7 +345,14 @@ async function collectSolana(definition: MarketDefinition, observedAt: string): 
 }
 
 export async function collectCuratorObservations(observedAt = new Date().toISOString()): Promise<CuratorObservation[]> {
-  return Promise.all(definitions().map((definition) => definition.chain === "solana"
+  const marketDefinitions = definitions();
+  const baseDefinitions = marketDefinitions.filter((definition) => definition.chain === "base");
+  const robinhoodDefinitions = marketDefinitions.filter((definition) => definition.chain === "robinhood");
+  const robinhoodPairsRequest = geckoPairs(robinhoodDefinitions);
+  const baseSecurity = await goPlusTokens(baseDefinitions, 8453);
+  const robinhoodSecurity = await goPlusTokens(robinhoodDefinitions, 4663);
+  const robinhoodPairs = await robinhoodPairsRequest;
+  return Promise.all(marketDefinitions.map((definition) => definition.chain === "solana"
     ? collectSolana(definition, observedAt)
-    : collectEvm(definition, observedAt)));
+    : collectEvm(definition, observedAt, robinhoodPairs, definition.chain === "robinhood" ? robinhoodSecurity : baseSecurity)));
 }

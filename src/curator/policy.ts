@@ -106,6 +106,7 @@ export function summarizeMarketHistory(observations: CuratorObservation[], snaps
   const ordered = [...observations].sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt));
   const latest = ordered.at(-1)!;
   const latestAt = Date.parse(latest.observedAt);
+  const recent = ordered.filter((row) => latestAt - Date.parse(row.observedAt) <= 24 * 3_600_000);
   const prior24h = [...ordered].reverse().find((row) => latestAt - Date.parse(row.observedAt) >= 23 * 3_600_000);
   const liquidityDrop24hPct = latest.liquidityUsd !== null && prior24h?.liquidityUsd && prior24h.liquidityUsd > 0
     ? Math.max(0, ((prior24h.liquidityUsd - latest.liquidityUsd) / prior24h.liquidityUsd) * 100)
@@ -128,9 +129,9 @@ export function summarizeMarketHistory(observations: CuratorObservation[], snaps
     latestHolderCount: latest.holderCount,
     latestTopHolderPct: latest.topHolderPct,
     latestSocialLinks: latest.socialLinks,
-    latestSecurityAvailable: latest.securityAvailable,
+    latestSecurityAvailable: recent.some((row) => row.securityAvailable),
     identity: latest.identity,
-    securityFlags: [...new Set(ordered.slice(-24).flatMap((row) => row.securityFlags))],
+    securityFlags: [...new Set(recent.flatMap((row) => row.securityFlags))],
   };
 }
 
@@ -157,8 +158,12 @@ export function evaluateMarket(observations: CuratorObservation[], policy: Curat
   if (hardSecurityFailure) reasons.push(`security: ${summary.securityFlags.join(", ")}`);
   if (collapsed) reasons.push(`pool liquidity fell ${summary.liquidityDrop24hPct!.toFixed(0)}% in 24h`);
   if (!latest.incumbent && !agePass) reasons.push(summary.latestPoolAgeDays === null ? "pool age is unavailable" : `pool is younger than ${policy.minimumPoolAgeDays} days`);
-  if (!liquidityPass) reasons.push(`median pool liquidity is below $${marketFloor(latest.incumbent, policy).toLocaleString()}`);
-  if (!volumePass) reasons.push(`median daily volume is below $${policy.minimumVolume24hUsd.toLocaleString()}`);
+  if (!liquidityPass) reasons.push(summary.medianLiquidityUsd === null
+    ? "pool liquidity data is unavailable"
+    : `median pool liquidity is below $${marketFloor(latest.incumbent, policy).toLocaleString()}`);
+  if (!volumePass) reasons.push(summary.medianVolume24hUsd === null
+    ? "daily volume data is unavailable"
+    : `median daily volume is below $${policy.minimumVolume24hUsd.toLocaleString()}`);
   if (!identityPass) reasons.push("token identity and social history still need review");
   if (!securityPass) reasons.push("security provider data is unavailable");
   if (!latest.incumbent && !proofComplete) reasons.push(`candidate needs ${policy.candidateProofDays} tracked days`);

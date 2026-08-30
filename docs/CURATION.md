@@ -14,6 +14,8 @@ A candidate must have a reviewed identity, clean token controls, a pool at least
 
 Pool capacity is capped at 1% of median TVL. Social data helps discover and verify candidates; it never overrides pool safety or capacity.
 
+Missing provider data is reported as unavailable, not as a failed liquidity or volume threshold. A clean security result remains valid for 24 hours so a transient provider outage cannot manufacture a risk call; any security flag still triggers review immediately.
+
 Catalog changes remain code-reviewed because they alter new deposits. Paused markets stay in the catalog so existing positions remain visible and withdrawable.
 
 ## Robinhood launch index

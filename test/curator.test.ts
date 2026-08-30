@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getCuratorConfig } from "../src/curator/config.js";
-import { evaluateMarket, proposeReplacements, type CuratorObservation } from "../src/curator/policy.js";
+import { evaluateMarket, proposeReplacements, summarizeMarketHistory, type CuratorObservation } from "../src/curator/policy.js";
 import { decodeSolanaMintSecurity } from "../src/curator/sources.js";
 
 const policy = getCuratorConfig().policy;
@@ -74,6 +74,21 @@ describe("index curator", () => {
     const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", volume24hUsd: 10_000, feeAprPct: 4 }, 0), policy);
     expect(evaluation.recommendation).toBe("review");
     expect(evaluation.reasons.join(" ")).toContain("daily volume");
+  });
+
+  it("distinguishes missing market data from a failed threshold", () => {
+    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", liquidityUsd: null, volume24hUsd: null }, 0), policy);
+    expect(evaluation.recommendation).toBe("review");
+    expect(evaluation.reasons).toContain("pool liquidity data is unavailable");
+    expect(evaluation.reasons).toContain("daily volume data is unavailable");
+    expect(evaluation.reasons.join(" ")).not.toContain("below");
+  });
+
+  it("keeps recent security evidence through a transient provider outage", () => {
+    const observations = history({ incumbent: true, catalogStatus: "active" }, 6);
+    observations.at(-1)!.securityAvailable = false;
+    expect(summarizeMarketHistory(observations, 60).latestSecurityAvailable).toBe(true);
+    expect(evaluateMarket(observations, policy).recommendation).toBe("hold");
   });
 
   it("only proposes a same-chain replacement with a material fee advantage", () => {

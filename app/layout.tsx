@@ -25,6 +25,12 @@ const siteUrl = "https://wizzy.meme";
 const socialTitle = "Wizzy: Make Meme Markets";
 const socialDescription =
   "Deposit ETH into a curated index of meme markets and earn trading fees, managed by agents on Robinhood Chain.";
+const socialImage = {
+  url: "/brand/wizzy-social-unbounded-v1.png",
+  width: 1200,
+  height: 630,
+  alt: "Wizzy mascot beside the words ‘Make Meme Markets’, with an invitation to deposit ETH and earn trading fees.",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -50,11 +56,13 @@ export const metadata: Metadata = {
     siteName: "Wizzy",
     locale: "en_GB",
     type: "website",
+    images: [socialImage],
   },
   twitter: {
     card: "summary_large_image",
     title: socialTitle,
     description: socialDescription,
+    images: [socialImage],
   },
 };
 

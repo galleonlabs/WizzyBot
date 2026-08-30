@@ -27,12 +27,10 @@ try {
   const { default: sharp } = await import("sharp");
   const source = await readFile(join(root, "public", "brand", "wizzy-social.svg"));
 
-  for (const name of ["opengraph-image.png", "twitter-image.png"]) {
-    const target = join(root, "app", name);
-    const pending = `${target}.next`;
-    await sharp(source).png({ compressionLevel: 9, palette: true }).toFile(pending);
-    await rename(pending, target);
-  }
+  const target = join(root, "public", "brand", "wizzy-social-unbounded-v1.png");
+  const pending = `${target}.next`;
+  await sharp(source).png({ compressionLevel: 9, palette: true }).toFile(pending);
+  await rename(pending, target);
 } finally {
   await rm(workDir, { recursive: true, force: true });
 }

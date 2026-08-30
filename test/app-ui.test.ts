@@ -9,9 +9,7 @@ const providers = readFileSync("app/providers.tsx", "utf8");
 const mascot = readFileSync("public/brand/wizzy-mascot.svg", "utf8");
 const socialSource = readFileSync("public/brand/wizzy-social.svg", "utf8");
 const socialRenderer = readFileSync("scripts/render-social-card.mjs", "utf8");
-const socialCard = readFileSync("app/opengraph-image.png");
-const openGraphAlt = readFileSync("app/opengraph-image.alt.txt", "utf8").trim();
-const twitterAlt = readFileSync("app/twitter-image.alt.txt", "utf8").trim();
+const socialCard = readFileSync("public/brand/wizzy-social-unbounded-v1.png");
 const nextConfig = readFileSync("next.config.ts", "utf8");
 
 describe("meme index product UI", () => {
@@ -155,11 +153,12 @@ describe("meme index product UI", () => {
     expect(layout).toContain('locale: "en_GB"');
     expect(layout).toContain('"max-image-preview": "large"');
     expect(layout).toContain("earn trading fees, managed by agents on Robinhood Chain");
+    expect(layout).toContain('url: "/brand/wizzy-social-unbounded-v1.png"');
+    expect(layout.match(/images: \[socialImage\]/g)).toHaveLength(2);
     expect(socialCard.readUInt32BE(16)).toBe(1200);
     expect(socialCard.readUInt32BE(20)).toBe(630);
     expect(socialCard.byteLength).toBeLessThan(5 * 1024 * 1024);
-    expect(openGraphAlt).toMatch(/Wizzy mascot.+Make Meme Markets.+earn trading fees/);
-    expect(twitterAlt).toBe(openGraphAlt);
+    expect(layout).toMatch(/alt: "Wizzy mascot.+Make Meme Markets.+earn trading fees/);
     expect(socialSource).toContain('font-family="Unbounded, sans-serif"');
     expect(socialSource).toContain('font-family="Plus Jakarta Sans, Arial, sans-serif"');
     expect(socialRenderer).toContain('"assets", "fonts"');

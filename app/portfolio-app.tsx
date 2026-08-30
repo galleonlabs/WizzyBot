@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useAddFunds, usePrivy, useWallets } from "@privy-io/react-auth";
+import { useAddFunds, useAuthorizationSignature, usePrivy, useWallets } from "@privy-io/react-auth";
 import {
   useSignTransaction,
   useWallets as useSolanaWallets,
@@ -25,7 +25,8 @@ import {
 } from "./lib/portfolio-types";
 import { type SolanaPositionActionPlan } from "./lib/solana-position-server";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
-import { sendWalletCallsAndWait, type ConnectedEvmWallet } from "./lib/wallet-calls";
+import { sendPrivyWalletCallsAndWait, sendWalletCallsAndWait, type ConnectedEvmWallet, type WalletTransaction } from "./lib/wallet-calls";
+import { PRIVY_APP_ID } from "./lib/privy-config";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 
 type ViewTab = "overview" | "markets";
@@ -83,6 +84,7 @@ const EMPTY_MARKETS: MarketsPayload = {
 export function PortfolioApp() {
   const { ready, authenticated, login, logout, user } = usePrivy();
   const { addFunds } = useAddFunds();
+  const { generateAuthorizationSignature } = useAuthorizationSignature();
   const { wallets } = useWallets();
   const { ready: solanaReady, wallets: solanaWallets } = useSolanaWallets();
   const { signTransaction } = useSignTransaction();
@@ -113,6 +115,46 @@ export function PortfolioApp() {
   const solanaWallet = useMemo(() => solanaWallets.find((candidate) => candidate.standardWallet.name.toLowerCase().includes("privy")) ?? solanaWallets[0], [solanaWallets]);
   const address = wallet?.address ?? user?.wallet?.address;
   const solanaAddress = solanaWallet?.address;
+  const privyWalletId = useMemo(() => {
+    if (!address) return null;
+    const accounts = [user?.wallet, ...(user?.linkedAccounts ?? [])] as unknown[];
+    for (const account of accounts) {
+      if (!account || typeof account !== "object") continue;
+      const record = account as Record<string, unknown>;
+      if (typeof record.address !== "string" || record.address.toLowerCase() !== address.toLowerCase()) continue;
+      if (typeof record.id === "string" && record.id.length >= 8) return record.id;
+    }
+    return null;
+  }, [address, user?.linkedAccounts, user?.wallet]);
+
+  async function sendEvmBatch(input: {
+    owner: string;
+    chainId: number;
+    transactions: readonly WalletTransaction[];
+    onSubmitted?: () => void;
+  }) {
+    if (!wallet) throw new Error("Your wallet is not ready");
+    if (input.chainId === 4663) {
+      if (!privyWalletId) throw new Error("Your Privy wallet is still initializing. Refresh once, then try again.");
+      return sendPrivyWalletCallsAndWait({
+        walletId: privyWalletId,
+        appId: PRIVY_APP_ID,
+        owner: input.owner,
+        walletAddress: wallet.address,
+        chainId: 4663,
+        transactions: input.transactions,
+        generateAuthorizationSignature,
+        onSubmitted: input.onSubmitted,
+      });
+    }
+    return sendWalletCallsAndWait({
+      wallet: wallet as unknown as ConnectedEvmWallet,
+      owner: input.owner,
+      chainId: input.chainId,
+      transactions: input.transactions,
+      onSubmitted: input.onSubmitted,
+    });
+  }
 
   const loadRobinhoodBalance = useCallback(async () => {
     const requestId = ++balanceRequestRef.current;
@@ -387,7 +429,6 @@ export function PortfolioApp() {
       setPlanState({ kind: "error", message: "This deposit quote expired. Review a fresh one before continuing." });
       return;
     }
-    const connected = wallet as unknown as ConnectedEvmWallet;
     const robinhood = plan.stages.find((stage) => stage.id === "make-robinhood-markets");
     if (!robinhood) {
       setPlanState({ kind: "error", message: "This deposit plan is incomplete. Please prepare it again." });
@@ -396,8 +437,7 @@ export function PortfolioApp() {
     try {
       trackProductEvent("Index Submit Started", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
       setPlanState({ kind: "signing", message: `Approve ${plan.constituentCount} Robinhood market positions.` });
-      await sendWalletCallsAndWait({
-        wallet: connected,
+      await sendEvmBatch({
         owner: plan.owner,
         chainId: robinhood.chainId,
         transactions: robinhood.transactions,
@@ -467,8 +507,7 @@ export function PortfolioApp() {
           }),
         });
       } else {
-        await sendWalletCallsAndWait({
-          wallet: wallet as unknown as ConnectedEvmWallet,
+        await sendEvmBatch({
           owner: actionPlan.owner,
           chainId: actionPlan.chainId,
           transactions: actionPlan.transactions,
@@ -518,8 +557,7 @@ export function PortfolioApp() {
     }
     try {
       setMigrationState({ kind: "signing", message: "Approve this index update in your wallet." });
-      await sendWalletCallsAndWait({
-        wallet: wallet as unknown as ConnectedEvmWallet,
+      await sendEvmBatch({
         owner: migrationPlan.owner,
         chainId: migrationPlan.chainId,
         transactions: migrationPlan.transactions,

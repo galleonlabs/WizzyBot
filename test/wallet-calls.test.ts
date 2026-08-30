@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { callsTerminalState, relaySucceeded, sendWalletCalls, sendWalletCallsAndWait } from "../app/lib/wallet-calls.js";
+import { callsTerminalState, privySendCallsBody, privyTransactionTerminalState, relaySucceeded, sendPrivyWalletCallsAndWait, sendWalletCalls, sendWalletCallsAndWait } from "../app/lib/wallet-calls.js";
 
 describe("client wallet batches", () => {
   it("switches chain and asks the wallet for one atomic batch", async () => {
@@ -82,5 +82,51 @@ describe("client wallet batches", () => {
     expect(callsTerminalState({ status: 200, receipts: [{ status: "0x0" }] })).toBe("failure");
     expect(callsTerminalState({ status: 100 })).toBe("pending");
     expect(callsTerminalState({ status: "CONFIRMED", receipts: [{ status: "0x1" }] })).toBe("success");
+  });
+
+  it("builds the Privy Wallet API batch with sponsorship in the signed body", () => {
+    expect(privySendCallsBody(4663, [{
+      to: "0x2222222222222222222222222222222222222222",
+      data: "0x1234",
+      value: "16",
+      description: "test",
+    }])).toEqual({
+      method: "wallet_sendCalls",
+      caip2: "eip155:4663",
+      chain_type: "ethereum",
+      sponsor: true,
+      params: { calls: [{ to: "0x2222222222222222222222222222222222222222", data: "0x1234", value: "0x10" }] },
+    });
+  });
+
+  it("signs, submits, and waits for a confirmed Privy transaction", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { transaction_id: "12345678-abcd" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "pending" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "confirmed", transaction_hash: "0xabc" }), { status: 200 }));
+    const generateAuthorizationSignature = vi.fn(async () => ({ signature: "signed-request-payload" }));
+    const result = await sendPrivyWalletCallsAndWait({
+      walletId: "wallet_12345678",
+      appId: "app_12345678",
+      owner: "0x1111111111111111111111111111111111111111",
+      walletAddress: "0x1111111111111111111111111111111111111111",
+      chainId: 4663,
+      transactions: [{ to: "0x2222222222222222222222222222222222222222", data: "0x1234", value: "0", description: "test" }],
+      generateAuthorizationSignature,
+      fetcher,
+      pollingIntervalMs: 0,
+    });
+    expect(generateAuthorizationSignature).toHaveBeenCalledWith(expect.objectContaining({
+      url: "https://api.privy.io/v1/wallets/wallet_12345678/rpc",
+      body: expect.objectContaining({ sponsor: true }),
+    }));
+    expect(fetcher).toHaveBeenNthCalledWith(1, "/api/privy/calls", expect.objectContaining({ method: "POST" }));
+    expect(result.status).toEqual({ status: "confirmed", transaction_hash: "0xabc" });
+  });
+
+  it("treats only confirmed Privy transactions as successful", () => {
+    expect(privyTransactionTerminalState({ status: "pending" })).toBe("pending");
+    expect(privyTransactionTerminalState({ status: "confirmed" })).toBe("success");
+    expect(privyTransactionTerminalState({ status: "execution_reverted" })).toBe("failure");
   });
 });

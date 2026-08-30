@@ -20,6 +20,7 @@ const solanaWallet = readFileSync("app/lib/solana-wallet.ts", "utf8");
 const solanaBroadcast = readFileSync("app/api/portfolio/solana/broadcast/route.ts", "utf8");
 const marketsRoute = readFileSync("app/api/markets/route.ts", "utf8");
 const apiBoundary = readFileSync("app/lib/api-request-server.ts", "utf8");
+const balanceRoute = readFileSync("app/api/balance/route.ts", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
@@ -52,8 +53,9 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain("https://www.geckoterminal.com/robinhood/pools");
     expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
-    expect(portfolio).not.toContain("fomo.family");
-    expect(portfolio).not.toContain("Trade on Fomo");
+    expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
+    expect(portfolio).toContain("Trade on Fomo");
+    expect(portfolio).toContain("Trade ${market.symbol}/WETH on Fomo");
     expect(portfolio).not.toContain("market-link-external");
     expect(portfolio).not.toMatch(/app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
@@ -187,6 +189,12 @@ describe("meme index product UI", () => {
     expect(css).toMatch(/\.index-hero \{[\s\S]*?align-items: start;/);
     expect(css).toContain("min-height: 44px");
     expect(css).toContain(".cross-chain-fund");
+    expect(portfolio).toContain("Robinhood Chain ETH balance");
+    expect(portfolio).toContain("<EthereumIcon />");
+    expect(css).toContain(".wallet-balance");
+    expect(css).toContain("font-variant-numeric: tabular-nums");
+    expect(balanceRoute).toContain("client.getBalance");
+    expect(balanceRoute).toContain("process.env.ROBINHOOD_RPC_URL");
     expect(css).toContain(".index-update-panel");
     expect(portfolio).toContain("Index updated");
     expect(portfolio).toContain("Update position");
@@ -290,7 +298,7 @@ describe("meme index product UI", () => {
     expect(nextConfig).toContain(
       "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com https://assets.relay.link https://www.geckoterminal.com",
     );
-    expect(nextConfig).not.toContain("https://fomo.family");
+    expect(nextConfig).toContain("https://fomo.family");
     expect(nextConfig).not.toMatch(/avatars\.githubusercontent\.com/);
     expect(nextConfig).not.toContain("img-src *");
   });

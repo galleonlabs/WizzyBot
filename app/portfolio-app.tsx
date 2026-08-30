@@ -31,6 +31,7 @@ import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 type ViewTab = "overview" | "markets";
 type ThemePreference = "system" | "light" | "dark";
 type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" | "submitted" | "error"; message?: string };
+type BalanceState = { kind: "idle" | "loading" | "ready" | "error"; balanceWei?: string };
 type AnyPositionActionPlan = PositionActionPlan | SolanaPositionActionPlan;
 type IndexChain = ChainSlug | "solana";
 type IndexMarket = {
@@ -45,11 +46,13 @@ type AvailableIndexUpdate = {
   toSymbol: string;
 };
 const INDEX_MARKET_COUNT = 6;
+const FOMO_URL = "https://fomo.family/r/makemememarkets";
 const ROBINHOOD_NATIVE_ETH = "0x0000000000000000000000000000000000000000";
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
   robinhood: "https://assets.relay.link/icons/4663/light.png",
   solana: "https://assets.relay.link/icons/792703809/light.png",
+  fomo: "https://fomo.family/favicon.svg",
   gecko: "https://www.geckoterminal.com/favicon.ico",
 } as const;
 
@@ -87,6 +90,7 @@ export function PortfolioApp() {
   const [theme, setTheme] = useState<ThemePreference>("dark");
   const [amount, setAmount] = useState("1.00");
   const [fundingState, setFundingState] = useState<PlanState>({ kind: "idle" });
+  const [balanceState, setBalanceState] = useState<BalanceState>({ kind: "idle" });
   const [markets, setMarkets] = useState<MarketsPayload>(EMPTY_MARKETS);
   const [marketsState, setMarketsState] = useState<"loading" | "ready" | "error">("loading");
   const [positions, setPositions] = useState<PositionView[]>([]);
@@ -99,6 +103,7 @@ export function PortfolioApp() {
   const [migrationPlan, setMigrationPlan] = useState<IndexMigrationPlan | null>(null);
   const [migrationState, setMigrationState] = useState<PlanState>({ kind: "idle" });
   const positionsRequestRef = useRef(0);
+  const balanceRequestRef = useRef(0);
   const authStateRef = useRef<"loading" | "signed-in" | "signed-out">("loading");
 
   const wallet = useMemo(() => {
@@ -108,6 +113,26 @@ export function PortfolioApp() {
   const solanaWallet = useMemo(() => solanaWallets.find((candidate) => candidate.standardWallet.name.toLowerCase().includes("privy")) ?? solanaWallets[0], [solanaWallets]);
   const address = wallet?.address ?? user?.wallet?.address;
   const solanaAddress = solanaWallet?.address;
+
+  const loadRobinhoodBalance = useCallback(async () => {
+    const requestId = ++balanceRequestRef.current;
+    if (!authenticated || !address) {
+      setBalanceState({ kind: "idle" });
+      return;
+    }
+    setBalanceState({ kind: "loading" });
+    try {
+      const response = await fetch(`/api/balance?address=${encodeURIComponent(address)}`, { cache: "no-store" });
+      const payload = await response.json() as { balanceWei?: string; error?: string };
+      if (!response.ok || payload.balanceWei === undefined) throw new Error(payload.error ?? "Could not read balance");
+      if (requestId !== balanceRequestRef.current) return;
+      setBalanceState({ kind: "ready", balanceWei: payload.balanceWei });
+    } catch (error) {
+      if (requestId !== balanceRequestRef.current) return;
+      setBalanceState({ kind: "error" });
+      reportClientError("positions", error);
+    }
+  }, [address, authenticated]);
 
   const loadPositions = useCallback(async () => {
     const requestId = ++positionsRequestRef.current;
@@ -157,6 +182,10 @@ export function PortfolioApp() {
       authStateRef.current = next;
     }
   }, [authenticated, ready]);
+
+  useEffect(() => {
+    void loadRobinhoodBalance();
+  }, [loadRobinhoodBalance]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -288,6 +317,7 @@ export function PortfolioApp() {
       }
       setFundingState({ kind: "submitted", message: "ETH arrived on Robinhood Chain. You can make markets now." });
       trackProductEvent("Cross-chain Funding Completed", { destinationChainId: 4663 });
+      await loadRobinhoodBalance();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not add ETH";
       if (message.includes("USER_EXITED")) {
@@ -354,7 +384,10 @@ export function PortfolioApp() {
       await sendWalletCalls({ wallet: connected, owner: plan.owner, chainId: robinhood.chainId, transactions: robinhood.transactions });
       setPlanState({ kind: "submitted", message: "Your Robinhood positions are being confirmed. They will appear in Markets shortly." });
       trackProductEvent("Index Submitted", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
-      window.setTimeout(() => void loadPositions(), 8_000);
+      window.setTimeout(() => {
+        void loadPositions();
+        void loadRobinhoodBalance();
+      }, 8_000);
     } catch (error) {
       setPlanState({ kind: "error", message: error instanceof Error ? error.message : "The deposit could not be completed" });
       reportClientError("index-submit", error);
@@ -559,6 +592,7 @@ export function PortfolioApp() {
                   maximumConstituents={markets.index.maximumConstituents || INDEX_MARKET_COUNT}
                   ready={ready}
                   fundingState={fundingState}
+                  balance={authenticated ? balanceState : null}
                   onFund={() => void fundRobinhood()}
                   onPrepare={() => void prepareIndex()}
                   plan={plan}
@@ -599,7 +633,7 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
   </div>;
 }
 
-function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amountError, maximumConstituents, ready, fundingState, onFund, onPrepare, plan, state, onExecute, onCancel }: {
+function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amountError, maximumConstituents, ready, fundingState, balance, onFund, onPrepare, plan, state, onExecute, onCancel }: {
   amount: string;
   onAmount: (amount: string) => void;
   markets: IndexMarket[];
@@ -610,6 +644,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
   maximumConstituents: number;
   ready: boolean;
   fundingState: PlanState;
+  balance: BalanceState | null;
   onFund: () => void;
   onPrepare: () => void;
   plan: RobinhoodIndexPlan | null;
@@ -621,7 +656,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
   return (
     <aside className="market-action" aria-label="Make markets">
       <label className={`amount-field ${amountError ? "is-invalid" : ""}`}>
-        <span>You deposit</span>
+        <span className="amount-heading"><span>You deposit</span>{balance ? <span className="wallet-balance" role="status" title="Robinhood Chain ETH balance">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></span> : null}</span>
         <span className="amount-input"><input id="deposit-amount" name="depositAmount" inputMode="decimal" value={amount} onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" aria-invalid={Boolean(amountError)} aria-describedby={amountError ? "amount-error" : undefined} /><b>ETH</b></span>
         {amountError ? <small className="amount-error" id="amount-error">{amountError}</small> : null}
       </label>
@@ -629,7 +664,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
       <div className="funding-choice">
         <span><b>ETH on another chain?</b><small>Privy moves it to Robinhood.</small></span>
         <button className="cross-chain-fund" type="button" disabled={!ready || fundingState.kind === "planning"} onClick={onFund}>
-          {fundingState.kind === "planning" ? "Opening Privy…" : "Add ETH"}
+          <EthereumIcon />{fundingState.kind === "planning" ? "Opening Privy…" : "Add ETH"}
         </button>
       </div>
       {fundingState.kind === "submitted" || fundingState.kind === "error" ? <p className={`funding-status is-${fundingState.kind}`} aria-live="polite">{fundingState.message}</p> : null}
@@ -759,6 +794,7 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
                   <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
+                  <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a>
                 </span></td>
               </tr>;
             }) : null}
@@ -995,6 +1031,13 @@ function trimEth(value: bigint): string {
   return fraction ? `${whole}.${fraction.slice(0, 6).replace(/0+$/, "") || "0"}` : whole!;
 }
 
+function formatWalletBalance(balanceWei: string): string {
+  const value = Number(formatEther(BigInt(balanceWei)));
+  if (value === 0) return "0";
+  if (value < 0.0001) return "<0.0001";
+  return new Intl.NumberFormat("en-GB", { maximumFractionDigits: value < 1 ? 4 : 3 }).format(value);
+}
+
 function sameAddress(left: string, right: string): boolean {
   return left.toLowerCase() === right.toLowerCase();
 }
@@ -1011,6 +1054,17 @@ function ThemeIcon({ preference }: { preference: ThemePreference }) {
   if (preference === "light") return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>;
   if (preference === "dark") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z" /></svg>;
   return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2.5" /><path d="M8 21h8M12 17v4M12 4v13" /></svg>;
+}
+
+function EthereumIcon() {
+  return <svg className="ethereum-icon" viewBox="0 0 256 417" aria-hidden="true">
+    <path d="M127.9 0 125 9.8v272l2.9 2.9 127.9-75.6Z" fill="currentColor" opacity=".72" />
+    <path d="m127.9 0-128 209.1 128 75.6Z" fill="currentColor" />
+    <path d="m127.9 309.2-1.6 2v98.2l1.6 4.7L256 233.6Z" fill="currentColor" opacity=".72" />
+    <path d="M127.9 414.1V309.2L0 233.6Z" fill="currentColor" />
+    <path d="m127.9 284.7 127.9-75.6-127.9-58.1Z" fill="currentColor" opacity=".45" />
+    <path d="m0 209.1 127.9 75.6V151Z" fill="currentColor" opacity=".72" />
+  </svg>;
 }
 
 function TokenIcon({ symbol, src, color }: { symbol: string; src?: string | null; color?: string }) {

@@ -407,8 +407,11 @@ svg {
 .position-ledger header p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 
 .amount-field { display: grid; gap: 10px; padding: 20px 22px; border-radius: 12px; background: var(--surface-2); }
-.amount-field > span:first-child,
+.amount-heading,
 .position-list small { color: var(--muted); font-size: 11px; font-weight: 700; }
+.amount-heading { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 14px; }
+.wallet-balance { overflow: hidden; color: var(--muted); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.wallet-balance b { color: var(--ink-soft); font-weight: 750; }
 .amount-input { display: flex; align-items: baseline; justify-content: space-between; }
 .amount-input input { min-width: 0; width: 100%; border: 0; background: transparent; color: var(--ink); font-size: 48px; font-weight: 750; letter-spacing: -.05em; }
 .amount-input b { color: var(--muted); font-size: 13px; }
@@ -419,7 +422,8 @@ svg {
 .funding-choice > span:first-child { display: grid; gap: 3px; }
 .funding-choice b { color: var(--ink-soft); font-size: 11px; }
 .funding-choice small { color: var(--muted); font-size: 9px; }
-.cross-chain-fund { min-width: 104px; min-height: 42px; padding: 0 14px; border-radius: 10px; background: var(--surface-2); color: var(--ink); font-size: 11px; font-weight: 800; transition: background 160ms ease, transform 120ms ease; }
+.cross-chain-fund { display: inline-flex; min-width: 104px; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border-radius: 10px; background: var(--surface-2); color: var(--ink); font-size: 11px; font-weight: 800; transition: background 160ms ease, transform 120ms ease; }
+.ethereum-icon { width: 11px; height: 18px; flex: 0 0 auto; color: var(--ink-soft); }
 .funding-status { margin: 0 20px 8px; font-size: 10px; line-height: 1.45; }
 .funding-status.is-submitted { color: var(--mint); }
 .funding-status.is-error { color: var(--orange); }
@@ -763,7 +767,7 @@ svg {
   .hero-token b { display: none; }
   .market-action { padding: 10px; }
   .amount-field { gap: 11px; padding: 18px; }
-  .amount-field > span:first-child { font-size: 12px; }
+  .amount-heading { font-size: 12px; }
   .amount-input input { font-size: 42px; }
   .amount-input b { font-size: 14px; }
   .funding-choice { min-height: 66px; padding-inline: 8px; }

@@ -10,21 +10,23 @@ const providers = readFileSync("app/providers.tsx", "utf8");
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
     expect(page).toContain("PortfolioApp");
-    expect(portfolio).toContain("Make meme markets");
-    expect(portfolio).toContain("Deposit ETH");
+    expect(portfolio).toContain("Be the market maker");
+    expect(portfolio).toContain("Deposit ETH. Una puts it to work across six meme markets on Robinhood Chain.");
     expect(portfolio).toContain("Make markets");
     expect(portfolio).toContain("Fee APR");
-    expect(portfolio).toContain("24h annualized");
-    expect(portfolio).toContain("Live index");
+    expect(portfolio).toContain("Based on 24h fees");
+    expect(portfolio).toContain("Inside the index");
     expect(portfolio).toContain("Earning now");
     expect(portfolio).toContain('{ id: "markets", label: "Markets" }');
     expect(portfolio).toContain('id="positions"');
-    expect(portfolio).toContain("Widens with your deposit");
-    expect(portfolio).toContain("One wallet. Every market.");
+    expect(portfolio).toContain("More with a larger deposit");
+    expect(portfolio).toContain("Pay from");
+    expect(portfolio).toContain("One wallet. Your markets.");
     expect(portfolio).not.toContain('label: "Positions"');
     expect(portfolio).not.toContain("scrollIntoView");
-    expect(portfolio).toContain("https://assets.relay.link/icons/792703809/light.png");
-    expect(portfolio).not.toContain("https://avatars.githubusercontent.com/u/35608259");
+    expect(portfolio).toContain("https://fomo.family/r/andrewwilkinson");
+    expect(portfolio).toContain("https://www.geckoterminal.com/robinhood/pools");
+    expect(portfolio).toContain("https://app.uniswap.org/swap?chain=robinhood");
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
     expect(portfolio).not.toMatch(/autopilot|guaranteed returns|UnaBot/i);
     expect(portfolio).not.toMatch(/Observed, not forecast|Positions stay yours|Ask Una/i);
@@ -40,20 +42,17 @@ describe("meme index product UI", () => {
     expect(css).toContain("--surface: #111116");
     expect(css).not.toMatch(/#FC72FF|#FF37C7|#ff007a/i);
     expect(css).not.toContain("Instrument Serif");
+    expect(css).not.toMatch(/gradient/i);
   });
 
-  it("keeps the tri-chain index, custody, and responsive navigation explicit", () => {
-    expect(portfolio).toContain("Base, Robinhood, and Solana");
-    expect(portfolio).toContain('brand="base"');
+  it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {
+    expect(portfolio).toContain("Una meme index on Robinhood Chain");
     expect(portfolio).toContain('brand="robinhood"');
-    expect(portfolio).toContain('brand="solana"');
     expect(portfolio).toContain('uniswap: "https://');
-    expect(portfolio).toContain('aerodrome: "https://');
-    expect(portfolio).toContain('meteora: "https://');
     expect(portfolio).toContain("Self-custodial");
-    expect(portfolio).not.toContain("3 wallet approvals");
-    expect(portfolio).toContain("approvals across Base, Robinhood, and Solana");
-    expect(portfolio).toContain("Each approval creates positions you own");
+    expect(portfolio).toContain("Two wallet approvals: deposit from");
+    expect(portfolio).toContain('useState("1")');
+    expect(portfolio).not.toContain("Deposit ETH. Earn trading fees across Base, Robinhood, and Solana.");
     expect(css).toContain(".index-hero { grid-template-columns: 1fr; gap: 48px; padding: 68px 0 64px");
     expect(css).toContain("min-height: 44px");
     expect(css).not.toContain("position: fixed");

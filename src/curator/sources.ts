@@ -19,6 +19,24 @@ type DexPair = {
   info?: { websites?: unknown[]; socials?: unknown[] };
 };
 
+type GeckoPool = {
+  attributes: {
+    address?: string;
+    base_token_price_usd?: string;
+    quote_token_price_usd?: string;
+    price_change_percentage?: { h24?: string };
+    reserve_in_usd?: string;
+    volume_usd?: { h24?: string };
+    market_cap_usd?: string | null;
+    fdv_usd?: string | null;
+    pool_created_at?: string;
+  };
+  relationships: {
+    base_token: { data: { id: string } };
+    quote_token: { data: { id: string } };
+  };
+};
+
 type GoPlusToken = {
   is_open_source?: string;
   is_proxy?: string;
@@ -136,6 +154,26 @@ async function dexPair(chain: MarketDefinition["chain"], pool: string): Promise<
   return payload?.pair ?? payload?.pairs?.[0] ?? null;
 }
 
+async function geckoPair(definition: MarketDefinition): Promise<DexPair | null> {
+  const payload = await getJson<{ data?: GeckoPool[] }>(
+    `https://api.geckoterminal.com/api/v2/networks/robinhood/pools/multi/${definition.pool.toLowerCase()}?include=base_token%2Cquote_token%2Cdex`,
+  );
+  const pool = payload?.data?.[0];
+  if (!pool) return null;
+  const tokenSuffix = `_${definition.token.toLowerCase()}`;
+  const memeIsBase = pool.relationships.base_token.data.id.toLowerCase().endsWith(tokenSuffix);
+  const createdAt = pool.attributes.pool_created_at ? Date.parse(pool.attributes.pool_created_at) : Number.NaN;
+  return {
+    url: `https://www.geckoterminal.com/robinhood/pools/${definition.pool.toLowerCase()}`,
+    priceUsd: memeIsBase ? pool.attributes.base_token_price_usd : pool.attributes.quote_token_price_usd,
+    priceChange: { h24: numberOrNull(pool.attributes.price_change_percentage?.h24) ?? undefined },
+    liquidity: { usd: numberOrNull(pool.attributes.reserve_in_usd) ?? undefined },
+    volume: { h24: numberOrNull(pool.attributes.volume_usd?.h24) ?? undefined },
+    marketCap: numberOrNull(pool.attributes.market_cap_usd ?? pool.attributes.fdv_usd) ?? undefined,
+    pairCreatedAt: Number.isFinite(createdAt) ? createdAt : undefined,
+  };
+}
+
 export function decodeSolanaMintSecurity(data: Uint8Array): SolanaMintSecurity | null {
   if (data.byteLength < 82) return null;
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -200,7 +238,7 @@ function evmSecurityFlags(token: GoPlusToken | null): string[] {
 async function collectEvm(definition: MarketDefinition, observedAt: string): Promise<CuratorObservation> {
   const chainId = definition.chain === "robinhood" ? 4663 : 8453;
   const [pair, securityPayload] = await Promise.all([
-    dexPair(definition.chain, definition.pool),
+    definition.chain === "robinhood" ? geckoPair(definition) : dexPair(definition.chain, definition.pool),
     getJson<{ result?: Record<string, GoPlusToken> }>(`https://api.gopluslabs.io/api/v1/token_security/${chainId}?contract_addresses=${definition.token}`),
   ]);
   const security = securityPayload?.result?.[definition.token.toLowerCase()] ?? null;

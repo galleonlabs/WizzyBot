@@ -23,7 +23,13 @@ type HostedPortfolioSurface = {
     solanaOwner: string;
     totalAmountWei: bigint;
   }) => Promise<unknown>;
+  planRobinhoodIndex: (input: {
+    owner: string;
+    totalAmountWei: bigint;
+    originChainId?: number;
+  }) => Promise<unknown>;
   getMemeIndexBreadthPolicy: () => unknown;
+  getRobinhoodIndexBreadthPolicy: () => unknown;
   planPositionAction: (input: {
     owner: string;
     chain: "base" | "robinhood";
@@ -33,6 +39,8 @@ type HostedPortfolioSurface = {
     positionManager?: string;
   }) => Promise<unknown>;
   quoteBaseToRobinhoodEth: (input: { owner: string; amountInWei: bigint }) => Promise<unknown>;
+  quoteEthToRobinhood: (input: { owner: string; amountInWei: bigint; originChainId: number }) => Promise<unknown>;
+  ETH_FUNDING_CHAINS: readonly { id: number; label: string }[];
   relayIntentStatus: (requestId: string) => Promise<unknown>;
 };
 
@@ -54,7 +62,11 @@ export const fetchSolanaMarketStats = hosted.fetchSolanaMarketStats;
 export const planAllocation = hosted.planAllocation;
 export const planDualChainAllocation = hosted.planDualChainAllocation;
 export const planMemeIndex = hosted.planMemeIndex;
+export const planRobinhoodIndex = hosted.planRobinhoodIndex;
 export const getMemeIndexBreadthPolicy = hosted.getMemeIndexBreadthPolicy;
+export const getRobinhoodIndexBreadthPolicy = hosted.getRobinhoodIndexBreadthPolicy;
 export const planPositionAction = hosted.planPositionAction;
 export const quoteBaseToRobinhoodEth = hosted.quoteBaseToRobinhoodEth;
+export const quoteEthToRobinhood = hosted.quoteEthToRobinhood;
+export const ETH_FUNDING_CHAINS = hosted.ETH_FUNDING_CHAINS;
 export const relayIntentStatus = hosted.relayIntentStatus;

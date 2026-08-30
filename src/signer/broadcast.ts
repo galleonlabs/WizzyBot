@@ -14,7 +14,15 @@ import { viemChainFor, type ChainSlug } from "../chains.js";
 import type { PlannedTx } from "../types.js";
 
 export function makePublicClient(rpcUrl: string, chain: Chain = base) {
-  return createPublicClient({ chain, transport: http(rpcUrl) });
+  return createPublicClient({
+    chain,
+    transport: http(rpcUrl, {
+      batch: { batchSize: 20, wait: 10 },
+      retryCount: 6,
+      retryDelay: 500,
+      timeout: 15_000,
+    }),
+  });
 }
 
 export function makeWalletClient(rpcUrl: string, account: Account, chain: Chain = base) {

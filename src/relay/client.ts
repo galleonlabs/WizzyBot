@@ -1,4 +1,5 @@
 import { getAddress, isAddress, type Address, type Hex } from "viem";
+import { ethFundingChain } from "./origins.js";
 
 const RELAY_API = "https://api.relay.link";
 const NATIVE = "0x0000000000000000000000000000000000000000";
@@ -11,7 +12,7 @@ const QUOTE_TIMEOUT_MS = 8_000;
 export type RelayBridgeQuote = {
   provider: "Relay";
   requestId: string;
-  originChainId: 8453;
+  originChainId: number;
   destinationChainId: 4663;
   owner: Address;
   amountInWei: string;
@@ -59,12 +60,15 @@ export type RelaySolanaQuote = {
   notices: string[];
 };
 
-export async function quoteBaseToRobinhoodEth(input: {
+export async function quoteEthToRobinhood(input: {
   owner: string;
   amountInWei: bigint;
+  originChainId: number;
 }): Promise<RelayBridgeQuote> {
   if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
   if (input.amountInWei <= 0n) throw new Error("bridge amount must be positive");
+  const origin = ethFundingChain(input.originChainId);
+  if (origin.id === ROBINHOOD_CHAIN_ID) throw new Error("ETH is already on Robinhood Chain");
   const owner = getAddress(input.owner);
   const response = await relayFetch("/quote/v2", {
     method: "POST",
@@ -72,7 +76,7 @@ export async function quoteBaseToRobinhoodEth(input: {
     body: JSON.stringify({
       user: owner,
       recipient: owner,
-      originChainId: BASE_CHAIN_ID,
+      originChainId: origin.id,
       destinationChainId: ROBINHOOD_CHAIN_ID,
       originCurrency: NATIVE,
       destinationCurrency: NATIVE,
@@ -110,11 +114,11 @@ export async function quoteBaseToRobinhoodEth(input: {
 
   if (transaction.from.toLowerCase() !== owner.toLowerCase()) throw new Error("Relay sender does not match wallet");
   if (transaction.to.toLowerCase() !== depository.toLowerCase()) throw new Error("Relay target does not match its depository");
-  if (transaction.chainId !== BASE_CHAIN_ID) throw new Error("Relay deposit must execute on Base");
+  if (transaction.chainId !== origin.id) throw new Error("Relay deposit network mismatch");
   if (transaction.value !== input.amountInWei.toString() || quotedIn !== transaction.value) {
     throw new Error("Relay quote changed the requested input amount");
   }
-  if (requiredNumber(inCurrency.chainId, "Relay input chain") !== BASE_CHAIN_ID) throw new Error("Relay input chain mismatch");
+  if (requiredNumber(inCurrency.chainId, "Relay input chain") !== origin.id) throw new Error("Relay input chain mismatch");
   if (requiredNumber(outCurrency.chainId, "Relay output chain") !== ROBINHOOD_CHAIN_ID) throw new Error("Relay output chain mismatch");
   if (requiredString(inCurrency.address, "Relay input currency").toLowerCase() !== NATIVE) throw new Error("Relay input must be native ETH");
   if (requiredString(outCurrency.address, "Relay output currency").toLowerCase() !== NATIVE) throw new Error("Relay output must be native ETH");
@@ -127,7 +131,7 @@ export async function quoteBaseToRobinhoodEth(input: {
   return {
     provider: "Relay",
     requestId,
-    originChainId: BASE_CHAIN_ID,
+    originChainId: origin.id,
     destinationChainId: ROBINHOOD_CHAIN_ID,
     owner,
     amountInWei: quotedIn,
@@ -141,7 +145,7 @@ export async function quoteBaseToRobinhoodEth(input: {
       to: transaction.to,
       data: transaction.data,
       value: transaction.value,
-      description: "Relay Base → Robinhood Chain funding deposit",
+      description: `Relay ${origin.label} → Robinhood Chain deposit`,
     },
     statusPath: `/api/relay/status?requestId=${encodeURIComponent(requestId)}`,
     createdAt: now.toISOString(),
@@ -152,6 +156,10 @@ export async function quoteBaseToRobinhoodEth(input: {
       "If the intent cannot be filled, Relay's protocol refund path returns funds to this wallet.",
     ],
   };
+}
+
+export function quoteBaseToRobinhoodEth(input: { owner: string; amountInWei: bigint }): Promise<RelayBridgeQuote> {
+  return quoteEthToRobinhood({ ...input, originChainId: BASE_CHAIN_ID });
 }
 
 export async function quoteBaseToSolanaSol(input: {

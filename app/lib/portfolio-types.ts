@@ -19,6 +19,7 @@ export type CuratedMarket = {
   weightBps: number;
   status: "active" | "paused" | "watch";
   risk: MarketRisk;
+  imageUrl?: string;
   color: string;
 };
 
@@ -65,9 +66,35 @@ export type MarketStats = {
 export type MarketsPayload = {
   catalog: MarketCatalog;
   solana: SolanaChainCatalog;
-  index: MemeIndexBreadthPolicy;
+  index: RobinhoodIndexBreadthPolicy;
+  fundingChains: EthFundingChain[];
   stats: MarketStats[];
   source: string;
+};
+
+export type EthFundingChain = {
+  id: number;
+  label: string;
+};
+
+export type RobinhoodIndexBreadthTier = {
+  minimumAmountWei: string;
+  constituentCount: number;
+  marketIds: string[];
+};
+
+export type RobinhoodIndexBreadthPolicy = {
+  chain: "robinhood";
+  breadthUnitWei: string;
+  minimumAmountWei: string;
+  maximumConstituents: number;
+  tiers: RobinhoodIndexBreadthTier[];
+  selectionRules: {
+    minimumPoolAgeDays: number;
+    minimumLiquidityUsd: number;
+    quoteSymbol: "WETH";
+    venue: "Uniswap v3";
+  };
 };
 
 export type IndexBreadthTier = {
@@ -115,10 +142,20 @@ export type SolanaChainCatalog = {
 export type AllocationMarketPlan = {
   marketId: string;
   symbol: string;
+  pool: `0x${string}`;
   venue: "uniswap-v3" | "aerodrome-slipstream";
   positionManager: `0x${string}`;
   weightBps: number;
   budgetWei: string;
+  swapInWei: string;
+  quotedMemeOut: string;
+  minimumMemeOut: string;
+  mintWeth: string;
+  mintMeme: string;
+  tickLower: number;
+  tickUpper: number;
+  leftoverWeth: string;
+  leftoverMeme: string;
 };
 
 export type AllocationPlan = {
@@ -143,6 +180,8 @@ export type AllocationPlan = {
 export type RelayQuote = {
   provider: "Relay";
   requestId: string;
+  originChainId: number;
+  destinationChainId: 4663;
   amountInWei: string;
   expectedAmountOutWei: string;
   minimumAmountOutWei: string;
@@ -256,6 +295,46 @@ export type MemeIndexPlan = {
         amountLamports: string;
         rangeDelta: number;
       }>;
+    },
+  ];
+  notices: string[];
+};
+
+export type RobinhoodIndexPlan = {
+  kind: "robinhood-index";
+  owner: `0x${string}`;
+  totalAmountWei: string;
+  indexVersion: number;
+  constituentCount: number;
+  sourceChainId: number;
+  sourceChainLabel: string;
+  expectedWalletSteps: 1 | 2;
+  createdAt: string;
+  expiresAt: string;
+  stages: [
+    {
+      id: "fund-robinhood";
+      chain: "source";
+      chainId: number;
+      chainLabel: string;
+      bridge: RelayQuote;
+      transactions: WalletTransaction[];
+    },
+    {
+      id: "make-robinhood-markets";
+      chain: "robinhood";
+      chainId: 4663;
+      waitForRequestId?: string;
+      allocation: AllocationPlan;
+      transactions: WalletTransaction[];
+    },
+  ] | [
+    {
+      id: "make-robinhood-markets";
+      chain: "robinhood";
+      chainId: 4663;
+      allocation: AllocationPlan;
+      transactions: WalletTransaction[];
     },
   ];
   notices: string[];

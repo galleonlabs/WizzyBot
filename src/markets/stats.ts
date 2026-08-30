@@ -17,6 +17,33 @@ type DexPair = {
   pairCreatedAt?: number;
 };
 
+type GeckoPool = {
+  id: string;
+  attributes: {
+    address?: string;
+    base_token_price_usd?: string;
+    quote_token_price_usd?: string;
+    price_change_percentage?: { h24?: string };
+    reserve_in_usd?: string;
+    volume_usd?: { h24?: string };
+    market_cap_usd?: string | null;
+    fdv_usd?: string | null;
+    pool_created_at?: string;
+  };
+  relationships: {
+    base_token: { data: { id: string } };
+    quote_token: { data: { id: string } };
+  };
+};
+
+type GeckoToken = {
+  id: string;
+  attributes: {
+    address?: string;
+    image_url?: string | null;
+  };
+};
+
 export type MarketStats = {
   marketId: string;
   tokenImageUrl: string | null;
@@ -43,6 +70,31 @@ function finite(value: unknown): number | null {
 
 function dexChain(slug: ChainSlug): string {
   return slug === "robinhood" ? "robinhood" : "base";
+}
+
+export function deriveGeckoMarketStats(
+  market: CuratedMarket,
+  pool: GeckoPool | undefined,
+  tokens: GeckoToken[] = [],
+  asOf = new Date().toISOString(),
+): MarketStats {
+  const tokenId = pool
+    ? [pool.relationships.base_token.data.id, pool.relationships.quote_token.data.id]
+      .find((id) => id.toLowerCase().endsWith(`_${market.token.toLowerCase()}`))
+    : undefined;
+  const memeIsBase = tokenId === pool?.relationships.base_token.data.id;
+  const token = tokens.find((candidate) => candidate.id === tokenId);
+  const createdAt = pool?.attributes.pool_created_at ? Date.parse(pool.attributes.pool_created_at) : Number.NaN;
+  return deriveMarketStats(market, pool ? {
+    url: `https://www.geckoterminal.com/robinhood/pools/${market.pool.toLowerCase()}`,
+    info: { imageUrl: token?.attributes.image_url ?? undefined },
+    priceUsd: memeIsBase ? pool.attributes.base_token_price_usd : pool.attributes.quote_token_price_usd,
+    priceChange: { h24: finite(pool.attributes.price_change_percentage?.h24) ?? undefined },
+    liquidity: { usd: finite(pool.attributes.reserve_in_usd) ?? undefined },
+    volume: { h24: finite(pool.attributes.volume_usd?.h24) ?? undefined },
+    marketCap: finite(pool.attributes.market_cap_usd ?? pool.attributes.fdv_usd) ?? undefined,
+    pairCreatedAt: Number.isFinite(createdAt) ? createdAt : undefined,
+  } : undefined, asOf);
 }
 
 export function deriveMarketStats(
@@ -77,7 +129,7 @@ export function deriveMarketStats(
     : Math.max(0, Math.min(100, Math.round(25 * Math.log10(1 + activity * 100) + (liquidityUsd! >= 1_000_000 ? 25 : 10))));
   return {
     marketId: market.id,
-    tokenImageUrl: pair?.info?.imageUrl ?? null,
+    tokenImageUrl: pair?.info?.imageUrl ?? market.imageUrl ?? null,
     feePips,
     priceUsd,
     priceChange24h,
@@ -100,7 +152,9 @@ export async function fetchMarketStats(): Promise<MarketStats[]> {
   const asOf = new Date().toISOString();
   const env = loadEnv();
   const baseClient = makePublicClient(env.rpcByChain.base, viemChainFor("base"));
-  return Promise.all(catalog.chains.flatMap((chain) => chain.markets.map(async (market) => {
+  const base = catalog.chains.find((chain) => chain.slug === "base")!;
+  const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood")!;
+  const baseStats = await Promise.all(base.markets.map(async (market) => {
     let feePips = market.fee;
     if (market.protocol === "AERODROME_SLIPSTREAM") {
       try {
@@ -110,7 +164,7 @@ export async function fetchMarketStats(): Promise<MarketStats[]> {
       }
     }
     try {
-      const response = await fetch(`https://api.dexscreener.com/latest/dex/pairs/${dexChain(chain.slug)}/${market.pool}`, {
+      const response = await fetch(`https://api.dexscreener.com/latest/dex/pairs/${dexChain(base.slug)}/${market.pool}`, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(5_000),
       });
@@ -120,5 +174,26 @@ export async function fetchMarketStats(): Promise<MarketStats[]> {
     } catch {
       return deriveMarketStats(market, undefined, asOf, feePips);
     }
-  })));
+  }));
+  const robinhoodStats = await fetchRobinhoodStats(robinhood.markets, asOf);
+  return [...baseStats, ...robinhoodStats];
+}
+
+async function fetchRobinhoodStats(markets: CuratedMarket[], asOf: string): Promise<MarketStats[]> {
+  if (!markets.length) return [];
+  const addresses = markets.map((market) => market.pool.toLowerCase()).join(",");
+  try {
+    const request: RequestInit & { next: { revalidate: number } } = {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5_000),
+      next: { revalidate: 60 },
+    };
+    const response = await fetch(`https://api.geckoterminal.com/api/v2/networks/robinhood/pools/multi/${addresses}?include=base_token%2Cquote_token%2Cdex`, request);
+    if (!response.ok) return markets.map((market) => deriveGeckoMarketStats(market, undefined, [], asOf));
+    const payload = await response.json() as { data?: GeckoPool[]; included?: GeckoToken[] };
+    const pools = new Map((payload.data ?? []).map((pool) => [pool.attributes.address?.toLowerCase() ?? "", pool]));
+    return markets.map((market) => deriveGeckoMarketStats(market, pools.get(market.pool.toLowerCase()), payload.included ?? [], asOf));
+  } catch {
+    return markets.map((market) => deriveGeckoMarketStats(market, undefined, [], asOf));
+  }
 }

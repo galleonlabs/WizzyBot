@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { quoteBaseToRobinhoodEth, quoteBaseToSolanaSol, relayIntentStatus } from "../src/relay/client.js";
+import { quoteBaseToRobinhoodEth, quoteBaseToSolanaSol, quoteEthToRobinhood, relayIntentStatus } from "../src/relay/client.js";
+import { ETH_FUNDING_CHAINS } from "../src/relay/origins.js";
 
 const OWNER = "0x1111111111111111111111111111111111111111";
 const DEPOSITORY = "0x4cd00e387622c35bddb9b4c962c136462338bc31";
@@ -20,6 +21,20 @@ describe("Relay funding", () => {
     expect(quote.transaction.value).toBe("5000000000000000");
     expect(quote.minimumAmountOutWei).toBe("4888000000000000");
     expect(quote.expectedAmountOutWei).toBe("4988000000000000");
+  });
+
+  it("quotes native ETH from another supported network", async () => {
+    globalThis.fetch = vi.fn(async () => new Response(JSON.stringify(relayQuote(42161)), { status: 200 })) as typeof fetch;
+    const quote = await quoteEthToRobinhood({ owner: OWNER, amountInWei: 5_000_000_000_000_000n, originChainId: 42161 });
+    expect(quote.originChainId).toBe(42161);
+    expect(quote.destinationChainId).toBe(4663);
+    expect(quote.transaction.description).toContain("Arbitrum");
+  });
+
+  it("publishes only named ETH networks and keeps Robinhood as the direct option", () => {
+    expect(ETH_FUNDING_CHAINS.find((chain) => chain.id === 1)?.label).toBe("Ethereum");
+    expect(ETH_FUNDING_CHAINS.find((chain) => chain.id === 4663)?.label).toBe("Robinhood Chain");
+    expect(new Set(ETH_FUNDING_CHAINS.map((chain) => chain.id)).size).toBe(ETH_FUNDING_CHAINS.length);
   });
 
   it("rejects a quote whose transaction target differs from its depository", async () => {
@@ -53,7 +68,7 @@ describe("Relay funding", () => {
   });
 });
 
-function relayQuote() {
+function relayQuote(originChainId = 8453) {
   return {
     requestId: REQUEST_ID,
     steps: [{
@@ -63,14 +78,14 @@ function relayQuote() {
         to: DEPOSITORY,
         data: "0x1234",
         value: "5000000000000000",
-        chainId: 8453,
+        chainId: originChainId,
       } }],
     }],
     fees: { relayer: { amount: "12000000000000", amountUsd: "0.03" } },
     details: {
       currencyIn: {
         amount: "5000000000000000",
-        currency: { chainId: 8453, address: "0x0000000000000000000000000000000000000000" },
+        currency: { chainId: originChainId, address: "0x0000000000000000000000000000000000000000" },
       },
       currencyOut: {
         amount: "4988000000000000",

@@ -4,10 +4,11 @@ import { TREASURY } from "../constants.js";
 import { bpsOf } from "../core/fees.js";
 import { getMarketCatalog } from "../markets/catalog.js";
 import { activeSolanaMarkets, getSolanaMarketCatalog } from "../markets/solana-catalog.js";
-import { quoteBaseToRobinhoodEth, quoteBaseToSolanaSol, type RelayBridgeQuote, type RelaySolanaQuote } from "../relay/client.js";
+import { quoteBaseToRobinhoodEth, quoteBaseToSolanaSol, quoteEthToRobinhood, type RelayBridgeQuote, type RelaySolanaQuote } from "../relay/client.js";
+import { ethFundingChain } from "../relay/origins.js";
 import { nativeTransferTx } from "../uniswap/calldata.js";
 import { planAllocation, weightedBudgets, type AllocationPlan, type SerializableTx } from "./allocation.js";
-import { INDEX_CHAIN_SHARES_BPS, selectMemeIndexMarkets } from "./index-selection.js";
+import { INDEX_CHAIN_SHARES_BPS, selectMemeIndexMarkets, selectRobinhoodIndexMarkets } from "./index-selection.js";
 
 const BPS = 10_000n;
 const BASE_SHARE_BPS = BigInt(INDEX_CHAIN_SHARES_BPS.base);
@@ -64,6 +65,117 @@ export type MemeIndexPlan = {
   ];
   notices: string[];
 };
+
+export type RobinhoodIndexPlan = {
+  kind: "robinhood-index";
+  owner: Address;
+  totalAmountWei: string;
+  indexVersion: number;
+  constituentCount: number;
+  sourceChainId: number;
+  sourceChainLabel: string;
+  expectedWalletSteps: 1 | 2;
+  createdAt: string;
+  expiresAt: string;
+  stages: [
+    {
+      id: "fund-robinhood";
+      chain: "source";
+      chainId: number;
+      chainLabel: string;
+      bridge: RelayBridgeQuote;
+      transactions: SerializableTx[];
+    },
+    {
+      id: "make-robinhood-markets";
+      chain: "robinhood";
+      chainId: 4663;
+      waitForRequestId?: string;
+      allocation: AllocationPlan;
+      transactions: SerializableTx[];
+    },
+  ] | [
+    {
+      id: "make-robinhood-markets";
+      chain: "robinhood";
+      chainId: 4663;
+      allocation: AllocationPlan;
+      transactions: SerializableTx[];
+    },
+  ];
+  notices: string[];
+};
+
+/**
+ * Public launch plan: fund Robinhood Chain from the user's chosen ETH network,
+ * then open every market their deposit supports in the destination wallet.
+ */
+export async function planRobinhoodIndex(input: {
+  owner: string;
+  totalAmountWei: bigint;
+  originChainId?: number;
+}): Promise<RobinhoodIndexPlan> {
+  if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
+  if (input.totalAmountWei <= 0n) throw new Error("amount must be positive");
+  const owner = getAddress(input.owner);
+  const source = ethFundingChain(input.originChainId ?? 8453);
+  const selection = selectRobinhoodIndexMarkets(input.totalAmountWei);
+  const bridge = source.id === 4663
+    ? null
+    : await quoteEthToRobinhood({ owner, amountInWei: input.totalAmountWei, originChainId: source.id });
+  const received = bridge ? BigInt(bridge.minimumAmountOutWei) : input.totalAmountWei;
+  const allocatable = received - ROBINHOOD_GAS_RESERVE_WEI;
+  if (allocatable <= 0n) throw new Error("The deposit leaves no ETH for markets after the network reserve");
+  const allocation = await planAllocation({
+    owner,
+    chain: "robinhood",
+    amountWei: allocatable,
+    marketIds: selection.marketIds,
+  });
+  const now = new Date();
+  const expiresAt = bridge
+    ? Math.min(Date.parse(bridge.expiresAt), Date.parse(allocation.expiresAt))
+    : Date.parse(allocation.expiresAt);
+  const allocationStage = {
+    id: "make-robinhood-markets" as const,
+    chain: "robinhood" as const,
+    chainId: 4663 as const,
+    ...(bridge ? { waitForRequestId: bridge.requestId } : {}),
+    allocation,
+    transactions: allocation.transactions,
+  };
+
+  return {
+    kind: "robinhood-index",
+    owner,
+    totalAmountWei: input.totalAmountWei.toString(),
+    indexVersion: getMarketCatalog().version,
+    constituentCount: selection.constituentCount,
+    sourceChainId: source.id,
+    sourceChainLabel: source.label,
+    expectedWalletSteps: bridge ? 2 : 1,
+    createdAt: now.toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
+    stages: bridge ? [
+      {
+        id: "fund-robinhood",
+        chain: "source",
+        chainId: source.id,
+        chainLabel: source.label,
+        bridge,
+        transactions: [bridge.transaction],
+      },
+      allocationStage,
+    ] : [allocationStage],
+    notices: [
+      bridge
+        ? `Una moves ETH from ${source.label} to Robinhood Chain, then creates every market position your deposit supports.`
+        : "Una creates every market position your deposit supports directly on Robinhood Chain.",
+      `${bridge ? "Two wallet approvals" : "One wallet approval"}. Every position remains self-custodial.`,
+      "Fee APR changes with trading activity. Meme prices can fall, and trading fees may not cover losses.",
+    ],
+  };
+}
 
 /**
  * Builds the one public Una product: a ranked, versioned meme-liquidity index.
@@ -163,7 +275,7 @@ export async function planMemeIndex(input: {
       },
     ],
     notices: [
-      "Una opens the broadest ranked slice your deposit can support, then chooses the chain split, pools, and liquidity ranges.",
+      "Una opens as many reviewed markets as your deposit can support, then chooses the networks, pools, and liquidity ranges.",
       "The Base batch funds every network in one intent. Privy then asks for the destination-wallet signatures each network requires.",
       "Every EVM LP NFT and Solana DLMM position is created in wallets controlled by this Privy identity.",
       "Fee APR changes with trading activity. Meme prices can fall, and trading fees may not cover losses.",

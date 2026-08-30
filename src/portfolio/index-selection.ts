@@ -1,4 +1,4 @@
-import { formatEther } from "viem";
+import { formatEther, parseEther } from "viem";
 import { activeMarkets, chainCatalog } from "../markets/catalog.js";
 import { activeSolanaMarkets } from "../markets/solana-catalog.js";
 
@@ -25,6 +25,28 @@ export type MemeIndexBreadthPolicy = {
   chainSharesBps: typeof INDEX_CHAIN_SHARES_BPS;
   tiers: IndexBreadthTier[];
 };
+
+export type RobinhoodIndexBreadthTier = {
+  minimumAmountWei: string;
+  constituentCount: number;
+  marketIds: string[];
+};
+
+export type RobinhoodIndexBreadthPolicy = {
+  chain: "robinhood";
+  breadthUnitWei: string;
+  minimumAmountWei: string;
+  maximumConstituents: number;
+  tiers: RobinhoodIndexBreadthTier[];
+  selectionRules: {
+    minimumPoolAgeDays: 30;
+    minimumLiquidityUsd: 75_000;
+    quoteSymbol: "WETH";
+    venue: "Uniswap v3";
+  };
+};
+
+const ROBINHOOD_BREADTH_UNIT_WEI = parseEther("0.05");
 
 type RankedMarket = {
   chain: IndexChain;
@@ -75,6 +97,43 @@ export function selectMemeIndexMarkets(totalAmountWei: bigint): IndexBreadthTier
   const minimum = BigInt(policy.minimumAmountWei);
   if (totalAmountWei < minimum) {
     throw new Error(`Minimum index deposit is ${trimEth(minimum)} ETH`);
+  }
+  return [...policy.tiers].reverse().find((tier) => totalAmountWei >= BigInt(tier.minimumAmountWei)) ?? policy.tiers[0]!;
+}
+
+/**
+ * The launch index is intentionally network-specific. Each viable 0.05 ETH
+ * unit adds the next code-reviewed Robinhood market by curator weight.
+ */
+export function getRobinhoodIndexBreadthPolicy(): RobinhoodIndexBreadthPolicy {
+  const markets = activeMarkets("robinhood")
+    .slice()
+    .sort((a, b) => b.weightBps - a.weightBps || a.id.localeCompare(b.id));
+  const tiers = markets.map((_, index) => ({
+    minimumAmountWei: (ROBINHOOD_BREADTH_UNIT_WEI * BigInt(index + 1)).toString(),
+    constituentCount: index + 1,
+    marketIds: markets.slice(0, index + 1).map((market) => market.id),
+  }));
+
+  return {
+    chain: "robinhood",
+    breadthUnitWei: ROBINHOOD_BREADTH_UNIT_WEI.toString(),
+    minimumAmountWei: ROBINHOOD_BREADTH_UNIT_WEI.toString(),
+    maximumConstituents: markets.length,
+    tiers,
+    selectionRules: {
+      minimumPoolAgeDays: 30,
+      minimumLiquidityUsd: 75_000,
+      quoteSymbol: "WETH",
+      venue: "Uniswap v3",
+    },
+  };
+}
+
+export function selectRobinhoodIndexMarkets(totalAmountWei: bigint): RobinhoodIndexBreadthTier {
+  const policy = getRobinhoodIndexBreadthPolicy();
+  if (totalAmountWei < BigInt(policy.minimumAmountWei)) {
+    throw new Error(`Minimum Robinhood index deposit is ${trimEth(BigInt(policy.minimumAmountWei))} ETH`);
   }
   return [...policy.tiers].reverse().find((tier) => totalAmountWei >= BigInt(tier.minimumAmountWei)) ?? policy.tiers[0]!;
 }

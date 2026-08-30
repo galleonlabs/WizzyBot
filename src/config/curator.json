@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "updatedAt": "2026-08-30",
   "policy": {
     "snapshotMinutes": 360,
@@ -7,13 +7,49 @@
     "candidateProofDays": 7,
     "minimumPoolAgeDays": 30,
     "minimumLiquidityUsd": 250000,
-    "incumbentLiquidityUsd": 100000,
+    "incumbentLiquidityUsd": 75000,
     "minimumVolume24hUsd": 50000,
     "maximumLiquidityDrop24hPct": 50,
     "maximumPoolAllocationBps": 100,
     "replacementAprMultiplier": 1.5
   },
   "candidates": [
+    {
+      "id": "robinhood-microduck",
+      "chain": "robinhood",
+      "name": "Microduck",
+      "symbol": "MICRODUCK",
+      "token": "0xd5f1afea47b1a9eab414d2ee740cf1d6d039e725",
+      "pool": "0xb87c3c63b53d19984f3b4a927e26b667e32087e8",
+      "protocol": "V3",
+      "feePips": 10000,
+      "risk": "experimental",
+      "identity": "watch"
+    },
+    {
+      "id": "robinhood-gg",
+      "chain": "robinhood",
+      "name": "Golden Goose",
+      "symbol": "GG",
+      "token": "0xcacb0e9caccee63ec4d82952e561a291c68bcb68",
+      "pool": "0xd89f6933a8ef11c2939054c0e287ecb327817242",
+      "protocol": "V3",
+      "feePips": 10000,
+      "risk": "experimental",
+      "identity": "watch"
+    },
+    {
+      "id": "robinhood-copperinu",
+      "chain": "robinhood",
+      "name": "Copper Inu",
+      "symbol": "COPPERINU",
+      "token": "0x5317c0d077d2eeb639448939b930d49c4984b63b",
+      "pool": "0xad5eb1fb22a06231a89f1b27c325f264572e2a54",
+      "protocol": "V3",
+      "feePips": 10000,
+      "risk": "experimental",
+      "identity": "watch"
+    },
     {
       "id": "solana-cate",
       "chain": "solana",

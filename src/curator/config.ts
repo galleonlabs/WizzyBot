@@ -35,6 +35,12 @@ const CandidateSchema = z.discriminatedUnion("chain", [
     protocol: z.enum(["V3", "AERODROME_SLIPSTREAM"]),
   }),
   CandidateBase.extend({
+    chain: z.literal("robinhood"),
+    token: EvmAddress,
+    pool: EvmAddress,
+    protocol: z.literal("V3"),
+  }),
+  CandidateBase.extend({
     chain: z.literal("solana"),
     token: Base58Address,
     pool: Base58Address,

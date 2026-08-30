@@ -12,7 +12,7 @@ const sans = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "Una — The Meme Market Maker",
-  description: "Deposit ETH. Earn meme-market trading fees across Base, Robinhood, and Solana.",
+  description: "Deposit ETH into Una’s Robinhood Chain meme index and earn trading fees from self-custodial market positions.",
 };
 
 export const viewport: Viewport = {

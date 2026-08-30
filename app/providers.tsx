@@ -2,6 +2,7 @@
 
 import { PrivyProvider } from "@privy-io/react-auth";
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
+import { abstract, arbitrum, blast, ink, linea, mainnet, mode, optimism, scroll, unichain, worldchain, zora } from "viem/chains";
 import { base, robinhoodChain } from "./lib/chains";
 
 /** Una Privy app (public). Secret is never shipped. */
@@ -32,7 +33,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           },
         },
         defaultChain: base,
-        supportedChains: [base, robinhoodChain],
+        supportedChains: [mainnet, base, arbitrum, optimism, unichain, worldchain, blast, linea, scroll, zora, ink, abstract, mode, robinhoodChain],
       }}
     >
       {children}

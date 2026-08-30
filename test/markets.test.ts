@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { activeMarkets, chainCatalog, getMarketCatalog } from "../src/markets/catalog.js";
-import { deriveMarketStats } from "../src/markets/stats.js";
+import { deriveGeckoMarketStats, deriveMarketStats } from "../src/markets/stats.js";
 import { activeSolanaMarkets, getSolanaMarketCatalog } from "../src/markets/solana-catalog.js";
 import { deriveSolanaMarketStats } from "../src/markets/solana-stats.js";
 import { weightedBudgets } from "../src/portfolio/allocation.js";
@@ -13,7 +13,9 @@ describe("curated meme markets", () => {
     }
     expect(activeMarkets("base").map((market) => market.symbol)).toEqual(["BRETT", "BASECAT"]);
     expect(chainCatalog("base").markets.find((market) => market.symbol === "BRETT")?.protocol).toBe("AERODROME_SLIPSTREAM");
-    expect(chainCatalog("robinhood").markets.map((market) => market.symbol)).toEqual(["CASHCAT"]);
+    expect(activeMarkets("robinhood").map((market) => market.symbol)).toEqual(["CASHCAT", "PONS", "AI", "CHUMP", "STONKBROKER", "PONSGUY"]);
+    expect(chainCatalog("robinhood").markets[0]?.pool.toLowerCase()).toBe("0xd42a491087a15e5afd51feb3606066cc152d2b09");
+    expect(chainCatalog("robinhood").markets[0]).toMatchObject({ fee: 3000, tickSpacing: 60 });
   });
 
   it("allocates integer dust to the final market without losing wei", () => {
@@ -60,6 +62,33 @@ describe("curated meme markets", () => {
     }, "2026-08-29T00:00:00.000Z", 2_500);
     expect(stats.feePips).toBe(2_500);
     expect(stats.dailyFeesPer1000Usd).toBe(0.25);
+  });
+
+  it("uses GeckoTerminal as the Robinhood evidence and token-image source", () => {
+    const market = activeMarkets("robinhood")[0]!;
+    const tokenId = `robinhood_${market.token.toLowerCase()}`;
+    const stats = deriveGeckoMarketStats(market, {
+      id: `robinhood_${market.pool.toLowerCase()}`,
+      attributes: {
+        address: market.pool.toLowerCase(),
+        base_token_price_usd: "0.02",
+        quote_token_price_usd: "2450",
+        price_change_percentage: { h24: "4.2" },
+        reserve_in_usd: "2500000",
+        volume_usd: { h24: "17500000" },
+        fdv_usd: "20000000",
+        pool_created_at: "2026-07-01T00:00:00.000Z",
+      },
+      relationships: {
+        base_token: { data: { id: tokenId } },
+        quote_token: { data: { id: `robinhood_${market.quoteToken.toLowerCase()}` } },
+      },
+    }, [{ id: tokenId, attributes: { address: market.token, image_url: "https://assets.geckoterminal.com/cashcat" } }], "2026-08-30T00:00:00.000Z");
+    expect(stats.priceUsd).toBe(0.02);
+    expect(stats.liquidityUsd).toBe(2_500_000);
+    expect(stats.trailingFeeAprPct).toBeCloseTo(766.5);
+    expect(stats.sourceUrl).toBe(`https://www.geckoterminal.com/robinhood/pools/${market.pool.toLowerCase()}`);
+    expect(stats.tokenImageUrl).toBe("https://assets.geckoterminal.com/cashcat");
   });
 
   it("withholds monthly extrapolation when one-day turnover is unstable", () => {

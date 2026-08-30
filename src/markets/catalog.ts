@@ -24,6 +24,7 @@ const MarketSchema = z.object({
   status: z.enum(["active", "paused", "watch"]),
   risk: z.enum(["established", "emerging", "experimental"]),
   coingeckoId: z.string().min(1).optional(),
+  imageUrl: z.string().url().optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
 });
 

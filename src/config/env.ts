@@ -39,6 +39,7 @@ const address = z
 export const EnvSchema = z.object({
   BASE_RPC_URL: z.string().url().default(BASE_RPC_DEFAULT),
   ROBINHOOD_RPC_URL: z.string().url().default(ROBINHOOD_RPC_DEFAULT),
+  ROBINHOOD_ACTIVITY_RPC_URL: z.string().url().optional(),
   UNISWAP_API_KEY: z.string().optional().default(""),
   UNABOT_PRIVATE_KEY: hexKey,
   UNA_TREASURY_PRIVATE_KEY: hexKey,
@@ -52,6 +53,7 @@ export const EnvSchema = z.object({
 export type Env = {
   rpcUrl: string;
   rpcByChain: Record<ChainSlug, string>;
+  activityRpcUrl: string | undefined;
   uniswapApiKey: string | undefined;
   privateKey: Hex | undefined;
   treasury: Address;
@@ -76,6 +78,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     parsed = EnvSchema.parse({
       BASE_RPC_URL: env.BASE_RPC_URL || BASE_RPC_DEFAULT,
       ROBINHOOD_RPC_URL: env.ROBINHOOD_RPC_URL || ROBINHOOD_RPC_DEFAULT,
+      ROBINHOOD_ACTIVITY_RPC_URL: env.ROBINHOOD_ACTIVITY_RPC_URL || undefined,
       UNISWAP_API_KEY: env.UNISWAP_API_KEY ?? "",
       UNABOT_PRIVATE_KEY: env.UNABOT_PRIVATE_KEY || undefined,
       UNA_TREASURY_PRIVATE_KEY: env.UNA_TREASURY_PRIVATE_KEY || undefined,
@@ -103,6 +106,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   return {
     rpcUrl: parsed.BASE_RPC_URL,
     rpcByChain: { base: parsed.BASE_RPC_URL, robinhood: parsed.ROBINHOOD_RPC_URL },
+    activityRpcUrl: parsed.ROBINHOOD_ACTIVITY_RPC_URL,
     uniswapApiKey: parsed.UNISWAP_API_KEY || undefined,
     privateKey: (parsed.UNABOT_PRIVATE_KEY ?? parsed.UNA_TREASURY_PRIVATE_KEY) as Hex | undefined,
     treasury: (parsed.UNABOT_TREASURY as Address | undefined) ?? TREASURY,

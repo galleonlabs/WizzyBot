@@ -101,7 +101,8 @@ export async function fetchRecentPoolActivity(options: {
   limit?: number;
 } = {}): Promise<PoolActivityPayload> {
   const markets = activeMarkets("robinhood").filter((market) => market.protocol === "V3");
-  const rpcUrl = loadEnv().rpcByChain.robinhood || ROBINHOOD_RPC_DEFAULT;
+  const env = loadEnv();
+  const rpcUrl = env.activityRpcUrl || env.rpcByChain.robinhood || ROBINHOOD_RPC_DEFAULT;
   const client = options.client ?? createPublicClient({
     chain: viemChainFor("robinhood"),
     transport: http(rpcUrl, { retryCount: 3, retryDelay: 500, timeout: 15_000 }),

@@ -29,6 +29,15 @@ describe("env + secret hygiene", () => {
     expect(env.privateKey).toBe(privateKey);
   });
 
+  it("allows the cached activity scan to use a distinct archive RPC", () => {
+    const env = loadEnv({
+      ROBINHOOD_RPC_URL: "https://robinhood-mainnet.g.alchemy.com/v2/example",
+      ROBINHOOD_ACTIVITY_RPC_URL: "https://archive.example/rpc",
+    });
+    expect(env.rpcByChain.robinhood).toBe("https://robinhood-mainnet.g.alchemy.com/v2/example");
+    expect(env.activityRpcUrl).toBe("https://archive.example/rpc");
+  });
+
   it("redacts keys and never echoes them", () => {
     expect(redactKey("0x1111111111111111111111111111111111111111111111111111111111111111")).toBe(
       "<redacted>",

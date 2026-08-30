@@ -21,7 +21,7 @@ A future token is a separate, manually authorized release governed by [Token and
 
 The public rail under the navigation is labelled **Pool activity**. It reports Uniswap V3 `Mint` and `Burn` events from only the active Robinhood pools in the current index; it does not imply that Wizzy vaults user funds.
 
-`GET /api/pool-activity` has a fixed two-request RPC budget per shared cache fill: one block-number read, then one `eth_getLogs` query covering every active pool and both event types over the most recent 1,000 blocks. Do not replace this with per-pool scans or transaction, receipt, or block-detail lookups. The server cache refreshes at most once per 60 seconds and can serve stale data for five minutes. Browsers poll at most once per minute, pause while the tab is hidden, retain the last good result during a transient failure, and never contact the RPC directly.
+`GET /api/pool-activity` has a fixed two-request RPC budget per shared cache fill: one block-number read, then one `eth_getLogs` query covering every active pool and both event types over the most recent 1,000 blocks. Do not replace this with per-pool scans or transaction, receipt, or block-detail lookups. Set `ROBINHOOD_ACTIVITY_RPC_URL` to an archive-capable endpoint that accepts the complete block range; Alchemy Free limits Robinhood `eth_getLogs` to 10 blocks, so it cannot serve this feed efficiently. The server cache refreshes at most once per 60 seconds and can serve stale data for five minutes. Browsers poll at most once per minute, pause while the tab is hidden, retain the last good result during a transient failure, and never contact the RPC directly.
 
 ## Install
 
@@ -112,12 +112,13 @@ Hosted keeper is the eve schedule `*/15 * * * *` (`agent/schedules/keeper.ts`). 
 
 ## Env
 
-Set these in `.env` locally or in the Vercel project `unabot`. Values here are public or empty on purpose.
+Set these in `.env` locally or in the Vercel project `wizzy`. Values here are public or empty on purpose.
 
 | Variable | Role |
 | --- | --- |
 | `BASE_RPC_URL` | Base RPC. Default `https://mainnet.base.org`. Use a dedicated provider in production. |
 | `ROBINHOOD_RPC_URL` | Robinhood RPC. Default `https://rpc.mainnet.chain.robinhood.com`. Use a dedicated provider in production. |
+| `ROBINHOOD_ACTIVITY_RPC_URL` | Optional server-only archive RPC for the shared Pool activity scan. It must accept a 1,000-block `eth_getLogs` range; the scan remains fixed at two requests per cache fill. |
 | `SOLANA_RPC_URL` | Server-only Solana endpoint used for planning, position reads, submission, and confirmation. Never expose a credentialed RPC URL through a `NEXT_PUBLIC_` variable. Privy manages wallet connectivity in the browser. |
 | `UNISWAP_API_KEY` | Optional. Write paths use Uniswap LP + Trading APIs when set. Never commit. |
 | `UNABOT_PRIVATE_KEY` | CLI `--live` signer. `0x` + 32-byte hex. Never commit. Hosted agent does **not** use this. |

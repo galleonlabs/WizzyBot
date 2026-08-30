@@ -320,6 +320,7 @@ describe("meme index product UI", () => {
     expect(css).toContain("@keyframes pool-activity-scroll");
     expect(css).toContain('.pool-activity-group[aria-hidden="true"]');
     expect(poolActivitySource).toContain('activeMarkets("robinhood")');
+    expect(poolActivitySource).toContain("env.activityRpcUrl || env.rpcByChain.robinhood");
     expect(poolActivitySource).toContain("const BLOCK_WINDOW = 1_000n");
     expect(poolActivitySource).toContain("events: [V3_MINT_EVENT, V3_BURN_EVENT]");
     expect(poolActivitySource).toContain("address: markets.map((market) => market.pool)");

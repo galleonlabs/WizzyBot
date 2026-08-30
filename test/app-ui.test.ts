@@ -294,12 +294,15 @@ describe("meme index product UI", () => {
     expect(nextConfig).not.toContain("wss://api.mainnet-beta.solana.com");
   });
 
-  it("allows every reviewed market and product-image host without weakening the rest of the image policy", () => {
+  it("allows remote asset artwork without weakening executable or connection policies", () => {
+    expect(nextConfig).toContain("img-src * data: blob:");
     expect(nextConfig).toContain(
-      "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com https://assets.relay.link https://www.geckoterminal.com",
+      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
     );
-    expect(nextConfig).toContain("https://fomo.family");
-    expect(nextConfig).not.toMatch(/avatars\.githubusercontent\.com/);
-    expect(nextConfig).not.toContain("img-src *");
+    expect(nextConfig).toContain("connect-src 'self' https://auth.privy.io");
+    expect(nextConfig).toContain("object-src 'none'");
+    expect(nextConfig).toContain("frame-ancestors 'none'");
+    expect(nextConfig).not.toContain("script-src *");
+    expect(nextConfig).not.toContain("connect-src *");
   });
 });

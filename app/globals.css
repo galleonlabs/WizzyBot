@@ -789,7 +789,7 @@ svg {
   .chain-picker-trigger b { font-size: 13px; }
   .chain-picker-trigger small { font-size: 10px; }
   .chain-picker-popover { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; width: auto; max-height: min(520px, calc(100dvh - 24px)); }
-  .wallet-menu-popover { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; width: auto; }
+  .wallet-menu-popover { top: calc(100% + 8px); right: 0; bottom: auto; left: auto; width: calc(100vw - 24px); }
   .chain-picker-options { max-height: min(410px, calc(100dvh - 112px)); }
   .market-output { display: grid; gap: 15px; padding: 17px 8px 10px; }
   .market-stack > * { width: 30px; height: 30px; }

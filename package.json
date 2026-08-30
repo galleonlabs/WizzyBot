@@ -72,6 +72,7 @@
   "devDependencies": {
     "@types/bn.js": "5.2.0",
     "@types/node": "^22.15.3",
+    "@types/react-dom": "^19.2.5",
     "esbuild": "^0.25.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"

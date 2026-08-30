@@ -30,6 +30,8 @@ import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { sendPrivyWalletCallsAndWait, sendWalletCallsAndWait, type ConnectedEvmWallet, type WalletTransaction } from "./lib/wallet-calls";
 import { PRIVY_APP_ID } from "./lib/privy-config";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
+import { AchievementCenter } from "./achievement-center";
+import type { AchievementAction } from "./lib/achievements";
 
 type ViewTab = "overview" | "markets";
 type ThemePreference = "system" | "light" | "dark";
@@ -107,7 +109,7 @@ const EMPTY_MARKETS: MarketsPayload = {
 };
 
 export function PortfolioApp() {
-  const { ready, authenticated, login, logout, user } = usePrivy();
+  const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
   const { addFunds } = useAddFunds();
   const { generateAuthorizationSignature } = useAuthorizationSignature();
   const { wallets } = useWallets();
@@ -132,6 +134,7 @@ export function PortfolioApp() {
   const positionsRequestRef = useRef(0);
   const balanceRequestRef = useRef(0);
   const authStateRef = useRef<"loading" | "signed-in" | "signed-out">("loading");
+  const achievementActionRef = useRef<((action: AchievementAction) => void) | null>(null);
 
   const wallet = useMemo(() => {
     const preferred = user?.wallet?.address?.toLowerCase();
@@ -575,6 +578,7 @@ export function PortfolioApp() {
         kind: "submitted",
         message: actionPlan.kind === "withdraw" ? "Your ETH is back in your wallet." : actionPlan.kind === "rebalance" ? "Your position is earning in its new range." : "Your fees are back at work.",
       });
+      if (actionPlan.kind === "compound" || actionPlan.kind === "rebalance") achievementActionRef.current?.(actionPlan.kind);
       trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : actionPlan.kind === "rebalance" ? "Rebalance Confirmed" : "Compound Confirmed", { chainId: actionPlan.chainId });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : "Wallet submission failed" });
@@ -681,6 +685,16 @@ export function PortfolioApp() {
             ))}
           </nav>
           <div className="nav-actions">
+            <AchievementCenter
+              address={address}
+              authenticated={authenticated}
+              positions={positions}
+              positionsState={positionsState}
+              getAccessToken={getAccessToken}
+              onConnect={() => startLogin("header")}
+              preview={previewMode}
+              actionRef={achievementActionRef}
+            />
             <a className="social-button" href="https://x.com/wizzydotmeme" target="_blank" rel="noreferrer" aria-label="Follow Wizzy on X" title="@wizzydotmeme on X" onClick={() => trackProductEvent("X Opened", { location: "header" })}>
               <XIcon />
             </a>

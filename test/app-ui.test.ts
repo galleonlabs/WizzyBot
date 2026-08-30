@@ -24,6 +24,9 @@ const poolActivitySource = readFileSync("src/markets/activity.ts", "utf8");
 const apiBoundary = readFileSync("app/lib/api-request-server.ts", "utf8");
 const balanceRoute = readFileSync("app/api/balance/route.ts", "utf8");
 const positionActionRoute = readFileSync("app/api/portfolio/action/route.ts", "utf8");
+const achievementCenter = readFileSync("app/achievement-center.tsx", "utf8");
+const achievementsRoute = readFileSync("app/api/achievements/route.ts", "utf8");
+const telemetry = readFileSync("app/lib/telemetry.ts", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
@@ -365,5 +368,31 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Close this position and return at least");
     expect(portfolio).toContain('actionPlan && actionState.kind === "ready"');
     expect(portfolio).not.toContain("one atomic approval.`");
+  });
+
+  it("ships a wallet-scoped XP and trophy system tied to confirmed product actions", () => {
+    expect(portfolio).toContain("<AchievementCenter");
+    expect(portfolio).toContain("achievementActionRef.current?.(actionPlan.kind)");
+    expect(achievementCenter).toContain('trackProductEvent("Achievement Unlocked"');
+    expect(achievementCenter).toContain('trackProductEvent("Trophy Case Opened"');
+    expect(achievementCenter).toContain('role="dialog"');
+    expect(achievementCenter).toContain('aria-modal="true"');
+    expect(achievementCenter).toContain('role="progressbar"');
+    expect(achievementCenter).toContain("createPortal");
+    expect(achievementCenter).toContain('fetch("/api/achievements"');
+    expect(achievementsRoute).toContain("verifyAuthToken");
+    expect(achievementsRoute).toContain("setCustomMetadata");
+    expect(achievementsRoute).not.toContain("userId: body");
+    expect(telemetry).toContain('"achievements"');
+  });
+
+  it("keeps the trophy case usable across desktop, mobile, themes, and reduced motion", () => {
+    expect(css).toContain(".achievement-backdrop {\n  position: fixed;");
+    expect(css).toContain(".trophy-case {\n  width: min(760px, 100%);");
+    expect(css).toContain(".achievement-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(css).toContain(".trophy-case { width: 100%; max-height: calc(100dvh - 16px);");
+    expect(css).toContain(".achievement-list { grid-template-columns: minmax(0, 1fr);");
+    expect(css).toContain(".achievement-toast-mascot i,");
+    expect(css).toContain(".achievement-progress i,");
   });
 });

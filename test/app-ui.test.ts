@@ -23,6 +23,7 @@ const poolActivityRoute = readFileSync("app/api/pool-activity/route.ts", "utf8")
 const poolActivitySource = readFileSync("src/markets/activity.ts", "utf8");
 const apiBoundary = readFileSync("app/lib/api-request-server.ts", "utf8");
 const balanceRoute = readFileSync("app/api/balance/route.ts", "utf8");
+const positionActionRoute = readFileSync("app/api/portfolio/action/route.ts", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
@@ -344,5 +345,25 @@ describe("meme index product UI", () => {
   it("clears the completed deposit celebration after an ETH withdrawal", () => {
     expect(portfolio).toContain('if (actionPlan.kind === "withdraw")');
     expect(portfolio).toContain('setPlanState({ kind: "idle" });');
+  });
+
+  it("ends completed loaders and clears the successful deposit amount without showing a balance error", () => {
+    expect(portfolio).toContain('setAmount("");');
+    expect(portfolio).toContain('state.kind === "submitted" ? null : amountError');
+    expect(portfolio).toContain('{busy ? <div className="plan-loading"');
+    expect(portfolio).not.toContain('</> : <div className="plan-loading"><i /><i /><i /></div>}');
+  });
+
+  it("matches live position artwork by pool and offers an out-of-range rebalance", () => {
+    expect(portfolio).toContain("positionTokenImage(position, markets, stats)");
+    expect(portfolio).toContain("market.pool.toLowerCase() === position.pool.toLowerCase()");
+    expect(portfolio).toContain('needsRebalance ? "Rebalance" : "Compound"');
+    expect(positionActionRoute).toContain('z.enum(["compound", "rebalance", "withdraw"])');
+  });
+
+  it("keeps withdrawal confirmation concise and removes the fee from success rows", () => {
+    expect(portfolio).toContain("Close this position and return at least");
+    expect(portfolio).toContain('actionPlan && actionState.kind === "ready"');
+    expect(portfolio).not.toContain("one atomic approval.`");
   });
 });

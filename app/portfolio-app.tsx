@@ -36,6 +36,7 @@ type ThemePreference = "system" | "light" | "dark";
 type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" | "submitted" | "error"; message?: string };
 type BalanceState = { kind: "idle" | "loading" | "ready" | "error"; balanceWei?: string };
 type AnyPositionActionPlan = PositionActionPlan | SolanaPositionActionPlan;
+type PositionActionKind = "compound" | "rebalance" | "withdraw";
 type IndexChain = ChainSlug | "solana";
 type IndexMarket = {
   market: CuratedMarket | SolanaCuratedMarket;
@@ -57,6 +58,22 @@ const PREVIEW_POOL_ACTIVITY: PoolActivityItem[] = [
   { id: "preview-2", kind: "removed", marketId: "robinhood-ai", symbol: "AI", pair: "AI/WETH", wethAmount: "0.61", transactionHash: "0xpreview", transactionUrl: "#", blockNumber: "2" },
   { id: "preview-3", kind: "added", marketId: "robinhood-cashcat", symbol: "CASHCAT", pair: "CASHCAT/WETH", wethAmount: "1.82", transactionHash: "0xpreview", transactionUrl: "#", blockNumber: "1" },
 ];
+const PREVIEW_WITHDRAWAL_PLAN: PositionActionPlan = {
+  kind: "withdraw",
+  owner: "0x1111111111111111111111111111111111111111",
+  chain: "robinhood",
+  chainId: 4663,
+  tokenId: "941",
+  pair: "CASHCAT/WETH",
+  expectedConfirmations: 1,
+  serviceFeeBps: 15,
+  serviceFee: [],
+  settlement: { asset: "ETH", minimumAmountWei: "19118000000000000", marketSymbol: "CASHCAT" },
+  transactions: [],
+  createdAt: "2026-08-30T00:00:00.000Z",
+  expiresAt: "2099-08-30T00:00:00.000Z",
+  notices: [],
+};
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
   robinhood: "https://assets.relay.link/icons/4663/light.png",
@@ -245,6 +262,18 @@ export function PortfolioApp() {
       setPreviewMode(true);
       setPositions(SHOT_VIEWS);
       setPositionsState("ready");
+      const previewState = params.get("state");
+      if (previewState === "deposit-success") {
+        setAmount("");
+        setPlanState({ kind: "submitted", message: "Your markets are live and earning in your wallet." });
+      }
+      if (previewState === "withdraw-ready" || previewState === "withdraw-success") {
+        setActionPlan(PREVIEW_WITHDRAWAL_PLAN);
+        setActionState({
+          kind: previewState === "withdraw-ready" ? "ready" : "submitted",
+          message: previewState === "withdraw-ready" ? "Review the ETH return before continuing." : "Your ETH is back in your wallet.",
+        });
+      }
     }
     fetch("/api/markets")
       .then(async (response) => {
@@ -264,6 +293,7 @@ export function PortfolioApp() {
   }, [loadPositions, previewMode]);
 
   useEffect(() => {
+    if (previewMode || isShotQuery()) return;
     setPlan(null);
     setPlanState({ kind: "idle" });
     setActionPlan(null);
@@ -271,7 +301,7 @@ export function PortfolioApp() {
     setMigrationPlan(null);
     setMigrationState({ kind: "idle" });
     setFundingState({ kind: "idle" });
-  }, [address, amount, authenticated]);
+  }, [address, authenticated, previewMode]);
 
   const activeMarkets = useMemo<IndexMarket[]>(() => {
     const robinhood = markets.catalog.chains.find((chain) => chain.slug === "robinhood");
@@ -326,6 +356,13 @@ export function PortfolioApp() {
     if (next === "overview") url.searchParams.delete("view");
     else url.searchParams.set("view", next);
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
+
+  function changeDepositAmount(next: string) {
+    setAmount(next);
+    setPlan(null);
+    setPlanState({ kind: "idle" });
+    setFundingState({ kind: "idle" });
   }
 
   function cycleTheme() {
@@ -452,6 +489,7 @@ export function PortfolioApp() {
         onSubmitted: () => setPlanState({ kind: "waiting", message: "Approved. Robinhood is confirming every market now…" }),
       });
       await Promise.all([loadPositions(), loadRobinhoodBalance()]);
+      setAmount("");
       setPlanState({ kind: "submitted", message: `${plan.constituentCount === 1 ? "Your market is" : "Your markets are"} live and earning in your wallet.` });
       trackProductEvent("Index Confirmed", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
     } catch (error) {
@@ -460,12 +498,13 @@ export function PortfolioApp() {
     }
   }
 
-  async function preparePositionAction(position: PositionView, action: "compound" | "withdraw") {
+  async function preparePositionAction(position: PositionView, action: PositionActionKind) {
     if (!address || !position.tokenId || !position.chain) return;
     setActionPlan(null);
-    setActionState({ kind: "planning", message: `${action === "compound" ? "Collecting and redepositing" : "Preparing to withdraw"} ${position.pair}…` });
+    setActionState({ kind: "planning", message: `${action === "compound" ? "Preparing to reinvest" : action === "rebalance" ? "Preparing a new range for" : "Preparing to withdraw"} ${position.pair}…` });
     try {
       const isSolana = position.chain === "solana";
+      if (isSolana && action === "rebalance") throw new Error("Solana rebalancing is not available yet");
       if (isSolana && (!solanaWallet || !position.marketId)) throw new Error("Your Solana wallet is not ready");
       const response = await fetch(isSolana ? "/api/portfolio/solana/action" : "/api/portfolio/action", {
         method: "POST",
@@ -487,7 +526,7 @@ export function PortfolioApp() {
       const payload = await response.json() as { plan?: AnyPositionActionPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? `Could not prepare ${action}`);
       setActionPlan(payload.plan);
-      setActionState({ kind: "ready", message: "Ready for your wallet approval." });
+      setActionState({ kind: "ready", message: action === "compound" ? "Review the fees ready to reinvest." : action === "rebalance" ? "Review the new range before continuing." : "Review the ETH return before continuing." });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : `Could not prepare ${action}` });
       reportClientError("position-action", error);
@@ -521,7 +560,7 @@ export function PortfolioApp() {
           transactions: actionPlan.transactions,
           onSubmitted: () => setActionState({
             kind: "waiting",
-            message: actionPlan.kind === "withdraw" ? "Closing the LP and converting everything back to ETH…" : "Robinhood is confirming your compound…",
+            message: actionPlan.kind === "withdraw" ? "Closing the position and returning ETH…" : actionPlan.kind === "rebalance" ? "Moving liquidity into the new range…" : "Reinvesting your fees…",
           }),
         });
       }
@@ -534,9 +573,9 @@ export function PortfolioApp() {
       }
       setActionState({
         kind: "submitted",
-        message: actionPlan.kind === "withdraw" ? "Done. Your position is closed and your ETH is back in your wallet." : "Done. Your earned fees are working in the position again.",
+        message: actionPlan.kind === "withdraw" ? "Your ETH is back in your wallet." : actionPlan.kind === "rebalance" ? "Your position is earning in its new range." : "Your fees are back at work.",
       });
-      trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : "Compound Confirmed", { chainId: actionPlan.chainId });
+      trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : actionPlan.kind === "rebalance" ? "Rebalance Confirmed" : "Compound Confirmed", { chainId: actionPlan.chainId });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : "Wallet submission failed" });
       reportClientError("position-action", error);
@@ -591,6 +630,7 @@ export function PortfolioApp() {
       authenticated={hasPortfolioAccess}
       positions={positions}
       state={positionsState}
+      markets={activeMarkets}
       stats={stats}
       onStart={() => hasPortfolioAccess ? changeTab("overview") : startLogin("markets")}
       onRetry={() => void loadPositions()}
@@ -671,7 +711,7 @@ export function PortfolioApp() {
                 </div>
                 <MarketAction
                   amount={amount}
-                  onAmount={setAmount}
+                  onAmount={changeDepositAmount}
                   markets={selectedMarkets}
                   stats={stats}
                   loading={marketsState === "loading"}
@@ -818,12 +858,13 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
   onViewMarkets: () => void;
 }) {
   const constituentCount = markets.length;
+  const visibleAmountError = state.kind === "submitted" ? null : amountError;
   return (
     <aside className="market-action" aria-label="Make markets">
-      <label className={`amount-field ${amountError ? "is-invalid" : ""}`}>
+      <label className={`amount-field ${visibleAmountError ? "is-invalid" : ""}`}>
         <span className="amount-heading"><span>You deposit</span>{balance ? <span className="wallet-balance" role="status" title="Robinhood Chain ETH balance">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></span> : null}</span>
-        <span className="amount-input"><input id="deposit-amount" name="depositAmount" inputMode="decimal" value={amount} onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" aria-invalid={Boolean(amountError)} aria-describedby={amountError ? "amount-error" : undefined} /><b>ETH</b></span>
-        {amountError ? <small className="amount-error" id="amount-error">{amountError}</small> : null}
+        <span className="amount-input"><input id="deposit-amount" name="depositAmount" inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" aria-invalid={Boolean(visibleAmountError)} aria-describedby={visibleAmountError ? "amount-error" : undefined} /><b>ETH</b></span>
+        {visibleAmountError ? <small className="amount-error" id="amount-error">{visibleAmountError}</small> : null}
       </label>
 
       <div className="funding-choice">
@@ -927,7 +968,8 @@ function PlanPreview({ plan, state, onExecute, onCancel, onViewMarkets }: { plan
           <div><dt>Swap protection</dt><dd>{swapProtection}</dd></div>
           <div><dt>Network fee</dt><dd>Shown by your wallet</dd></div>
         </dl>
-      </> : <div className="plan-loading"><i /><i /><i /></div>}
+      </> : null}
+      {busy ? <div className="plan-loading" role="status" aria-label={state.message ?? title}><i /><i /><i /></div> : null}
       {state.kind === "ready" && plan ? <>
         <p className="approval-note">One approval opens every position. Everything stays in your wallet.</p>
         <p className="risk-note">Meme prices can fall, and trading fees may not cover losses.</p>
@@ -1006,14 +1048,15 @@ function IndexSnapshot({ markets, stats, state }: { markets: IndexMarket[]; stat
   </section>;
 }
 
-function PositionLedger({ authenticated, positions, state, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel, updates, migrationPlan, migrationState, onPrepareMigration, onExecuteMigration, onCancelMigration }: {
+function PositionLedger({ authenticated, positions, state, markets, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel, updates, migrationPlan, migrationState, onPrepareMigration, onExecuteMigration, onCancelMigration }: {
   authenticated: boolean;
   positions: PositionView[];
   state: "idle" | "loading" | "ready" | "error";
+  markets: IndexMarket[];
   stats: Map<string, MarketStats>;
   onStart: () => void;
   onRetry: () => void;
-  onAction: (position: PositionView, action: "compound" | "withdraw") => void;
+  onAction: (position: PositionView, action: PositionActionKind) => void;
   actionPlan: AnyPositionActionPlan | null;
   actionState: PlanState;
   onExecute: () => void;
@@ -1035,10 +1078,10 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
       {updates.length ? <IndexUpdatePanel updates={updates} plan={migrationPlan} state={migrationState} onPrepare={onPrepareMigration} onExecute={onExecuteMigration} onCancel={onCancelMigration} /> : null}
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
-          {actionState.kind === "submitted" ? <SuccessCelebration label={actionPlan?.kind === "withdraw" ? "ETH returned" : "Fees compounded"} /> : null}
-          <div><b>{actionPlan ? `${actionPlan.kind === "compound" ? "Reinvest fees" : settlement?.asset === "ETH" ? "Withdraw to ETH" : "Withdraw"} · ${actionPlan.pair}` : "Preparing your position"}</b><p>{actionState.message}{actionState.kind === "ready" && actionPlan?.kind === "compound" ? ` Collect fees, deduct Wizzy’s ${(actionPlan.serviceFeeBps / 100).toFixed(0)}% fee, and add the rest back to this position.` : actionState.kind === "ready" && settlement?.asset === "ETH" ? ` Close the LP, sell ${settlement.marketSymbol}, and unwrap WETH to at least ${trimEth(BigInt(settlement.minimumAmountWei))} ETH in one atomic approval.` : ""}</p></div>
-          {actionPlan ? <span>{(actionPlan.serviceFeeBps / 100).toFixed(2)}% Wizzy fee</span> : null}
-          <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>{actionPlan?.kind === "withdraw" ? "Withdraw to ETH" : "Approve"}</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting"}>Close</button></div>
+          {actionState.kind === "submitted" ? <SuccessCelebration label={actionPlan?.kind === "withdraw" ? "ETH returned" : actionPlan?.kind === "rebalance" ? "Position rebalanced" : "Fees compounded"} /> : null}
+          <div className="action-copy"><b>{positionActionTitle(actionPlan, actionState)}</b><p>{positionActionDescription(actionPlan, actionState, settlement)}</p></div>
+          {actionPlan && actionState.kind === "ready" ? <span>{formatServiceFee(actionPlan.serviceFeeBps)}</span> : null}
+          <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>{actionPlan?.kind === "withdraw" ? "Withdraw to ETH" : actionPlan?.kind === "rebalance" ? "Rebalance" : "Compound"}</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting"}>Close</button></div>
         </section>
       ) : null}
       {!authenticated ? <PortfolioEmpty variant="disconnected" onPrimary={onStart} /> : null}
@@ -1052,15 +1095,72 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
         <div><span>Fee APR</span><strong>{formatFeeAprFraction(summary.feeApr)}</strong><small>Across priced positions</small></div>
       </section> : null}
       {showPositions ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
-        <span className="position-pair"><TokenIcon symbol={position.symbol0} src={position.marketId ? stats.get(position.marketId)?.tokenImageUrl : undefined} /><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
+        <span className="position-pair"><TokenIcon symbol={position.symbol0} src={positionTokenImage(position, markets, stats)} /><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
         <span><small>Position value</small><b>{positionValueLabel(position)}</b></span>
         <span><small>Ready to collect</small><b>{positionFeesLabel(position)}</b></span>
         <span><small>Fee APR</small><b>{formatFeeAprFraction(position.feeApr ?? null)}</b></span>
         <PositionRange position={position} />
-        <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed || !position.inRange} title={!position.inRange ? "Rebalancing is required before compounding" : undefined}>Compound</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{position.chain === "robinhood" ? "Withdraw to ETH" : "Withdraw"}</button></span>
+        <PositionActions position={position} onAction={onAction} />
       </article>)}</div> : null}
     </section>
   );
+}
+
+function PositionActions({ position, onAction }: {
+  position: PositionView;
+  onAction: (position: PositionView, action: PositionActionKind) => void;
+}) {
+  const needsRebalance = !position.inRange;
+  const canRebalance = position.protocol === "V3" && position.chain !== "solana" && position.venue !== "aerodrome-slipstream";
+  const primaryAction: PositionActionKind = needsRebalance ? "rebalance" : "compound";
+  const primaryDisabled = position.closed || (needsRebalance && !canRebalance);
+  return <span className="position-actions">
+    <button type="button" onClick={() => onAction(position, primaryAction)} disabled={primaryDisabled} title={needsRebalance && !canRebalance ? "Rebalancing is not available for this pool yet" : undefined}>{needsRebalance ? "Rebalance" : "Compound"}</button>
+    <button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{position.chain === "robinhood" ? "Withdraw to ETH" : "Withdraw"}</button>
+  </span>;
+}
+
+function positionTokenImage(position: PositionView, markets: IndexMarket[], stats: Map<string, MarketStats>): string | null | undefined {
+  if (position.marketId) {
+    const direct = stats.get(position.marketId)?.tokenImageUrl;
+    if (direct) return direct;
+  }
+  const market = markets.find(({ market }) =>
+    (position.pool && "pool" in market && market.pool.toLowerCase() === position.pool.toLowerCase())
+    || market.symbol.toLowerCase() === position.symbol0.toLowerCase(),
+  )?.market;
+  if (!market) return undefined;
+  return stats.get(market.id)?.tokenImageUrl ?? ("imageUrl" in market ? market.imageUrl : undefined);
+}
+
+function positionActionTitle(plan: AnyPositionActionPlan | null, state: PlanState): string {
+  if (!plan) return "Preparing your position";
+  if (state.kind === "submitted") {
+    if (plan.kind === "withdraw") return `${plan.pair} withdrawn to ETH`;
+    if (plan.kind === "rebalance") return `${plan.pair} rebalanced`;
+    return `${plan.pair} fees compounded`;
+  }
+  if (plan.kind === "withdraw") return `Withdraw ${plan.pair} to ETH`;
+  if (plan.kind === "rebalance") return `Rebalance ${plan.pair}`;
+  return `Compound ${plan.pair} fees`;
+}
+
+function positionActionDescription(
+  plan: AnyPositionActionPlan | null,
+  state: PlanState,
+  settlement: PositionActionPlan["settlement"] | undefined,
+): string {
+  if (!plan || state.kind !== "ready") return state.message ?? "";
+  if (plan.kind === "withdraw" && settlement?.asset === "ETH") {
+    return `Close this position and return at least ${trimEth(BigInt(settlement.minimumAmountWei))} ETH to your wallet.`;
+  }
+  if (plan.kind === "withdraw") return "Close this position and return both pool tokens to your wallet.";
+  if (plan.kind === "rebalance") return "Move this liquidity into a same-width range centred on the current price.";
+  return "Collect and reinvest the fees ready to claim.";
+}
+
+function formatServiceFee(serviceFeeBps: number): string {
+  return `${(serviceFeeBps / 100).toFixed(serviceFeeBps % 100 === 0 ? 0 : 2)}% Wizzy fee`;
 }
 
 function IndexUpdatePanel({ updates, plan, state, onPrepare, onExecute, onCancel }: {

@@ -11,6 +11,7 @@ import {
 } from "../aerodrome/calldata.js";
 import { loadEnv } from "../config/env.js";
 import { bpsOf } from "../core/fees.js";
+import { recenterSameWidth } from "../core/ticks.js";
 import { getRobinhoodIndexState } from "../index/registry.js";
 import { chainCatalog, getMarketCatalog, type CuratedMarket } from "../markets/catalog.js";
 import { makePublicClient } from "../signer/broadcast.js";
@@ -21,6 +22,7 @@ import {
   erc20ApproveTx,
   erc20TransferTx,
   increaseCalldata,
+  mintCalldata,
   unwrapEthTx,
 } from "../uniswap/calldata.js";
 import { exactInV3Tx } from "../uniswap/router.js";
@@ -33,7 +35,7 @@ const BPS = 10_000n;
 const WITHDRAW_SWAP_SLIPPAGE_BPS = 150n;
 
 export type PositionActionPlan = {
-  kind: "compound" | "withdraw";
+  kind: "compound" | "rebalance" | "withdraw";
   owner: Address;
   chain: ChainSlug;
   chainId: number;
@@ -44,6 +46,7 @@ export type PositionActionPlan = {
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: Address; symbol: string; amount: string }>;
+  range?: { tickLower: number; tickUpper: number };
   settlement?: { asset: "ETH"; minimumAmountWei: string; marketSymbol: string };
   transactions: SerializableTx[];
   allowedTargets: Address[];
@@ -56,7 +59,7 @@ export async function planPositionAction(input: {
   owner: string;
   chain: ChainSlug;
   tokenId: bigint;
-  action: "compound" | "withdraw";
+  action: "compound" | "rebalance" | "withdraw";
   venue?: "uniswap-v3" | "aerodrome-slipstream";
   positionManager?: string;
 }): Promise<PositionActionPlan> {
@@ -85,6 +88,20 @@ export async function planPositionAction(input: {
     : chainCatalog(input.chain).markets;
   const configured = configuredMarkets.find((market) => positionPoolIsConfigured(snapshot, [market]));
   if (!configured) throw new Error("position pool is not in Wizzy's curated market catalog");
+  if (input.action === "rebalance") {
+    if (snapshot.inRange) throw new Error("position is already in range");
+    if (snapshot.venue === "aerodrome-slipstream") throw new Error("Aerodrome rebalancing is not available yet");
+    const feeBps = getMarketCatalog().fees.rebalanceBps;
+    const available0 = ((snapshot.amount0 + snapshot.uncollected0) * WITHDRAW_FEE_SAFETY_BPS) / BPS - bpsOf(snapshot.amount0, feeBps);
+    const available1 = ((snapshot.amount1 + snapshot.uncollected1) * WITHDRAW_FEE_SAFETY_BPS) / BPS - bpsOf(snapshot.amount1, feeBps);
+    let swap: RebalanceSwap | undefined;
+    if (snapshot.amount0 === 0n && available1 > 1n) {
+      swap = await quoteRebalanceSwap(client, input.chain, snapshot.token1.address, snapshot.token0.address, available1 / 2n, snapshot.fee);
+    } else if (snapshot.amount1 === 0n && available0 > 1n) {
+      swap = await quoteRebalanceSwap(client, input.chain, snapshot.token0.address, snapshot.token1.address, available0 / 2n, snapshot.fee);
+    }
+    return buildRebalancePositionActionPlan(snapshot, owner, input.chain, env.treasury, swap);
+  }
   const plan = buildPositionActionPlan(snapshot, owner, input.chain, input.action, env.treasury);
   if (input.action !== "withdraw" || input.chain !== "robinhood" || configured.protocol !== "V3") return plan;
   return addRobinhoodEthSettlement(plan, snapshot, configured, client);
@@ -172,13 +189,14 @@ export function buildPositionActionPlan(
   snapshot: PositionSnapshot,
   owner: Address,
   chain: ChainSlug,
-  action: "compound" | "withdraw",
+  action: "compound" | "rebalance" | "withdraw",
   treasury: Address,
 ): PositionActionPlan {
   if (snapshot.ref.protocol !== "V3") throw new Error("launch portfolio actions support concentrated-liquidity positions");
   if (snapshot.ref.chainId !== chainOf(chain).id) throw new Error("position chain mismatch");
   if (snapshot.owner.toLowerCase() !== owner.toLowerCase()) throw new Error("wallet does not own this position");
 
+  if (action === "rebalance") throw new Error("rebalance requires a live swap quote");
   const feeBps = action === "compound"
     ? getMarketCatalog().fees.compoundBps
     : getMarketCatalog().fees.withdrawBps;
@@ -227,6 +245,122 @@ export function buildPositionActionPlan(
           "You receive both underlying pool tokens. Consolidating them to ETH is a separate quoted action so no hidden swap is taken.",
           "The fee is calculated below the slippage-adjusted expected withdrawal amounts; re-plan if this quote expires.",
         ],
+  };
+}
+
+type RebalanceSwap = {
+  tokenIn: Address;
+  tokenOut: Address;
+  amountIn: bigint;
+  minimumAmountOut: bigint;
+};
+
+async function quoteRebalanceSwap(
+  client: PublicClient,
+  chain: EvmChainKey,
+  tokenIn: Address,
+  tokenOut: Address,
+  amountIn: bigint,
+  fee: number,
+): Promise<RebalanceSwap> {
+  const quote = await client.simulateContract({
+    address: addressesFor(chain).quoterV2,
+    abi: quoterV2Abi,
+    functionName: "quoteExactInputSingle",
+    args: [{ tokenIn, tokenOut, amountIn, fee, sqrtPriceLimitX96: 0n }],
+  });
+  const minimumAmountOut = (quote.result[0] * (BPS - WITHDRAW_SWAP_SLIPPAGE_BPS)) / BPS;
+  if (minimumAmountOut <= 0n) throw new Error("The pool returned no usable rebalance quote");
+  return { tokenIn, tokenOut, amountIn, minimumAmountOut };
+}
+
+export function buildRebalancePositionActionPlan(
+  snapshot: PositionSnapshot,
+  owner: Address,
+  chain: ChainSlug,
+  treasury: Address,
+  swap?: RebalanceSwap,
+): PositionActionPlan {
+  if (snapshot.inRange) throw new Error("position is already in range");
+  if (snapshot.venue === "aerodrome-slipstream") throw new Error("Aerodrome rebalancing is not available yet");
+  const feeBps = getMarketCatalog().fees.rebalanceBps;
+  const fee0 = bpsOf(snapshot.amount0, feeBps);
+  const fee1 = bpsOf(snapshot.amount1, feeBps);
+  const available0 = ((snapshot.amount0 + snapshot.uncollected0) * WITHDRAW_FEE_SAFETY_BPS) / BPS;
+  const available1 = ((snapshot.amount1 + snapshot.uncollected1) * WITHDRAW_FEE_SAFETY_BPS) / BPS;
+  let add0 = available0 - fee0;
+  let add1 = available1 - fee1;
+  if (add0 < 0n || add1 < 0n || (add0 === 0n && add1 === 0n)) throw new Error("position is too small to rebalance");
+  if (swap) {
+    if (swap.tokenIn.toLowerCase() === snapshot.token0.address.toLowerCase() && swap.tokenOut.toLowerCase() === snapshot.token1.address.toLowerCase()) {
+      if (swap.amountIn > add0) throw new Error("rebalance swap exceeds available token amount");
+      add0 -= swap.amountIn;
+      add1 += swap.minimumAmountOut;
+    } else if (swap.tokenIn.toLowerCase() === snapshot.token1.address.toLowerCase() && swap.tokenOut.toLowerCase() === snapshot.token0.address.toLowerCase()) {
+      if (swap.amountIn > add1) throw new Error("rebalance swap exceeds available token amount");
+      add1 -= swap.amountIn;
+      add0 += swap.minimumAmountOut;
+    } else {
+      throw new Error("rebalance swap tokens do not match the position");
+    }
+  }
+  const range = recenterSameWidth(snapshot.tickLower, snapshot.tickUpper, snapshot.tickCurrent, snapshot.tickSpacing);
+  const positionManager = managerFor(snapshot, chain);
+  const transactions: PlannedTx[] = [decreaseCalldata(snapshot, 100, owner, 150, Math.floor(PLAN_TTL_MS / 1_000), true)];
+  if (fee0 > 0n) transactions.push(erc20TransferTx(snapshot.token0.address, treasury, fee0));
+  if (fee1 > 0n) transactions.push(erc20TransferTx(snapshot.token1.address, treasury, fee1));
+  if (swap) transactions.push(
+    erc20ApproveTx(swap.tokenIn, addressesFor(chain).swapRouter02, swap.amountIn),
+    exactInV3Tx({
+      tokenIn: swap.tokenIn,
+      tokenOut: swap.tokenOut,
+      fee: snapshot.fee,
+      amountIn: swap.amountIn,
+      amountOutMin: swap.minimumAmountOut,
+      recipient: owner,
+      chainId: snapshot.ref.chainId,
+    }),
+  );
+  if (add0 > 0n) transactions.push(erc20ApproveTx(snapshot.token0.address, positionManager, add0));
+  if (add1 > 0n) transactions.push(erc20ApproveTx(snapshot.token1.address, positionManager, add1));
+  transactions.push(mintCalldata({
+    position: snapshot,
+    tickLower: range.tickLower,
+    tickUpper: range.tickUpper,
+    amount0: add0,
+    amount1: add1,
+    recipient: owner,
+    slippageBps: 150,
+    deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+  }));
+  const allowedTargets = uniqueAddresses([positionManager, snapshot.token0.address, snapshot.token1.address, treasury, ...(swap ? [addressesFor(chain).swapRouter02] : [])]);
+  assertAllowed(transactions, allowedTargets);
+  const now = new Date();
+  return {
+    kind: "rebalance",
+    owner,
+    chain,
+    chainId: snapshot.ref.chainId,
+    tokenId: snapshot.ref.tokenId.toString(),
+    pair: `${snapshot.token0.symbol}/${snapshot.token1.symbol}`,
+    execution: "wallet_sendCalls",
+    atomic: true,
+    expectedConfirmations: 1,
+    serviceFeeBps: feeBps,
+    serviceFee: [
+      { token: snapshot.token0.address, symbol: snapshot.token0.symbol, amount: fee0.toString() },
+      { token: snapshot.token1.address, symbol: snapshot.token1.symbol, amount: fee1.toString() },
+    ],
+    range,
+    transactions: transactions.map(serialize),
+    allowedTargets,
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString(),
+    notices: [
+      "Your current position closes and a new same-width range opens around the live price in one atomic wallet approval.",
+      "If any step fails, the entire rebalance reverts and your original position remains yours.",
+      "Wizzy swaps only when an out-of-range position is entirely one token. Any amount that does not fit the new range remains in your wallet.",
+    ],
   };
 }
 

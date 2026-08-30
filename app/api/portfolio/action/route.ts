@@ -9,7 +9,7 @@ const Body = z.object({
   owner: z.string(),
   chain: z.enum(["base", "robinhood"]),
   tokenId: z.string().regex(/^\d+$/),
-  action: z.enum(["compound", "withdraw"]),
+  action: z.enum(["compound", "rebalance", "withdraw"]),
   venue: z.enum(["uniswap-v3", "aerodrome-slipstream"]).optional(),
   positionManager: z.string().optional(),
 });

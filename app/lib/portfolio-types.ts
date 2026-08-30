@@ -262,7 +262,7 @@ export type DualChainPlan = {
 };
 
 export type PositionActionPlan = {
-  kind: "compound" | "withdraw";
+  kind: "compound" | "rebalance" | "withdraw";
   owner: `0x${string}`;
   chain: ChainSlug;
   chainId: number;
@@ -271,6 +271,7 @@ export type PositionActionPlan = {
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: `0x${string}`; symbol: string; amount: string }>;
+  range?: { tickLower: number; tickUpper: number };
   settlement?: { asset: "ETH"; minimumAmountWei: string; marketSymbol: string };
   transactions: WalletTransaction[];
   createdAt: string;

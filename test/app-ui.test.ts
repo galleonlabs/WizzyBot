@@ -56,26 +56,28 @@ describe("meme index product UI", () => {
     expect(css).not.toMatch(/gradient/i);
   });
 
-  it("gives the hooded mascot a crystal staff without a coral hand", () => {
-    expect(mascot).toContain("crystal-tipped staff");
-    expect(mascot).toContain('stroke="#4f4a54"');
+  it("reduces Una to one oversized hooded head", () => {
+    expect(mascot).toContain("single oversized hooded head");
+    expect(mascot).toContain("M33 98C47 76 68 64 86 48");
+    expect(mascot).toContain("M48 104C61 80 91 68 127 68");
+    expect(mascot.match(/<path /g)).toHaveLength(2);
     expect(mascot).toContain('fill="#77e8c9"');
-    expect(mascot).not.toMatch(/#ff6f83|#e85570/i);
+    expect(mascot).not.toMatch(/staff|crystal|hands|feet|stroke=/i);
   });
 
   it("keeps Una eye-first at icon scale", () => {
-    expect(mascot).toContain('rx="15.5" ry="22.5"');
-    expect(mascot).toContain('rx="5" ry="7"');
+    expect(mascot).toContain('rx="22" ry="32"');
+    expect(mascot).toContain('rx="7" ry="10"');
+    expect(mascot).not.toContain('rx="15.5" ry="22.5"');
     expect(mascot).not.toContain('rx="9" ry="13"');
   });
 
-  it("keeps Una one near-circular hooded blob with no neck, tiny limbs, and an oversized staff", () => {
-    expect(mascot).toContain("near-circular hooded light blob with no neck");
-    expect(mascot).toContain("tiny hands and feet");
-    expect(mascot).toContain("M72 44C77 23 93 10 113 10");
-    expect(mascot).toContain("M89 219c-3 3-4 8-1 11");
-    expect(mascot).toContain("m221 11 20 23-20 25-18-25 18-23Z");
-    expect(mascot).not.toContain('ellipse cx="109" cy="166"');
+  it("keeps the hood pronounced without reintroducing a body or limbs", () => {
+    expect(mascot).toContain("pronounced point and enormous mint eyes");
+    expect(mascot).toContain("94 10C124 14 154 28 180 52");
+    expect(mascot).not.toContain("M72 44C77 23 93 10 113 10");
+    expect(mascot).not.toContain("M89 219c-3 3-4 8-1 11");
+    expect(mascot).not.toContain("m221 11 20 23-20 25-18-25 18-23Z");
   });
 
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {

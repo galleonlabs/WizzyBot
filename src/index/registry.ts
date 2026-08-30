@@ -1,6 +1,7 @@
 import {
   getAddress,
   hexToString,
+  stringToHex,
   type Address,
   type Hex,
   type PublicClient,
@@ -49,6 +50,7 @@ export const unaIndexRegistryAbi = [
   { type: "function", name: "evidenceURI", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
   { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "curator", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  { type: "function", name: "replacementOf", stateMutability: "view", inputs: [{ name: "fromMarketId", type: "bytes32" }], outputs: [{ type: "bytes32" }] },
   { type: "function", name: "FACTORY", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "QUOTE_TOKEN", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   {
@@ -100,6 +102,7 @@ export type IndexRegistrySnapshot = {
   factory: Address;
   quoteToken: Address;
   markets: RegistryMarket[];
+  replacements: Array<{ fromMarketId: string; toMarketId: string }>;
 };
 
 export type RobinhoodIndexState = {
@@ -134,6 +137,17 @@ export async function readIndexRegistry(
     read("getMarkets"),
   ]);
   const markets = (rawMarkets as RawMarket[]).map(parseMarket);
+  const replacementRows = await Promise.all([...registryMetadata().keys()].map(async (fromMarketId) => {
+    const toMarketIdHex = await client.readContract({
+      address,
+      abi: unaIndexRegistryAbi,
+      functionName: "replacementOf",
+      args: [stringToHex(fromMarketId, { size: 32 })],
+      blockNumber,
+    });
+    const toMarketId = hexToString(toMarketIdHex).replace(/\0+$/g, "");
+    return toMarketId ? { fromMarketId, toMarketId } : null;
+  }));
   return {
     address: getAddress(address),
     blockNumber,
@@ -145,6 +159,7 @@ export async function readIndexRegistry(
     factory: getAddress(String(factory)),
     quoteToken: getAddress(String(quoteToken)),
     markets,
+    replacements: replacementRows.filter((row): row is NonNullable<typeof row> => row !== null),
   };
 }
 
@@ -198,7 +213,7 @@ export async function getRobinhoodIndexState(): Promise<RobinhoodIndexState> {
   return {
     source: "onchain",
     policy: getRobinhoodIndexBreadthPolicy(markets),
-    catalog: catalogWithRegistryMarkets(markets, snapshot.version),
+    catalog: catalogWithRegistryMarkets(markets, snapshot.version, snapshot.updatedAt, snapshot.replacements),
     markets,
     registry: {
       address: snapshot.address,
@@ -210,26 +225,40 @@ export async function getRobinhoodIndexState(): Promise<RobinhoodIndexState> {
       evidenceURI: snapshot.evidenceURI,
       factory: snapshot.factory,
       quoteToken: snapshot.quoteToken,
+      replacements: snapshot.replacements,
     },
   };
 }
 
-function catalogWithRegistryMarkets(markets: CuratedMarket[], version: number): MarketCatalog {
+export function catalogWithRegistryMarkets(
+  markets: CuratedMarket[],
+  version: number,
+  updatedAt: number,
+  replacements: IndexRegistrySnapshot["replacements"],
+): MarketCatalog {
   const byId = new Map(markets.map((market) => [market.id, market]));
   const catalog = getMarketCatalog();
-  const existing = new Set(chainCatalog("robinhood").markets.map((market) => market.id));
+  const known = registryMetadata();
+  const migrations = replacements
+    .filter((replacement) => byId.has(replacement.toMarketId) && known.has(replacement.fromMarketId))
+    .map((replacement) => ({
+      id: `registry-${version}-${replacement.fromMarketId}-to-${replacement.toMarketId}`,
+      chain: "robinhood" as const,
+      fromMarketId: replacement.fromMarketId,
+      toMarketId: replacement.toMarketId,
+      effectiveAt: new Date(updatedAt * 1_000).toISOString().slice(0, 10),
+    }));
   return {
     ...catalog,
     version,
+    updatedAt: new Date(updatedAt * 1_000).toISOString().slice(0, 10),
+    migrations: [...catalog.migrations, ...migrations],
     chains: catalog.chains.map((chain) => chain.slug !== "robinhood" ? chain : {
       ...chain,
-      markets: [
-        ...chain.markets.map((market) => byId.get(market.id) ?? {
+      markets: [...known.values()].map((market) => byId.get(market.id) ?? {
           ...market,
-          status: market.status === "watch" ? "watch" as const : "paused" as const,
+          status: "paused" as const,
         }),
-        ...markets.filter((market) => !existing.has(market.id)),
-      ],
     }) as MarketCatalog["chains"],
   };
 }

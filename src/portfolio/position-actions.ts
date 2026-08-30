@@ -11,7 +11,8 @@ import {
 } from "../aerodrome/calldata.js";
 import { loadEnv } from "../config/env.js";
 import { bpsOf } from "../core/fees.js";
-import { chainCatalog, getMarketCatalog } from "../markets/catalog.js";
+import { getRobinhoodIndexState } from "../index/registry.js";
+import { chainCatalog, getMarketCatalog, type CuratedMarket } from "../markets/catalog.js";
 import { makePublicClient } from "../signer/broadcast.js";
 import type { PlannedTx, PositionSnapshot } from "../types.js";
 import {
@@ -74,12 +75,22 @@ export async function planPositionAction(input: {
     snapshot = await new V3Adapter(client).readPosition(input.tokenId);
   }
   if (snapshot.owner.toLowerCase() !== owner.toLowerCase()) throw new Error("wallet does not own this position");
-  const configured = chainCatalog(input.chain).markets.some((market) =>
+  const configuredMarkets = input.chain === "robinhood"
+    ? (await getRobinhoodIndexState()).catalog.chains.find((catalogChain) => catalogChain.slug === "robinhood")?.markets ?? []
+    : chainCatalog(input.chain).markets;
+  const configured = positionPoolIsConfigured(snapshot, configuredMarkets);
+  if (!configured) throw new Error("position pool is not in Wizzy's curated market catalog");
+  return buildPositionActionPlan(snapshot, owner, input.chain, input.action, env.treasury);
+}
+
+export function positionPoolIsConfigured(
+  snapshot: PositionSnapshot,
+  markets: readonly CuratedMarket[],
+): boolean {
+  return markets.some((market) =>
     market.pool.toLowerCase() === snapshot.pool.toLowerCase()
     && (snapshot.venue === "aerodrome-slipstream") === (market.protocol === "AERODROME_SLIPSTREAM"),
   );
-  if (!configured) throw new Error("position pool is not in Wizzy's curated market catalog");
-  return buildPositionActionPlan(snapshot, owner, input.chain, input.action, env.treasury);
 }
 
 export function buildPositionActionPlan(

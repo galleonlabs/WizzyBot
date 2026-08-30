@@ -15,7 +15,6 @@ import { makePublicClient } from "../signer/broadcast.js";
 import type { PlannedTx, TokenRef } from "../types.js";
 import { erc20ApproveTx, mintCalldata, nativeTransferTx, wrapEthTx } from "../uniswap/calldata.js";
 import { exactInV3Tx } from "../uniswap/router.js";
-import { permit2ApproveTx } from "../uniswap/v4-calldata.js";
 import { activeMarkets, chainCatalog, getMarketCatalog, type CuratedMarket } from "../markets/catalog.js";
 import { slipstreamPoolAbi, slipstreamQuoterV2Abi } from "../aerodrome/abi.js";
 import { exactInSlipstreamTx, mintSlipstreamTx } from "../aerodrome/calldata.js";
@@ -124,8 +123,7 @@ export async function planAllocation(input: {
   const uniswapSwapWeth = uniswapQuotes.reduce((sum, quote) => sum + BigInt(quote.marketPlan.swapInWei), 0n);
   if (uniswapSwapWeth > 0n) {
     transactions.push(
-      erc20ApproveTx(addresses.weth, addresses.permit2, uniswapSwapWeth),
-      permit2ApproveTx(addresses.weth, addresses.universalRouter, uniswapSwapWeth, 20 * 60),
+      erc20ApproveTx(addresses.weth, addresses.swapRouter02, uniswapSwapWeth),
       ...uniswapQuotes.map((quote) => quote.swap),
     );
   }
@@ -155,7 +153,7 @@ export async function planAllocation(input: {
     env.treasury ?? TREASURY,
     ...markets.map((market) => market.token),
     ...quotes.flatMap((quote) => [quote.swapSpender, quote.positionManager]),
-    ...(uniswapQuotes.length ? [addresses.permit2, addresses.universalRouter] : []),
+    ...(uniswapQuotes.length ? [addresses.swapRouter02] : []),
   ]);
   assertAllowedTransactions(transactions, allowedTargets);
 
@@ -318,7 +316,7 @@ async function quoteUniswapMarket(
     },
     swap,
     mint,
-    swapSpender: addressesFor(chainId === 4663 ? "robinhood" : "base").universalRouter,
+    swapSpender: addressesFor(chainId === 4663 ? "robinhood" : "base").swapRouter02,
     positionManager: addressesFor(chainId === 4663 ? "robinhood" : "base").nfpm,
     mintWeth,
     mintMeme,

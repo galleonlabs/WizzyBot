@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getAddress } from "viem";
 import { addressesFor } from "../src/chains.js";
 import { activeMarkets } from "../src/markets/catalog.js";
-import { buildPositionActionPlan } from "../src/portfolio/position-actions.js";
+import { buildPositionActionPlan, positionPoolIsConfigured } from "../src/portfolio/position-actions.js";
 import { TREASURY } from "../src/constants.js";
 import type { PositionSnapshot } from "../src/types.js";
 
@@ -24,6 +24,18 @@ describe("self-custodial position actions", () => {
     expect(plan.transactions[0]?.to).toBe(addressesFor("base").nfpm);
     expect(plan.transactions[0]?.description).toContain("decreaseLiquidity 100%");
     expect(plan.transactions.slice(1).every((tx) => tx.description.startsWith("ERC20.transfer"))).toBe(true);
+  });
+
+  it("allows a curator-added market to be withdrawn after an onchain rebalance", () => {
+    const position = snapshot();
+    const market = activeMarkets("base").find((candidate) => candidate.protocol === "V3")!;
+    const replacement = {
+      ...market,
+      id: "registry-replacement",
+      pool: "0x2222222222222222222222222222222222222222" as const,
+      status: "paused" as const,
+    };
+    expect(positionPoolIsConfigured({ ...position, pool: replacement.pool }, [replacement])).toBe(true);
   });
 });
 

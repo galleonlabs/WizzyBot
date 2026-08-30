@@ -3,12 +3,12 @@ import { addressesFor, chainOf } from "../chains.js";
 import { quoterV2Abi } from "../chain/abi.js";
 import { V3Adapter } from "../chain/positions.js";
 import { loadEnv } from "../config/env.js";
-import { chainCatalog, getMarketCatalog, type CuratedMarket } from "../markets/catalog.js";
+import { type CuratedMarket } from "../markets/catalog.js";
+import { getRobinhoodIndexState } from "../index/registry.js";
 import { makePublicClient } from "../signer/broadcast.js";
 import type { PlannedTx, PositionSnapshot } from "../types.js";
 import { decreaseCalldata, erc20ApproveTx, unwrapEthTx } from "../uniswap/calldata.js";
 import { exactInV3Tx } from "../uniswap/router.js";
-import { permit2ApproveTx } from "../uniswap/v4-calldata.js";
 import { planAllocation, type SerializableTx } from "./allocation.js";
 
 const BPS = 10_000n;
@@ -47,11 +47,13 @@ export async function planIndexMigration(input: {
 }): Promise<IndexMigrationPlan> {
   if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
   const owner = getAddress(input.owner);
-  const catalog = getMarketCatalog();
+  const indexState = await getRobinhoodIndexState();
+  const catalog = indexState.catalog;
   const migration = catalog.migrations.find((candidate) => candidate.id === input.migrationId);
   if (!migration) throw new Error("This index update is no longer available");
   if (Date.parse(migration.effectiveAt) > Date.now()) throw new Error("This index update is not active yet");
-  const robinhood = chainCatalog("robinhood");
+  const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood");
+  if (!robinhood) throw new Error("The Robinhood index catalog is unavailable");
   const fromMarket = robinhood.markets.find((market) => market.id === migration.fromMarketId);
   const toMarket = robinhood.markets.find((market) => market.id === migration.toMarketId);
   if (!fromMarket || !toMarket || fromMarket.status === "active" || toMarket.status !== "active") {
@@ -83,8 +85,7 @@ export async function planIndexMigration(input: {
   const allowedTargets = uniqueAddresses([
     addressesFor("robinhood").nfpm,
     addressesFor("robinhood").weth,
-    addressesFor("robinhood").permit2,
-    addressesFor("robinhood").universalRouter,
+    addressesFor("robinhood").swapRouter02,
     fromMarket.token,
     ...allocation.allowedTargets,
   ]);
@@ -151,8 +152,7 @@ async function buildMigrationTransactions(
   return {
     decrease,
     swapTransactions: [
-      erc20ApproveTx(fromMarket.token, addresses.permit2, memeFloor),
-      permit2ApproveTx(fromMarket.token, addresses.universalRouter, memeFloor, Math.floor(PLAN_TTL_MS / 1_000)),
+      erc20ApproveTx(fromMarket.token, addresses.swapRouter02, memeFloor),
       exactInV3Tx({
         tokenIn: fromMarket.token,
         tokenOut: fromMarket.quoteToken,

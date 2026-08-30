@@ -1,9 +1,10 @@
-import { stringToHex, type PublicClient } from "viem";
+import { getAddress, stringToHex, type PublicClient } from "viem";
 import { describe, expect, it } from "vitest";
 import { addressesFor } from "../src/chains.js";
+import { getCuratorConfig } from "../src/curator/config.js";
 import { activeMarkets } from "../src/markets/catalog.js";
 import { encodeRegistryPublish, initialRobinhoodRegistryMarkets } from "../src/index/publish.js";
-import { readIndexRegistry, resolveRegistryMarkets, type IndexRegistrySnapshot } from "../src/index/registry.js";
+import { catalogWithRegistryMarkets, readIndexRegistry, resolveRegistryMarkets, type IndexRegistrySnapshot } from "../src/index/registry.js";
 
 function snapshot(overrides: Partial<IndexRegistrySnapshot> = {}): IndexRegistrySnapshot {
   const addresses = addressesFor("robinhood");
@@ -26,6 +27,7 @@ function snapshot(overrides: Partial<IndexRegistrySnapshot> = {}): IndexRegistry
       tickSpacing: market.tickSpacing,
       rangeWidthBps: Math.round(market.rangeWidthPct * 100),
     })),
+    replacements: [],
     ...overrides,
   };
 }
@@ -61,6 +63,31 @@ describe("onchain Una index registry", () => {
     expect(data).toMatch(/^0x1198b2ff/);
   });
 
+  it("derives a user migration directly from an onchain curator replacement", () => {
+    const next = snapshot({ version: 2, updatedAt: 1_788_115_200 });
+    const outgoing = next.markets.at(-1)!;
+    const candidate = getCuratorConfig().candidates.find((row) => row.id === "robinhood-gg")!;
+    next.markets[next.markets.length - 1] = {
+      ...outgoing,
+      id: candidate.id,
+      token: getAddress(candidate.token),
+      pool: getAddress(candidate.pool),
+      fee: candidate.feePips,
+      tickSpacing: 200,
+    };
+    next.replacements = [{ fromMarketId: outgoing.id, toMarketId: candidate.id }];
+
+    const current = resolveRegistryMarkets(next);
+    const catalog = catalogWithRegistryMarkets(current, next.version, next.updatedAt, next.replacements);
+    expect(catalog.migrations).toContainEqual(expect.objectContaining({
+      fromMarketId: outgoing.id,
+      toMarketId: candidate.id,
+    }));
+    const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood")!;
+    expect(robinhood.markets.find((market) => market.id === outgoing.id)?.status).toBe("paused");
+    expect(robinhood.markets.find((market) => market.id === candidate.id)?.status).toBe("active");
+  });
+
   it("reads every registry field from one block", async () => {
     const addresses = addressesFor("robinhood");
     const calls: Array<{ functionName: string; blockNumber: bigint }> = [];
@@ -86,13 +113,13 @@ describe("onchain Una index registry", () => {
       getBlockNumber: async () => 123n,
       readContract: async ({ functionName, blockNumber }: { functionName: string; blockNumber: bigint }) => {
         calls.push({ functionName, blockNumber });
-        return values[functionName];
+        return functionName === "replacementOf" ? `0x${"00".repeat(32)}` : values[functionName];
       },
     } as unknown as PublicClient;
     const result = await readIndexRegistry(client, "0x0000000000000000000000000000000000000001");
     expect(result.version).toBe(4);
     expect(result.markets).toHaveLength(6);
-    expect(calls).toHaveLength(8);
+    expect(calls.length).toBeGreaterThan(8);
     expect(calls.every((call) => call.blockNumber === 123n)).toBe(true);
   });
 });

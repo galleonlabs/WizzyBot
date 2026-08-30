@@ -40,6 +40,7 @@ export const ADDRESSES = {
 /** Static signer allowlist. Position tokens may be added per-action. */
 export const SIGNER_ALLOWLIST: readonly Address[] = [
   ADDRESSES.nfpm,
+  ADDRESSES.swapRouter02,
   ADDRESSES.permit2,
   ADDRESSES.universalRouter,
   ADDRESSES.v2Router,

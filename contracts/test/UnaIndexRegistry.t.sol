@@ -137,6 +137,40 @@ contract UnaIndexRegistryTest {
         registry.publish(0, markets, EVIDENCE, "ipfs://report-v1");
     }
 
+    function testRecordsAStableSlotReplacementOnchain() public {
+        VM.prank(CURATOR);
+        registry.publish(0, _markets(), EVIDENCE, "ipfs://report-v1");
+
+        UnaIndexRegistry.Market[] memory next = _markets();
+        next[0] = UnaIndexRegistry.Market({
+            id: keccak256("cashcat-v2"),
+            token: address(tokenA),
+            pool: address(poolA),
+            weightBps: 6_000,
+            fee: 10_000,
+            tickSpacing: 200,
+            rangeWidthBps: 6_000
+        });
+        VM.prank(CURATOR);
+        registry.publish(1, next, keccak256("curator-report-v2"), "ipfs://report-v2");
+
+        assert(registry.replacementOf(keccak256("cashcat")) == keccak256("cashcat-v2"));
+        assert(registry.version() == 2);
+    }
+
+    function testRejectsReplacementThatChangesTheIndexSlot() public {
+        VM.prank(CURATOR);
+        registry.publish(0, _markets(), EVIDENCE, "ipfs://report-v1");
+
+        UnaIndexRegistry.Market[] memory next = _markets();
+        next[0].id = keccak256("cashcat-v2");
+        next[0].weightBps = 5_999;
+        next[1].weightBps = 4_001;
+        VM.expectRevert(abi.encodeWithSelector(UnaIndexRegistry.InvalidReplacement.selector, uint256(0)));
+        VM.prank(CURATOR);
+        registry.publish(1, next, keccak256("curator-report-v2"), "ipfs://report-v2");
+    }
+
     function testPauseIsImmediateAndOwnerControlsRecovery() public {
         VM.prank(CURATOR);
         registry.pause(keccak256("security-incident"));

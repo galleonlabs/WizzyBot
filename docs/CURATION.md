@@ -44,8 +44,8 @@ The dappnode timer persists:
 - `latest.json` — machine-readable calls and replacements.
 - `latest.md` — the operator review.
 
-Candidate addresses and thresholds live in `src/config/curator.json`. Robinhood membership, weights, and availability live in `src/config/markets.json`. The curator report supplies the evidence and policy-valid proposal; the curator agent changes the catalog and ships it through the normal tested deployment path. The dappnode service never signs or broadcasts a registry transaction.
+Candidate addresses and thresholds live in `src/config/curator.json`; the catalog remains the reviewed metadata allowlist. Robinhood membership, weights, pause state, and stable-slot replacements are canonical in `UnaIndexRegistry`. The product reads that snapshot directly and derives affected-wallet migrations from its onchain replacement records.
 
-Every constituent replacement must keep the outgoing market in the catalog as inactive and add a `migrations` entry naming its active successor and effective date. The replacement inherits the outgoing weight and range width. Markets uses that manifest to offer affected wallets a one-approval migration of only the retired position; unrelated positions remain untouched.
+Every constituent replacement inherits the outgoing weight and range width. The registry records the old and new market IDs, allowing Markets to offer affected wallets a one-approval migration of only the retired position while leaving unrelated positions untouched.
 
-The deferred `registry:sync` command remains available for a future onchain-registry review, but it is manual, dry-run by default, and outside the current operating workflow.
+`registry:sync` is the controlled publication path. It is dry-run by default, validates a fresh curator report, simulates the exact contract action, and requires the dedicated curator signer for `--live`.

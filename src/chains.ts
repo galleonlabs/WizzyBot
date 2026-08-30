@@ -67,6 +67,7 @@ const ROBINHOOD_ADDRESSES: ChainAddresses = {
 
 const ROBINHOOD_ALLOWLIST: readonly Address[] = [
   ROBINHOOD_ADDRESSES.nfpm,
+  ROBINHOOD_ADDRESSES.swapRouter02,
   ROBINHOOD_ADDRESSES.permit2,
   ROBINHOOD_ADDRESSES.universalRouter,
   ROBINHOOD_ADDRESSES.v2Router,

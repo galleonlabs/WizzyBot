@@ -23,6 +23,12 @@ describe("env + secret hygiene", () => {
     }
   });
 
+  it("accepts the Vercel treasury key name without requiring a duplicate secret", () => {
+    const privateKey = `0x${"11".repeat(32)}`;
+    const env = loadEnv({ UNA_TREASURY_PRIVATE_KEY: privateKey });
+    expect(env.privateKey).toBe(privateKey);
+  });
+
   it("redacts keys and never echoes them", () => {
     expect(redactKey("0x1111111111111111111111111111111111111111111111111111111111111111")).toBe(
       "<redacted>",

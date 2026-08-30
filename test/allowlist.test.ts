@@ -8,6 +8,7 @@ describe("signer allowlist", () => {
     expect(isAllowedTarget(ADDRESSES.nfpm)).toBe(true);
     expect(isAllowedTarget(ADDRESSES.permit2)).toBe(true);
     expect(isAllowedTarget(ADDRESSES.universalRouter)).toBe(true);
+    expect(isAllowedTarget(ADDRESSES.swapRouter02)).toBe(true);
     expect(isAllowedTarget(TREASURY)).toBe(true);
     expect(SIGNER_ALLOWLIST).toEqual(
       expect.arrayContaining([

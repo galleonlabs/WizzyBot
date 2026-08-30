@@ -1,31 +1,37 @@
-import { concatHex, encodeAbiParameters, encodeFunctionData, padHex, toHex, type Address, type Hex } from "viem";
+import { encodeFunctionData, type Address } from "viem";
 import { CHAIN_ID } from "../constants.js";
 import { addressesFor, slugForChainId } from "../chains.js";
 import type { PlannedTx } from "../types.js";
 
-const UR_ABI = [
+const SWAP_ROUTER_02_ABI = [
   {
     type: "function",
-    name: "execute",
+    name: "exactInputSingle",
     stateMutability: "payable",
-    inputs: [
-      { name: "commands", type: "bytes" },
-      { name: "inputs", type: "bytes[]" },
-      { name: "deadline", type: "uint256" },
-    ],
-    outputs: [],
+    inputs: [{
+      name: "params",
+      type: "tuple",
+      components: [
+        { name: "tokenIn", type: "address" },
+        { name: "tokenOut", type: "address" },
+        { name: "fee", type: "uint24" },
+        { name: "recipient", type: "address" },
+        { name: "amountIn", type: "uint256" },
+        { name: "amountOutMinimum", type: "uint256" },
+        { name: "sqrtPriceLimitX96", type: "uint160" },
+      ],
+    }],
+    outputs: [{ name: "amountOut", type: "uint256" }],
   },
 ] as const;
 
-const V3_SWAP_EXACT_IN = 0x00;
-
-function v3Path(tokenIn: Address, fee: number, tokenOut: Address): Hex {
-  const feeHex = padHex(toHex(fee), { size: 3 });
-  return concatHex([tokenIn, feeHex, tokenOut]);
-}
-
 /**
- * Single-hop v3 exact-in via Universal Router 2.0.
+ * Single-hop v3 exact-in via SwapRouter02.
+ *
+ * Robinhood's deployed Universal Router rejects the standard v3 command with
+ * SliceOutOfBounds, while its canonical SwapRouter02 executes the same pool
+ * route. Use the direct router on every supported EVM chain so quotes are
+ * executable instead of merely structurally valid.
  * Rebalance swaps pay the DEX pool fee only — Wizzy adds no swap take.
  */
 export function exactInV3Tx(args: {
@@ -39,29 +45,22 @@ export function exactInV3Tx(args: {
   deadlineSec?: number;
   chainId?: number;
 }): PlannedTx {
-  const path = v3Path(args.tokenIn, args.fee, args.tokenOut);
-  const input = encodeAbiParameters(
-    [
-      { type: "address" },
-      { type: "uint256" },
-      { type: "uint256" },
-      { type: "bytes" },
-      { type: "bool" },
-    ],
-    [args.recipient, args.amountIn, args.amountOutMin, path, args.payerIsUser ?? true],
-  );
   const data = encodeFunctionData({
-    abi: UR_ABI,
-    functionName: "execute",
-    args: [
-      toHex(new Uint8Array([V3_SWAP_EXACT_IN])),
-      [input],
-      BigInt(Math.floor(Date.now() / 1000) + (args.deadlineSec ?? 600)),
-    ],
+    abi: SWAP_ROUTER_02_ABI,
+    functionName: "exactInputSingle",
+    args: [{
+      tokenIn: args.tokenIn,
+      tokenOut: args.tokenOut,
+      fee: args.fee,
+      recipient: args.recipient,
+      amountIn: args.amountIn,
+      amountOutMinimum: args.amountOutMin,
+      sqrtPriceLimitX96: 0n,
+    }],
   });
   const addresses = addressesFor(slugForChainId(args.chainId ?? CHAIN_ID));
   return {
-    to: addresses.universalRouter,
+    to: addresses.swapRouter02,
     data,
     value: 0n,
     description: `UR v3 exact-in ${args.tokenIn} → ${args.tokenOut}`,

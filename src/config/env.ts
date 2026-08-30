@@ -28,7 +28,7 @@ function mergedEnv(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 
 const hexKey = z
   .string()
-  .regex(/^0x[0-9a-fA-F]{64}$/, "UNABOT_PRIVATE_KEY must be 0x + 32-byte hex")
+  .regex(/^0x[0-9a-fA-F]{64}$/, "private key must be 0x + 32-byte hex")
   .optional();
 
 const address = z
@@ -41,6 +41,7 @@ export const EnvSchema = z.object({
   ROBINHOOD_RPC_URL: z.string().url().default(ROBINHOOD_RPC_DEFAULT),
   UNISWAP_API_KEY: z.string().optional().default(""),
   UNABOT_PRIVATE_KEY: hexKey,
+  UNA_TREASURY_PRIVATE_KEY: hexKey,
   UNABOT_TREASURY: address,
   UNA_INDEX_REGISTRY_ADDRESS: address,
   UNABOT_ETH_USD: z.coerce.number().positive().optional(),
@@ -62,6 +63,7 @@ export type Env = {
 
 const SECRET_ENV_KEYS = new Set([
   "UNABOT_PRIVATE_KEY",
+  "UNA_TREASURY_PRIVATE_KEY",
   "UNISWAP_API_KEY",
   "TELEGRAM_BOT_TOKEN",
   "UNABOT_ALERT_WEBHOOK",
@@ -76,6 +78,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       ROBINHOOD_RPC_URL: env.ROBINHOOD_RPC_URL || ROBINHOOD_RPC_DEFAULT,
       UNISWAP_API_KEY: env.UNISWAP_API_KEY ?? "",
       UNABOT_PRIVATE_KEY: env.UNABOT_PRIVATE_KEY || undefined,
+      UNA_TREASURY_PRIVATE_KEY: env.UNA_TREASURY_PRIVATE_KEY || undefined,
       UNABOT_TREASURY: env.UNABOT_TREASURY || undefined,
       UNA_INDEX_REGISTRY_ADDRESS: env.UNA_INDEX_REGISTRY_ADDRESS || undefined,
       UNABOT_ETH_USD: env.UNABOT_ETH_USD || undefined,
@@ -101,7 +104,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     rpcUrl: parsed.BASE_RPC_URL,
     rpcByChain: { base: parsed.BASE_RPC_URL, robinhood: parsed.ROBINHOOD_RPC_URL },
     uniswapApiKey: parsed.UNISWAP_API_KEY || undefined,
-    privateKey: parsed.UNABOT_PRIVATE_KEY as Hex | undefined,
+    privateKey: (parsed.UNABOT_PRIVATE_KEY ?? parsed.UNA_TREASURY_PRIVATE_KEY) as Hex | undefined,
     treasury: (parsed.UNABOT_TREASURY as Address | undefined) ?? TREASURY,
     indexRegistryAddress: parsed.UNA_INDEX_REGISTRY_ADDRESS as Address | undefined,
     ethUsd: parsed.UNABOT_ETH_USD,

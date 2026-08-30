@@ -34,10 +34,12 @@ contract UnaIndexRegistry {
     error EvidenceRequired();
     error EvidenceUriTooLong(uint256 length);
     error RegistryIsPaused();
+    error InvalidReplacement(uint256 index);
     error NoPendingOwner();
     error NoPendingCurator();
 
     event IndexPublished(uint64 indexed version, bytes32 indexed evidenceHash, uint256 marketCount, string evidenceURI);
+    event MarketReplaced(uint64 indexed version, bytes32 indexed fromMarketId, bytes32 indexed toMarketId);
     event RegistryPaused(bytes32 indexed reasonHash, address indexed account);
     event RegistryUnpaused(address indexed account);
     event OwnershipTransferStarted(address indexed owner, address indexed pendingOwner);
@@ -58,6 +60,7 @@ contract UnaIndexRegistry {
     address public immutable QUOTE_TOKEN;
 
     Market[] private _markets;
+    mapping(bytes32 => bytes32) public replacementOf;
 
     constructor(address initialOwner, address initialCurator, address canonicalFactory, address canonicalQuoteToken) {
         if (
@@ -127,12 +130,28 @@ contract UnaIndexRegistry {
         }
         if (totalWeightBps != 10_000) revert InvalidTotalWeight(totalWeightBps);
 
+        uint64 nextVersion = version + 1;
+        if (version != 0) {
+            if (count != _markets.length) revert InvalidMarketCount(count);
+            for (uint256 i; i < count; ++i) {
+                Market storage previous = _markets[i];
+                Market calldata nextMarket = nextMarkets[i];
+                if (previous.id == nextMarket.id) continue;
+                if (
+                    previous.weightBps != nextMarket.weightBps
+                        || previous.rangeWidthBps != nextMarket.rangeWidthBps
+                ) revert InvalidReplacement(i);
+                replacementOf[previous.id] = nextMarket.id;
+                emit MarketReplaced(nextVersion, previous.id, nextMarket.id);
+            }
+        }
+
         delete _markets;
         for (uint256 i; i < count; ++i) {
             _markets.push(nextMarkets[i]);
         }
         unchecked {
-            ++version;
+            version = nextVersion;
         }
         updatedAt = uint64(block.timestamp);
         evidenceHash = nextEvidenceHash;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { quoteEthToRobinhood } from "../../../lib/portfolio-server";
+import { apiErrorResponse, readApiJson } from "../../../lib/api-request-server";
 
 export const runtime = "nodejs";
 
@@ -12,13 +13,10 @@ const Body = z.object({
 
 export async function POST(request: Request) {
   try {
-    const body = Body.parse(await request.json());
+    const body = Body.parse(await readApiJson(request));
     const quote = await quoteEthToRobinhood({ owner: body.owner, amountInWei: BigInt(body.amountInWei), originChainId: body.originChainId });
     return NextResponse.json({ quote });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not quote Relay" },
-      { status: 400 },
-    );
+    return apiErrorResponse(error, "Could not quote Relay");
   }
 }

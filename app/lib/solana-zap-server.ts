@@ -13,11 +13,11 @@ import {
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { ComputeBudgetProgram, Connection, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { ComputeBudgetProgram, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { getSolanaMarketCatalog } from "./portfolio-server";
+import { getSolanaConnection } from "./solana-rpc-server";
 
 const WSOL = new PublicKey("So11111111111111111111111111111111111111112");
-const DEFAULT_SOLANA_RPC = "https://api.mainnet-beta.solana.com";
 
 type SolanaMarket = {
   id: string;
@@ -60,7 +60,7 @@ export async function planSolanaZap(input: {
   const market = catalog.markets.find((candidate) => candidate.id === input.marketId && candidate.status === "active");
   if (!market) throw new Error("Unknown or inactive Solana market");
 
-  const connection = new Connection(process.env.SOLANA_RPC_URL ?? DEFAULT_SOLANA_RPC, "confirmed");
+  const connection = getSolanaConnection();
   const pool = new PublicKey(market.pool);
   const amountIn = new BN(input.amountLamports.toString());
   const config = {

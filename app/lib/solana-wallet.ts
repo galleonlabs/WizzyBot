@@ -1,4 +1,4 @@
-import { Connection, Keypair, Transaction } from "@solana/web3.js";
+import { Keypair, Transaction } from "@solana/web3.js";
 import { useSignTransaction, type ConnectedStandardSolanaWallet } from "@privy-io/react-auth/solana";
 import type { SolanaPositionActionPlan } from "./solana-position-server";
 import type { SolanaZapPlan } from "./solana-zap-server";
@@ -11,7 +11,6 @@ export type SolanaExecutionProgress = {
 };
 
 type SignTransaction = ReturnType<typeof useSignTransaction>["signTransaction"];
-const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com", "confirmed");
 
 /**
  * Collects every Meteora transaction into one Privy signing request, then broadcasts
@@ -52,7 +51,7 @@ export async function executeSolanaZaps(input: {
   for (const [index, result] of signedTransactions.entries()) {
     const item = prepared[index]!;
     input.onProgress?.({ market: item.market, step: index + 1, total: prepared.length, label: item.label });
-    const signature = await connection.sendRawTransaction(result.signedTransaction, { maxRetries: 3, skipPreflight: false });
+    const signature = await broadcastSignedTransaction(input.wallet.address, result.signedTransaction);
     signatures.push(signature);
     await waitForSolanaConfirmation(signature);
   }
@@ -86,7 +85,7 @@ export async function executeSolanaPositionAction(input: {
   for (const [index, result] of signedTransactions.entries()) {
     const item = prepared[index]!;
     input.onProgress?.({ market: item.market, step: index + 1, total: prepared.length, label: item.label });
-    const signature = await connection.sendRawTransaction(result.signedTransaction, { maxRetries: 3, skipPreflight: false });
+    const signature = await broadcastSignedTransaction(input.wallet.address, result.signedTransaction);
     signatures.push(signature);
     await waitForSolanaConfirmation(signature);
   }
@@ -96,6 +95,21 @@ export async function executeSolanaPositionAction(input: {
 function decodeBase64(value: string): Uint8Array {
   const decoded = window.atob(value);
   return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+}
+
+function encodeBase64(value: Uint8Array): string {
+  return window.btoa(String.fromCharCode(...value));
+}
+
+async function broadcastSignedTransaction(owner: string, transaction: Uint8Array): Promise<string> {
+  const response = await fetch("/api/portfolio/solana/broadcast", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ owner, transactionBase64: encodeBase64(transaction) }),
+  });
+  const payload = await response.json() as { signature?: string; error?: string };
+  if (!response.ok || !payload.signature) throw new Error(payload.error ?? "Could not submit Solana transaction");
+  return payload.signature;
 }
 
 async function waitForSolanaConfirmation(signature: string): Promise<void> {

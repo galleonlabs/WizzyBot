@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planIndexMigration } from "../../../lib/portfolio-server";
+import { apiErrorResponse, readApiJson } from "../../../lib/api-request-server";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ const Body = z.object({
 
 export async function POST(request: Request) {
   try {
-    const body = Body.parse(await request.json());
+    const body = Body.parse(await readApiJson(request));
     const plan = await planIndexMigration({
       owner: body.owner,
       tokenId: BigInt(body.tokenId),
@@ -20,9 +21,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ plan });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not prepare the index update" },
-      { status: 400 },
-    );
+    return apiErrorResponse(error, "Could not prepare the index update");
   }
 }

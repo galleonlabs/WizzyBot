@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planSolanaPositionAction } from "../../../../lib/solana-position-server";
+import { apiErrorResponse, readApiJson } from "../../../../lib/api-request-server";
 
 export const runtime = "nodejs";
 
@@ -14,13 +15,10 @@ const Body = z.object({
 
 export async function POST(request: Request) {
   try {
-    const body = Body.parse(await request.json());
+    const body = Body.parse(await readApiJson(request));
     const plan = await planSolanaPositionAction(body);
     return NextResponse.json({ plan });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not prepare Solana position action" },
-      { status: 400 },
-    );
+    return apiErrorResponse(error, "Could not prepare Solana position action");
   }
 }

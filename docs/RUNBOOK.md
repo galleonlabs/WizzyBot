@@ -99,8 +99,7 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 | --- | --- |
 | `BASE_RPC_URL` | Base RPC. Default `https://mainnet.base.org`. Use a dedicated provider in production. |
 | `ROBINHOOD_RPC_URL` | Robinhood RPC. Default `https://rpc.mainnet.chain.robinhood.com`. Use a dedicated provider in production. |
-| `SOLANA_RPC_URL` | Server-side Solana mainnet RPC for Meteora planning and position reads. Use a dedicated provider in production. |
-| `NEXT_PUBLIC_SOLANA_RPC_URL` / `NEXT_PUBLIC_SOLANA_WS_URL` | Client-side Solana submission and subscription endpoints used by Privy. |
+| `SOLANA_RPC_URL` | Server-only Solana endpoint used for planning, position reads, submission, and confirmation. Never expose a credentialed RPC URL through a `NEXT_PUBLIC_` variable. Privy manages wallet connectivity in the browser. |
 | `UNISWAP_API_KEY` | Optional. Write paths use Uniswap LP + Trading APIs when set. Never commit. |
 | `UNABOT_PRIVATE_KEY` | CLI `--live` signer. `0x` + 32-byte hex. Never commit. Hosted agent does **not** use this. |
 | `UNABOT_TREASURY` | Optional override. Product fees go here. |

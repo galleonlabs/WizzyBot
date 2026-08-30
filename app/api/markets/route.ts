@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { ETH_FUNDING_CHAINS, fetchMarketStats, fetchSolanaMarketStats, getRobinhoodIndexState, getSolanaMarketCatalog } from "../../lib/portfolio-server";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
-export async function GET() {
+const getMarketsPayload = unstable_cache(async () => {
   const solana = getSolanaMarketCatalog();
   const [indexState, evmStats, solanaStats] = await Promise.all([
     getRobinhoodIndexState() as Promise<{ source: "catalog" | "onchain"; catalog: unknown; policy: unknown; registry: unknown }>,
     fetchMarketStats().catch(() => []),
     fetchSolanaMarketStats().catch(() => []),
   ]);
-  return NextResponse.json({
+  return {
     catalog: indexState.catalog,
     solana,
     index: indexState.policy,
@@ -19,5 +20,11 @@ export async function GET() {
     fundingChains: ETH_FUNDING_CHAINS,
     stats: [...evmStats as unknown[], ...solanaStats as unknown[]],
     source: `${indexState.source === "onchain" ? "onchain Robinhood index" : "version-controlled Robinhood index"} + live GeckoTerminal pool data`,
+  };
+}, ["wizzy-markets-v1"], { revalidate: 30, tags: ["markets"] });
+
+export async function GET() {
+  return NextResponse.json(await getMarketsPayload(), {
+    headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=300" },
   });
 }

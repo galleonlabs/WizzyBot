@@ -310,7 +310,7 @@ svg {
 .index-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(390px, 470px);
-  align-items: center;
+  align-items: start;
   min-height: calc(100dvh - 68px);
   gap: clamp(48px, 7vw, 96px);
   padding: 92px 0 88px;

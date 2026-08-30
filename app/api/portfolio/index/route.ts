@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planRobinhoodIndex } from "../../../lib/portfolio-server";
+import { apiErrorResponse, readApiJson } from "../../../lib/api-request-server";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ const Body = z.object({
 
 export async function POST(request: Request) {
   try {
-    const body = Body.parse(await request.json());
+    const body = Body.parse(await readApiJson(request));
     const plan = await planRobinhoodIndex({
       owner: body.owner,
       totalAmountWei: BigInt(body.amountWei),
@@ -20,7 +21,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ plan });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not quote the Robinhood index";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiErrorResponse(error, "Could not quote the Robinhood index");
   }
 }

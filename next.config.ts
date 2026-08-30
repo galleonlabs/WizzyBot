@@ -13,7 +13,7 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "child-src https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org",
   "frame-src https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org https://challenges.cloudflare.com",
-  "connect-src 'self' https://auth.privy.io wss://relay.walletconnect.com wss://relay.walletconnect.org wss://www.walletlink.org https://*.rpc.privy.systems https://explorer-api.walletconnect.com https://api.relay.link https://api.mainnet-beta.solana.com wss://api.mainnet-beta.solana.com",
+  "connect-src 'self' https://auth.privy.io wss://relay.walletconnect.com wss://relay.walletconnect.org wss://www.walletlink.org https://*.rpc.privy.systems https://explorer-api.walletconnect.com https://api.relay.link",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
 ].join("; ");

@@ -25,7 +25,6 @@ import {
   type SolanaCuratedMarket,
 } from "./lib/portfolio-types";
 import { type SolanaPositionActionPlan } from "./lib/solana-position-server";
-import { executeSolanaPositionAction } from "./lib/solana-wallet";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { relaySucceeded, sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
@@ -193,7 +192,11 @@ export function PortfolioApp() {
   useEffect(() => {
     setPlan(null);
     setPlanState({ kind: "idle" });
-  }, [amount, sourceChainId]);
+    setActionPlan(null);
+    setActionState({ kind: "idle" });
+    setMigrationPlan(null);
+    setMigrationState({ kind: "idle" });
+  }, [address, amount, authenticated, sourceChainId]);
 
   const activeMarkets = useMemo<IndexMarket[]>(() => {
     const robinhood = markets.catalog.chains.find((chain) => chain.slug === "robinhood");
@@ -313,6 +316,11 @@ export function PortfolioApp() {
 
   async function executeIndex() {
     if (!plan || !wallet || !address) return;
+    if (!sameAddress(plan.owner, address) || !sameAddress(plan.owner, wallet.address)) {
+      setPlan(null);
+      setPlanState({ kind: "error", message: "Your wallet changed. Review a fresh deposit before continuing." });
+      return;
+    }
     if (Date.now() >= Date.parse(plan.expiresAt)) {
       setPlanState({ kind: "error", message: "This deposit quote expired. Review a fresh one before continuing." });
       return;
@@ -328,13 +336,13 @@ export function PortfolioApp() {
       trackProductEvent("Index Submit Started", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
       if (funding) {
         setPlanState({ kind: "signing", message: `Approve your ETH deposit from ${funding.chainLabel}.` });
-        await sendWalletCalls({ wallet: connected, owner: address, chainId: funding.chainId, transactions: funding.transactions });
+        await sendWalletCalls({ wallet: connected, owner: plan.owner, chainId: funding.chainId, transactions: funding.transactions });
         setPlanState({ kind: "waiting", message: "Moving your ETH to Robinhood Chain…" });
         await waitForRelay(funding.bridge.statusPath);
       }
 
       setPlanState({ kind: "signing", message: `Approve ${plan.constituentCount} Robinhood market positions.` });
-      await sendWalletCalls({ wallet: connected, owner: address, chainId: robinhood.chainId, transactions: robinhood.transactions });
+      await sendWalletCalls({ wallet: connected, owner: plan.owner, chainId: robinhood.chainId, transactions: robinhood.transactions });
       setPlanState({ kind: "submitted", message: "Your Robinhood positions are being confirmed. They will appear in Markets shortly." });
       trackProductEvent("Index Submitted", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
       window.setTimeout(() => void loadPositions(), 8_000);
@@ -388,6 +396,7 @@ export function PortfolioApp() {
       setActionState({ kind: "signing", message: "Approve this position update in your wallet." });
       if (actionPlan.chain === "solana") {
         if (!solanaWallet) throw new Error("Your Solana wallet is not ready");
+        const { executeSolanaPositionAction } = await import("./lib/solana-wallet");
         await executeSolanaPositionAction({
           plan: actionPlan,
           wallet: solanaWallet as ConnectedStandardSolanaWallet,
@@ -398,7 +407,7 @@ export function PortfolioApp() {
           }),
         });
       } else {
-        await sendWalletCalls({ wallet: wallet as unknown as ConnectedEvmWallet, owner: address, chainId: actionPlan.chainId, transactions: actionPlan.transactions });
+        await sendWalletCalls({ wallet: wallet as unknown as ConnectedEvmWallet, owner: actionPlan.owner, chainId: actionPlan.chainId, transactions: actionPlan.transactions });
       }
       setActionState({ kind: "submitted", message: "Submitted. Your position will refresh after confirmation." });
       window.setTimeout(() => void loadPositions(), 8_000);
@@ -438,7 +447,7 @@ export function PortfolioApp() {
       setMigrationState({ kind: "signing", message: "Approve this index update in your wallet." });
       await sendWalletCalls({
         wallet: wallet as unknown as ConnectedEvmWallet,
-        owner: address,
+        owner: migrationPlan.owner,
         chainId: migrationPlan.chainId,
         transactions: migrationPlan.transactions,
       });
@@ -995,6 +1004,10 @@ function trimEth(value: bigint): string {
   const formatted = formatEther(value);
   const [whole, fraction = ""] = formatted.split(".");
   return fraction ? `${whole}.${fraction.slice(0, 6).replace(/0+$/, "") || "0"}` : whole!;
+}
+
+function sameAddress(left: string, right: string): boolean {
+  return left.toLowerCase() === right.toLowerCase();
 }
 
 function short(value: string): string {

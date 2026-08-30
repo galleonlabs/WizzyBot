@@ -11,15 +11,14 @@ import {
 } from "@solana/spl-token";
 import {
   ComputeBudgetProgram,
-  Connection,
   PublicKey,
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
 import { getMarketCatalog, getSolanaMarketCatalog } from "./portfolio-server";
 import { deriveSolanaTreasury, mergeTransactionsWhenFits } from "./solana-plan-utils";
+import { getSolanaConnection } from "./solana-rpc-server";
 
-const DEFAULT_SOLANA_RPC = "https://api.mainnet-beta.solana.com";
 const BPS = 10_000n;
 const ACTION_TTL_MS = 90_000;
 const MEMO_PROGRAMS = [
@@ -117,7 +116,7 @@ export async function fetchSolanaPositionList(ownerAddress: string): Promise<{
   // Retain discovery for paused/watch entries so a catalog status change never
   // hides an existing wallet position. Only active entries receive new liquidity.
   const markets = (getSolanaMarketCatalog() as SolanaCatalog).markets;
-  const connection = solanaConnection();
+  const connection = getSolanaConnection();
   const pools = await DLMM.createMultiple(connection, markets.map((market) => new PublicKey(market.pool)));
   const results = await Promise.allSettled(pools.map(async (pool, index) => {
     const market = markets[index]!;
@@ -169,7 +168,7 @@ export async function planSolanaPositionAction(input: {
   if (!market) throw new Error("Unknown Solana market");
   if (input.action === "compound" && market.status !== "active") throw new Error("This Solana market is paused; withdraw remains available");
 
-  const connection = solanaConnection();
+  const connection = getSolanaConnection();
   const pool = await DLMM.create(connection, new PublicKey(market.pool));
   assertCuratedPool(pool, market);
   const result = await pool.getPositionsByUserAndLbPair(owner);
@@ -529,8 +528,4 @@ function formatUiAmount(raw: string, decimals: number): string {
 function finite(value: unknown): number | null {
   const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function solanaConnection(): Connection {
-  return new Connection(process.env.SOLANA_RPC_URL ?? DEFAULT_SOLANA_RPC, "confirmed");
 }

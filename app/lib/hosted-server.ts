@@ -48,12 +48,13 @@ export async function fetchPositionList(owner?: string, chain: ChainSlug = "base
       positions,
     };
   } catch (err) {
+    console.error("[wizzy-position-list-error]", err instanceof Error ? err.name : "UnknownError");
     return {
       owner,
       chain,
       count: 0,
       positions: [] as unknown[],
-      error: err instanceof Error ? err.message : String(err),
+      error: "Could not read wallet positions",
     };
   }
 }

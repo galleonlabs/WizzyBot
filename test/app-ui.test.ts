@@ -16,6 +16,10 @@ const xProfile = readFileSync("public/brand/x/wizzy-x-profile-400.png");
 const xBanner = readFileSync("public/brand/x/wizzy-x-banner-1500x500.png");
 const xBannerSource = readFileSync("public/brand/x/wizzy-x-banner.svg", "utf8");
 const nextConfig = readFileSync("next.config.ts", "utf8");
+const solanaWallet = readFileSync("app/lib/solana-wallet.ts", "utf8");
+const solanaBroadcast = readFileSync("app/api/portfolio/solana/broadcast/route.ts", "utf8");
+const marketsRoute = readFileSync("app/api/markets/route.ts", "utf8");
+const apiBoundary = readFileSync("app/lib/api-request-server.ts", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
@@ -178,6 +182,7 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("Your liquidity and the index, in one place.");
     expect(portfolio).not.toContain("Deposit ETH. Earn trading fees across Base, Robinhood, and Solana.");
     expect(css).toContain(".index-hero { grid-template-columns: 1fr; gap: 48px; padding: 68px 0 64px");
+    expect(css).toMatch(/\.index-hero \{[\s\S]*?align-items: start;/);
     expect(css).toContain("min-height: 44px");
     expect(css).toContain(".chain-picker-popover");
     expect(css).toContain("position: fixed");
@@ -185,6 +190,10 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Index updated");
     expect(portfolio).toContain("Update position");
     expect(portfolio).toContain("/api/portfolio/migrate");
+    expect(portfolio).toContain("sameAddress(plan.owner, address)");
+    expect(portfolio).toContain("owner: plan.owner");
+    expect(portfolio).toContain("owner: actionPlan.owner");
+    expect(portfolio).toContain("owner: migrationPlan.owner");
   });
 
   it("ships the Wizzy identity and canonical domain without stale public Una assets", () => {
@@ -245,7 +254,23 @@ describe("meme index product UI", () => {
     expect(providers).toContain("toSolanaWalletConnectors");
     expect(providers).toContain("solana: { connectors: solanaConnectors }");
     expect(providers).toContain("defaultChain: robinhoodChain");
-    expect(providers).toContain('"solana:mainnet"');
+    expect(providers).not.toContain("NEXT_PUBLIC_SOLANA_RPC_URL");
+    expect(providers).not.toContain("NEXT_PUBLIC_SOLANA_WS_URL");
+    expect(providers).not.toContain("createSolanaRpc");
+  });
+
+  it("keeps custom RPC credentials on the server and caches the public market snapshot", () => {
+    expect(solanaWallet).not.toContain("NEXT_PUBLIC_SOLANA_RPC_URL");
+    expect(solanaWallet).toContain('/api/portfolio/solana/broadcast');
+    expect(solanaBroadcast).toContain("getSolanaConnection");
+    expect(solanaBroadcast).toContain("verifySignatures: true");
+    expect(marketsRoute).toContain("unstable_cache");
+    expect(marketsRoute).toContain("s-maxage=30, stale-while-revalidate=300");
+    expect(apiBoundary).toContain("same-origin request required");
+    expect(apiBoundary).toContain("Buffer.byteLength");
+    expect(apiBoundary).toContain("redactServerError");
+    expect(nextConfig).not.toContain("https://api.mainnet-beta.solana.com");
+    expect(nextConfig).not.toContain("wss://api.mainnet-beta.solana.com");
   });
 
   it("allows every reviewed market and product-image host without weakening the rest of the image policy", () => {

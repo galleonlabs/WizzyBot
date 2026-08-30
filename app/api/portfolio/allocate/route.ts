@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planAllocation, planDualChainAllocation } from "../../../lib/portfolio-server";
+import { apiErrorResponse, readApiJson } from "../../../lib/api-request-server";
 
 export const runtime = "nodejs";
 
@@ -16,7 +17,7 @@ const Body = z.object({
 
 export async function POST(request: Request) {
   try {
-    const body = Body.parse(await request.json());
+    const body = Body.parse(await readApiJson(request));
     const amountWei = BigInt(body.amountWei);
     const plan = body.chain === "both"
       ? await planDualChainAllocation({
@@ -34,7 +35,6 @@ export async function POST(request: Request) {
         });
     return NextResponse.json({ plan });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not build allocation plan";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiErrorResponse(error, "Could not build allocation plan");
   }
 }

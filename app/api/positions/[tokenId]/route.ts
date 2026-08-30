@@ -25,9 +25,10 @@ export async function GET(
     }
     return NextResponse.json(payload);
   } catch (err) {
+    console.error("[wizzy-position-status-error]", err instanceof Error ? err.name : "UnknownError");
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err), chain },
-      { status: 400 },
+      { error: "Could not read this position", chain },
+      { status: 400, headers: { "Cache-Control": "private, no-store" } },
     );
   }
 }

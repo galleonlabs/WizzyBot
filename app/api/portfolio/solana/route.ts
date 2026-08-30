@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planSolanaZap } from "../../../lib/solana-zap-server";
+import { apiErrorResponse, readApiJson } from "../../../lib/api-request-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -15,7 +16,7 @@ const Body = z.object({
 
 export async function POST(request: Request) {
   try {
-    const body = Body.parse(await request.json());
+    const body = Body.parse(await readApiJson(request));
     const plan = await planSolanaZap({
       owner: body.owner,
       marketId: body.marketId,
@@ -24,7 +25,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ plan });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not prepare Solana liquidity";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiErrorResponse(error, "Could not prepare Solana liquidity");
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useAddFunds, usePrivy, useWallets } from "@privy-io/react-auth";
 import {
   useSignTransaction,
   useWallets as useSolanaWallets,
@@ -13,7 +13,6 @@ import { positionValueUsd, summarizePositions } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
 import {
   type CuratedMarket,
-  type EthFundingChain,
   type AllocationMarketPlan,
   type MarketsPayload,
   type MarketStats,
@@ -26,7 +25,7 @@ import {
 } from "./lib/portfolio-types";
 import { type SolanaPositionActionPlan } from "./lib/solana-position-server";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
-import { relaySucceeded, sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
+import { sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 
 type ViewTab = "overview" | "markets";
@@ -46,12 +45,11 @@ type AvailableIndexUpdate = {
   toSymbol: string;
 };
 const INDEX_MARKET_COUNT = 6;
-const FOMO_URL = "https://fomo.family/r/makemememarkets";
+const ROBINHOOD_NATIVE_ETH = "0x0000000000000000000000000000000000000000";
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
   robinhood: "https://assets.relay.link/icons/4663/light.png",
   solana: "https://assets.relay.link/icons/792703809/light.png",
-  fomo: "https://fomo.family/favicon.svg",
   gecko: "https://www.geckoterminal.com/favicon.ico",
 } as const;
 
@@ -81,13 +79,14 @@ const EMPTY_MARKETS: MarketsPayload = {
 
 export function PortfolioApp() {
   const { ready, authenticated, login, logout, user } = usePrivy();
+  const { addFunds } = useAddFunds();
   const { wallets } = useWallets();
   const { ready: solanaReady, wallets: solanaWallets } = useSolanaWallets();
   const { signTransaction } = useSignTransaction();
   const [tab, setTab] = useState<ViewTab>("overview");
   const [theme, setTheme] = useState<ThemePreference>("dark");
   const [amount, setAmount] = useState("1.00");
-  const [sourceChainId, setSourceChainId] = useState(4663);
+  const [fundingState, setFundingState] = useState<PlanState>({ kind: "idle" });
   const [markets, setMarkets] = useState<MarketsPayload>(EMPTY_MARKETS);
   const [marketsState, setMarketsState] = useState<"loading" | "ready" | "error">("loading");
   const [positions, setPositions] = useState<PositionView[]>([]);
@@ -192,7 +191,8 @@ export function PortfolioApp() {
     setActionState({ kind: "idle" });
     setMigrationPlan(null);
     setMigrationState({ kind: "idle" });
-  }, [address, amount, authenticated, sourceChainId]);
+    setFundingState({ kind: "idle" });
+  }, [address, amount, authenticated]);
 
   const activeMarkets = useMemo<IndexMarket[]>(() => {
     const robinhood = markets.catalog.chains.find((chain) => chain.slug === "robinhood");
@@ -267,6 +267,38 @@ export function PortfolioApp() {
     }
   }
 
+  async function fundRobinhood() {
+    if (!authenticated || !address) {
+      startLogin("make-markets");
+      return;
+    }
+    setFundingState({ kind: "planning", message: "Opening Privy funding…" });
+    trackProductEvent("Cross-chain Funding Started", { destinationChainId: 4663 });
+    try {
+      const result = await addFunds({
+        destination: {
+          address,
+          chain: "eip155:4663",
+          asset: ROBINHOOD_NATIVE_ETH,
+        },
+        crypto: { slippageBps: 100 },
+      });
+      if (result.method !== "crypto" || result.status !== "completed") {
+        throw new Error("Privy did not complete the crypto deposit");
+      }
+      setFundingState({ kind: "submitted", message: "ETH arrived on Robinhood Chain. You can make markets now." });
+      trackProductEvent("Cross-chain Funding Completed", { destinationChainId: 4663 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not add ETH";
+      if (message.includes("USER_EXITED")) {
+        setFundingState({ kind: "idle" });
+        return;
+      }
+      setFundingState({ kind: "error", message: "Privy could not route that deposit. Try another supported chain or asset." });
+      reportClientError("cross-chain-funding", error);
+    }
+  }
+
   async function prepareIndex() {
     if (!authenticated || !address) {
       startLogin("make-markets");
@@ -281,18 +313,18 @@ export function PortfolioApp() {
     }
     setPlanState({ kind: "planning", message: "Getting the latest price for your deposit…" });
     setPlan(null);
-    trackProductEvent("Index Quote Started", { originChainId: sourceChainId });
+    trackProductEvent("Index Quote Started", { originChainId: 4663 });
     try {
       const response = await fetch("/api/portfolio/index", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ owner: address, amountWei: amountWei.toString(), originChainId: sourceChainId }),
+        body: JSON.stringify({ owner: address, amountWei: amountWei.toString(), originChainId: 4663 }),
       });
       const payload = await response.json() as { plan?: RobinhoodIndexPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not prepare the index deposit");
       setPlan(payload.plan);
       setPlanState({ kind: "ready", message: "Review your deposit and fees before continuing." });
-      trackProductEvent("Index Quote Ready", { originChainId: sourceChainId, constituents: payload.plan.constituentCount });
+      trackProductEvent("Index Quote Ready", { originChainId: 4663, constituents: payload.plan.constituentCount });
     } catch (error) {
       setPlanState({ kind: "error", message: error instanceof Error ? error.message : "Could not prepare the index deposit" });
       reportClientError("index-plan", error);
@@ -311,7 +343,6 @@ export function PortfolioApp() {
       return;
     }
     const connected = wallet as unknown as ConnectedEvmWallet;
-    const funding = plan.stages.find((stage) => stage.id === "fund-robinhood");
     const robinhood = plan.stages.find((stage) => stage.id === "make-robinhood-markets");
     if (!robinhood) {
       setPlanState({ kind: "error", message: "This deposit plan is incomplete. Please prepare it again." });
@@ -319,13 +350,6 @@ export function PortfolioApp() {
     }
     try {
       trackProductEvent("Index Submit Started", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
-      if (funding) {
-        setPlanState({ kind: "signing", message: `Approve your ETH deposit from ${funding.chainLabel}.` });
-        await sendWalletCalls({ wallet: connected, owner: plan.owner, chainId: funding.chainId, transactions: funding.transactions });
-        setPlanState({ kind: "waiting", message: "Moving your ETH to Robinhood Chain…" });
-        await waitForRelay(funding.bridge.statusPath);
-      }
-
       setPlanState({ kind: "signing", message: `Approve ${plan.constituentCount} Robinhood market positions.` });
       await sendWalletCalls({ wallet: connected, owner: plan.owner, chainId: robinhood.chainId, transactions: robinhood.transactions });
       setPlanState({ kind: "submitted", message: "Your Robinhood positions are being confirmed. They will appear in Markets shortly." });
@@ -527,9 +551,6 @@ export function PortfolioApp() {
                 <MarketAction
                   amount={amount}
                   onAmount={setAmount}
-                  sourceChainId={sourceChainId}
-                  onSourceChain={setSourceChainId}
-                  fundingChains={markets.fundingChains}
                   markets={selectedMarkets}
                   stats={stats}
                   loading={marketsState === "loading"}
@@ -537,6 +558,8 @@ export function PortfolioApp() {
                   amountError={amountError}
                   maximumConstituents={markets.index.maximumConstituents || INDEX_MARKET_COUNT}
                   ready={ready}
+                  fundingState={fundingState}
+                  onFund={() => void fundRobinhood()}
                   onPrepare={() => void prepareIndex()}
                   plan={plan}
                   state={planState}
@@ -576,12 +599,9 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
   </div>;
 }
 
-function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingChains, markets, stats, loading, feeApr, amountError, maximumConstituents, ready, onPrepare, plan, state, onExecute, onCancel }: {
+function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amountError, maximumConstituents, ready, fundingState, onFund, onPrepare, plan, state, onExecute, onCancel }: {
   amount: string;
   onAmount: (amount: string) => void;
-  sourceChainId: number;
-  onSourceChain: (chainId: number) => void;
-  fundingChains: EthFundingChain[];
   markets: IndexMarket[];
   stats: Map<string, MarketStats>;
   loading: boolean;
@@ -589,6 +609,8 @@ function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingC
   amountError: string | null;
   maximumConstituents: number;
   ready: boolean;
+  fundingState: PlanState;
+  onFund: () => void;
   onPrepare: () => void;
   plan: RobinhoodIndexPlan | null;
   state: PlanState;
@@ -604,7 +626,13 @@ function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingC
         {amountError ? <small className="amount-error" id="amount-error">{amountError}</small> : null}
       </label>
 
-      <ChainPicker value={sourceChainId} chains={fundingChains} onChange={onSourceChain} />
+      <div className="funding-choice">
+        <span><b>ETH on another chain?</b><small>Privy moves it to Robinhood.</small></span>
+        <button className="cross-chain-fund" type="button" disabled={!ready || fundingState.kind === "planning"} onClick={onFund}>
+          {fundingState.kind === "planning" ? "Opening Privy…" : "Add ETH"}
+        </button>
+      </div>
+      {fundingState.kind === "submitted" || fundingState.kind === "error" ? <p className={`funding-status is-${fundingState.kind}`} aria-live="polite">{fundingState.message}</p> : null}
 
       <div className={`market-output ${loading ? "is-loading" : ""}`} aria-label="Index markets">
         <span className="market-breadth">
@@ -624,48 +652,6 @@ function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingC
       <p className="action-assurance">Robinhood Chain · Self-custodial</p>
     </aside>
   );
-}
-
-function ChainPicker({ value, chains, onChange }: { value: number; chains: EthFundingChain[]; onChange: (chainId: number) => void }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const selected = chains.find((chain) => chain.id === value) ?? chains[0];
-  useEffect(() => {
-    if (!open) return;
-    rootRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-    const close = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open]);
-  if (!selected) return null;
-  return <div className="funding-choice" ref={rootRef}>
-    <span>Pay from</span>
-    <button className="chain-picker-trigger" type="button" onClick={() => setOpen((current) => !current)} aria-haspopup="listbox" aria-expanded={open} aria-controls="source-chain-options">
-      <img src={relayChainIcon(selected.id)} alt="" />
-      <span><b>{selected.label}</b><small>ETH network</small></span>
-      <ChevronIcon />
-    </button>
-    {open ? <div className="chain-picker-popover" id="source-chain-options" role="listbox" aria-label="Pay from network">
-      <header><b>Pay from</b><small>Choose where your ETH is now</small></header>
-      <div className="chain-picker-options">
-        {chains.map((chain) => <button type="button" role="option" aria-selected={chain.id === value} key={chain.id} onClick={() => { onChange(chain.id); setOpen(false); }}>
-          <img src={relayChainIcon(chain.id)} alt="" />
-          <span>{chain.label}</span>
-          {chain.id === value ? <CheckIcon /> : null}
-        </button>)}
-      </div>
-    </div> : null}
-    <input type="hidden" id="source-chain" name="sourceChain" value={value} />
-  </div>;
 }
 
 function WalletMenu({ address, onDisconnect }: { address: string; onDisconnect: () => void }) {
@@ -723,11 +709,8 @@ function handleMenuNavigation(event: ReactKeyboardEvent<HTMLDivElement>) {
 }
 
 function PlanPreview({ plan, state, onExecute, onCancel }: { plan: RobinhoodIndexPlan | null; state: PlanState; onExecute: () => void; onCancel: () => void }) {
-  const funding = plan?.stages.find((stage) => stage.id === "fund-robinhood");
   const robinhood = plan?.stages.find((stage) => stage.id === "make-robinhood-markets");
   const feeWei = robinhood ? BigInt(robinhood.allocation.serviceFeeWei) : 0n;
-  const relayFee = Number(funding?.bridge.relayerFeeUsd ?? 0);
-  const relayImpact = funding?.bridge.impactPercent ?? null;
   const swapProtection = robinhood ? maximumSwapProtection(robinhood.allocation.markets) : null;
   const busy = state.kind === "planning" || state.kind === "signing" || state.kind === "waiting";
   const title = state.kind === "ready" ? "Review deposit" : state.kind === "error" ? "Deposit not ready" : state.kind === "submitted" ? "Deposit submitted" : "Preparing deposit";
@@ -737,16 +720,15 @@ function PlanPreview({ plan, state, onExecute, onCancel }: { plan: RobinhoodInde
       <p>{state.message}</p>
       {plan ? <>
         <dl>
-          <div><dt>Pay from</dt><dd><img src={relayChainIcon(plan.sourceChainId)} alt="" />{plan.sourceChainLabel}</dd></div>
+          <div><dt>Network</dt><dd><img src={BRAND_ASSETS.robinhood} alt="" />Robinhood Chain</dd></div>
           <div><dt>You’ll open</dt><dd>{plan.constituentCount} Robinhood position{plan.constituentCount === 1 ? "" : "s"}</dd></div>
           <div><dt>Wizzy fee</dt><dd>{trimEth(feeWei)} ETH</dd></div>
-          {funding ? <><div><dt>Relay fee</dt><dd>{relayFee > 0 ? `$${relayFee.toFixed(2)}` : "Included"}</dd></div><div><dt>Bridge price change</dt><dd>{formatPercent(relayImpact)}</dd></div></> : null}
           <div><dt>Swap protection</dt><dd>{swapProtection}</dd></div>
           <div><dt>Network fee</dt><dd>Shown by your wallet</dd></div>
         </dl>
       </> : <div className="plan-loading"><i /><i /><i /></div>}
       {state.kind === "ready" && plan ? <>
-        <p className="approval-note">{funding ? `Two approvals: move your ETH from ${plan.sourceChainLabel}, then open the positions.` : "One approval opens every position."} Everything stays in your wallet.</p>
+        <p className="approval-note">One approval opens every position. Everything stays in your wallet.</p>
         <p className="risk-note">Meme prices can fall, and trading fees may not cover losses.</p>
         <button className="fund-button" type="button" onClick={onExecute}>Make markets</button>
       </> : null}
@@ -777,7 +759,6 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
                   <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
-                  <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a>
                 </span></td>
               </tr>;
             }) : null}
@@ -970,24 +951,6 @@ function marketTierIndex(policy: RobinhoodIndexBreadthPolicy, marketId: string):
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
-async function waitForRelay(statusPath: string): Promise<void> {
-  for (let attempt = 0; attempt < 90; attempt += 1) {
-    const response = await fetch(statusPath, { cache: "no-store" });
-    const payload: unknown = await response.json();
-    if (!response.ok) throw new Error(payload && typeof payload === "object" && "error" in payload ? String((payload as { error: unknown }).error) : "Could not verify network routing");
-    if (relaySucceeded(payload)) return;
-    if (relayFailed(payload)) throw new Error("A network route failed or refunded. Check your wallet before retrying.");
-    await new Promise((resolve) => window.setTimeout(resolve, 2_000));
-  }
-  throw new Error("A network route is still pending. Check your wallet before continuing.");
-}
-
-function relayFailed(status: unknown): boolean {
-  if (!status || typeof status !== "object") return false;
-  const value = String((status as Record<string, unknown>).status ?? (status as Record<string, unknown>).state ?? "").toLowerCase();
-  return ["failure", "failed", "refunded", "refund"].includes(value);
-}
-
 function chainLabel(chain: IndexChain): string {
   if (chain === "base") return "Base";
   if (chain === "robinhood") return "Robinhood";
@@ -1013,13 +976,6 @@ function formatFeeAprFraction(value?: number | null): string {
   return formatFeeApr(value * 100);
 }
 
-function formatPercent(value?: string | null): string {
-  if (!value) return "Included";
-  const numeric = Number(value.replace("%", ""));
-  if (!Number.isFinite(numeric)) return value;
-  return `${numeric.toFixed(numeric >= 1 ? 1 : 2).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1")}%`;
-}
-
 function maximumSwapProtection(markets: AllocationMarketPlan[]): string {
   let maximumBps = 0n;
   for (const market of markets) {
@@ -1031,10 +987,6 @@ function maximumSwapProtection(markets: AllocationMarketPlan[]): string {
     }
   }
   return `${(Number(maximumBps) / 100).toFixed(1)}% max`;
-}
-
-function relayChainIcon(chainId: number): string {
-  return `https://assets.relay.link/icons/${chainId}/light.png`;
 }
 
 function trimEth(value: bigint): string {
@@ -1089,6 +1041,5 @@ function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path
 function ChevronIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" /></svg>; }
 function ExternalLinkIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M17 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" /></svg>; }
 function DisconnectIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3M14 8l4 4-4 4M18 12H9" /></svg>; }
-function CheckIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>; }
 function RefreshIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.2-2L20 12M4 12l2.7 5a7 7 0 0 0 11.2-2" /></svg>; }
 function XIcon() { return <svg className="x-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" /></svg>; }

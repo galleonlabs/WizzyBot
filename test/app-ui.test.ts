@@ -35,11 +35,14 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain('{ id: "markets", label: "Markets" }');
     expect(portfolio).toContain('id="positions"');
     expect(portfolio).toContain("More with a larger deposit");
-    expect(portfolio).toContain("Pay from");
     expect(portfolio).toContain('name="depositAmount"');
-    expect(portfolio).toContain('name="sourceChain"');
+    expect(portfolio).toContain("ETH on another chain?");
+    expect(portfolio).toContain("Privy moves it to Robinhood.");
+    expect(portfolio).toContain("useAddFunds");
+    expect(portfolio).toContain('chain: "eip155:4663"');
+    expect(portfolio).not.toContain('name="sourceChain"');
     expect(portfolio).toContain('className="market-stack" role="img"');
-    expect(portfolio).toContain("Choose where your ETH is now");
+    expect(portfolio).not.toContain("Choose where your ETH is now");
     expect(portfolio).not.toContain("<select");
     expect(portfolio).toContain("Reveal your markets");
     expect(portfolio).toContain("Connect to see position value, fees, range status, and index updates.");
@@ -49,9 +52,8 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain("https://www.geckoterminal.com/robinhood/pools");
     expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
-    expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
-    expect(portfolio).toContain("Trade on Fomo");
-    expect(portfolio).toContain("Trade ${market.symbol}/WETH on Fomo");
+    expect(portfolio).not.toContain("fomo.family");
+    expect(portfolio).not.toContain("Trade on Fomo");
     expect(portfolio).not.toContain("market-link-external");
     expect(portfolio).not.toMatch(/app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
@@ -172,9 +174,9 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Actively curated as meme markets change.");
     expect(portfolio).toContain('src={BRAND_ASSETS.robinhood}');
     expect(portfolio).toContain("Self-custodial");
-    expect(portfolio).toContain("Two approvals: move your ETH from");
+    expect(portfolio).toContain("One approval opens every position.");
     expect(portfolio).toContain('useState("1.00")');
-    expect(portfolio).toContain("useState(4663)");
+    expect(portfolio).toContain('chain: "eip155:4663"');
     expect(portfolio).not.toContain("v{markets.catalog.version}");
     expect(portfolio).toContain('loading ? "Reading markets"');
     expect(portfolio).not.toContain("loading ? INDEX_MARKET_COUNT : constituentCount");
@@ -184,8 +186,7 @@ describe("meme index product UI", () => {
     expect(css).toContain(".index-hero { grid-template-columns: 1fr; gap: 48px; padding: 68px 0 64px");
     expect(css).toMatch(/\.index-hero \{[\s\S]*?align-items: start;/);
     expect(css).toContain("min-height: 44px");
-    expect(css).toContain(".chain-picker-popover");
-    expect(css).toContain("position: fixed");
+    expect(css).toContain(".cross-chain-fund");
     expect(css).toContain(".index-update-panel");
     expect(portfolio).toContain("Index updated");
     expect(portfolio).toContain("Update position");
@@ -289,7 +290,7 @@ describe("meme index product UI", () => {
     expect(nextConfig).toContain(
       "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com https://assets.relay.link https://www.geckoterminal.com",
     );
-    expect(nextConfig).toContain("https://fomo.family");
+    expect(nextConfig).not.toContain("https://fomo.family");
     expect(nextConfig).not.toMatch(/avatars\.githubusercontent\.com/);
     expect(nextConfig).not.toContain("img-src *");
   });

@@ -119,7 +119,7 @@ export async function planRobinhoodIndex(input: {
   if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
   if (input.totalAmountWei <= 0n) throw new Error("amount must be positive");
   const owner = getAddress(input.owner);
-  const source = ethFundingChain(input.originChainId ?? 8453);
+  const source = ethFundingChain(input.originChainId ?? 4663);
   const indexState = await getRobinhoodIndexState();
   const selection = selectRobinhoodIndexMarkets(input.totalAmountWei, indexState.markets);
   const selectedIds = new Set(selection.marketIds);

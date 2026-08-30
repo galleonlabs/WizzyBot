@@ -4,6 +4,7 @@ export const TELEMETRY_AREAS = [
   "positions",
   "index-plan",
   "index-submit",
+  "cross-chain-funding",
   "position-action",
   "index-migration",
   "render",

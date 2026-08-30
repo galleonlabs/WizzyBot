@@ -16,6 +16,7 @@ describe("telemetry hygiene", () => {
 
   it("accepts only bounded product areas", () => {
     expect(isTelemetryArea("index-submit")).toBe(true);
+    expect(isTelemetryArea("cross-chain-funding")).toBe(true);
     expect(isTelemetryArea("wallet-private-key")).toBe(false);
   });
 });

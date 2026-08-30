@@ -6,6 +6,7 @@ const portfolio = readFileSync("app/portfolio-app.tsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
 const providers = readFileSync("app/providers.tsx", "utf8");
+const mascot = readFileSync("public/brand/una-mascot.svg", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
@@ -49,6 +50,13 @@ describe("meme index product UI", () => {
     expect(css).not.toMatch(/#FC72FF|#FF37C7|#ff007a/i);
     expect(css).not.toContain("Instrument Serif");
     expect(css).not.toMatch(/gradient/i);
+  });
+
+  it("gives the hooded mascot a crystal staff without a coral hand", () => {
+    expect(mascot).toContain("crystal-tipped staff");
+    expect(mascot).toContain('stroke="#4f4a54"');
+    expect(mascot).toContain('fill="#77e8c9"');
+    expect(mascot).not.toMatch(/#ff6f83|#e85570/i);
   });
 
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {

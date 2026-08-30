@@ -54,10 +54,10 @@ describe("meme index breadth", () => {
       "robinhood-stonkbroker",
       "robinhood-ponsguy",
     ]);
-    expect(BigInt(policy.minimumAmountWei)).toBe(parseEther("0.05"));
-    expect(BigInt(policy.tiers.at(-1)!.minimumAmountWei)).toBe(parseEther("0.3"));
-    expect(selectRobinhoodIndexMarkets(parseEther("0.25")).constituentCount).toBe(5);
+    expect(BigInt(policy.minimumAmountWei)).toBe(parseEther("0.02"));
+    expect(BigInt(policy.tiers.at(-1)!.minimumAmountWei)).toBe(parseEther("0.12"));
+    expect(selectRobinhoodIndexMarkets(parseEther("0.10")).constituentCount).toBe(5);
     expect(selectRobinhoodIndexMarkets(parseEther("1")).constituentCount).toBe(6);
-    expect(() => selectRobinhoodIndexMarkets(parseEther("0.049"))).toThrow("Minimum Robinhood index deposit");
+    expect(() => selectRobinhoodIndexMarkets(parseEther("0.019"))).toThrow("Minimum Robinhood index deposit");
   });
 });

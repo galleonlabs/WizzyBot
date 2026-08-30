@@ -305,4 +305,9 @@ describe("meme index product UI", () => {
     expect(nextConfig).not.toContain("script-src *");
     expect(nextConfig).not.toContain("connect-src *");
   });
+
+  it("clears the completed deposit celebration after an ETH withdrawal", () => {
+    expect(portfolio).toContain('if (actionPlan.kind === "withdraw")');
+    expect(portfolio).toContain('setPlanState({ kind: "idle" });');
+  });
 });

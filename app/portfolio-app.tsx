@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useAddFunds, usePrivy, useWallets } from "@privy-io/react-auth";
+import { useAddFunds, useAuthorizationSignature, usePrivy, useWallets } from "@privy-io/react-auth";
 import {
   useSignTransaction,
   useWallets as useSolanaWallets,
@@ -9,7 +9,7 @@ import {
 } from "@privy-io/react-auth/solana";
 import { formatEther, parseEther } from "viem";
 import { lightRowToView, priceLabel, type PositionView } from "./lib/cards";
-import { positionValueUsd, summarizePositions } from "./lib/portfolio-summary";
+import { positionFeesEth, positionValueEth, positionValueUsd, summarizePositions } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
 import {
   type CuratedMarket,
@@ -25,7 +25,8 @@ import {
 } from "./lib/portfolio-types";
 import { type SolanaPositionActionPlan } from "./lib/solana-position-server";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
-import { sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
+import { sendPrivyWalletCallsAndWait, sendWalletCallsAndWait, type ConnectedEvmWallet, type WalletTransaction } from "./lib/wallet-calls";
+import { PRIVY_APP_ID } from "./lib/privy-config";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 
 type ViewTab = "overview" | "markets";
@@ -69,8 +70,8 @@ const EMPTY_MARKETS: MarketsPayload = {
   },
   index: {
     chain: "robinhood",
-    breadthUnitWei: "50000000000000000",
-    minimumAmountWei: "50000000000000000",
+    breadthUnitWei: "20000000000000000",
+    minimumAmountWei: "20000000000000000",
     maximumConstituents: INDEX_MARKET_COUNT,
     tiers: [],
     selectionRules: { minimumPoolAgeDays: 30, minimumLiquidityUsd: 75_000, quoteSymbol: "WETH", venue: "Uniswap v3" },
@@ -83,6 +84,7 @@ const EMPTY_MARKETS: MarketsPayload = {
 export function PortfolioApp() {
   const { ready, authenticated, login, logout, user } = usePrivy();
   const { addFunds } = useAddFunds();
+  const { generateAuthorizationSignature } = useAuthorizationSignature();
   const { wallets } = useWallets();
   const { ready: solanaReady, wallets: solanaWallets } = useSolanaWallets();
   const { signTransaction } = useSignTransaction();
@@ -113,6 +115,46 @@ export function PortfolioApp() {
   const solanaWallet = useMemo(() => solanaWallets.find((candidate) => candidate.standardWallet.name.toLowerCase().includes("privy")) ?? solanaWallets[0], [solanaWallets]);
   const address = wallet?.address ?? user?.wallet?.address;
   const solanaAddress = solanaWallet?.address;
+  const privyWalletId = useMemo(() => {
+    if (!address) return null;
+    const accounts = [user?.wallet, ...(user?.linkedAccounts ?? [])] as unknown[];
+    for (const account of accounts) {
+      if (!account || typeof account !== "object") continue;
+      const record = account as Record<string, unknown>;
+      if (typeof record.address !== "string" || record.address.toLowerCase() !== address.toLowerCase()) continue;
+      if (typeof record.id === "string" && record.id.length >= 8) return record.id;
+    }
+    return null;
+  }, [address, user?.linkedAccounts, user?.wallet]);
+
+  async function sendEvmBatch(input: {
+    owner: string;
+    chainId: number;
+    transactions: readonly WalletTransaction[];
+    onSubmitted?: () => void;
+  }) {
+    if (!wallet) throw new Error("Your wallet is not ready");
+    if (input.chainId === 4663) {
+      if (!privyWalletId) throw new Error("Your Privy wallet is still initializing. Refresh once, then try again.");
+      return sendPrivyWalletCallsAndWait({
+        walletId: privyWalletId,
+        appId: PRIVY_APP_ID,
+        owner: input.owner,
+        walletAddress: wallet.address,
+        chainId: 4663,
+        transactions: input.transactions,
+        generateAuthorizationSignature,
+        onSubmitted: input.onSubmitted,
+      });
+    }
+    return sendWalletCallsAndWait({
+      wallet: wallet as unknown as ConnectedEvmWallet,
+      owner: input.owner,
+      chainId: input.chainId,
+      transactions: input.transactions,
+      onSubmitted: input.onSubmitted,
+    });
+  }
 
   const loadRobinhoodBalance = useCallback(async () => {
     const requestId = ++balanceRequestRef.current;
@@ -231,6 +273,17 @@ export function PortfolioApp() {
   }, [markets]);
   const selectedTier = useMemo(() => selectIndexTier(markets.index, amount), [amount, markets.index]);
   const amountError = useMemo(() => validateIndexAmount(markets.index, amount), [amount, markets.index]);
+  const balanceError = useMemo(() => {
+    if (balanceState.kind !== "ready" || balanceState.balanceWei === undefined) return null;
+    try {
+      const required = parseEther(amount);
+      const available = BigInt(balanceState.balanceWei);
+      if (required <= available) return null;
+      return `Add ${trimEth(required - available)} ETH to continue.`;
+    } catch {
+      return null;
+    }
+  }, [amount, balanceState]);
   const selectedMarkets = useMemo(() => {
     if (!markets.index.tiers.length) return activeMarkets;
     if (!selectedTier) return [];
@@ -341,6 +394,10 @@ export function PortfolioApp() {
       setPlanState({ kind: "error", message: "Enter a valid ETH amount." });
       return;
     }
+    if (balanceState.kind === "ready" && balanceState.balanceWei !== undefined && amountWei > BigInt(balanceState.balanceWei)) {
+      await fundRobinhood();
+      return;
+    }
     setPlanState({ kind: "planning", message: "Getting the latest price for your deposit…" });
     setPlan(null);
     trackProductEvent("Index Quote Started", { originChainId: 4663 });
@@ -372,7 +429,6 @@ export function PortfolioApp() {
       setPlanState({ kind: "error", message: "This deposit quote expired. Review a fresh one before continuing." });
       return;
     }
-    const connected = wallet as unknown as ConnectedEvmWallet;
     const robinhood = plan.stages.find((stage) => stage.id === "make-robinhood-markets");
     if (!robinhood) {
       setPlanState({ kind: "error", message: "This deposit plan is incomplete. Please prepare it again." });
@@ -381,13 +437,15 @@ export function PortfolioApp() {
     try {
       trackProductEvent("Index Submit Started", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
       setPlanState({ kind: "signing", message: `Approve ${plan.constituentCount} Robinhood market positions.` });
-      await sendWalletCalls({ wallet: connected, owner: plan.owner, chainId: robinhood.chainId, transactions: robinhood.transactions });
-      setPlanState({ kind: "submitted", message: "Your Robinhood positions are being confirmed. They will appear in Markets shortly." });
-      trackProductEvent("Index Submitted", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
-      window.setTimeout(() => {
-        void loadPositions();
-        void loadRobinhoodBalance();
-      }, 8_000);
+      await sendEvmBatch({
+        owner: plan.owner,
+        chainId: robinhood.chainId,
+        transactions: robinhood.transactions,
+        onSubmitted: () => setPlanState({ kind: "waiting", message: "Approved. Robinhood is confirming every market now…" }),
+      });
+      await Promise.all([loadPositions(), loadRobinhoodBalance()]);
+      setPlanState({ kind: "submitted", message: `${plan.constituentCount === 1 ? "Your market is" : "Your markets are"} live and earning in your wallet.` });
+      trackProductEvent("Index Confirmed", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
     } catch (error) {
       setPlanState({ kind: "error", message: error instanceof Error ? error.message : "The deposit could not be completed" });
       reportClientError("index-submit", error);
@@ -449,10 +507,28 @@ export function PortfolioApp() {
           }),
         });
       } else {
-        await sendWalletCalls({ wallet: wallet as unknown as ConnectedEvmWallet, owner: actionPlan.owner, chainId: actionPlan.chainId, transactions: actionPlan.transactions });
+        await sendEvmBatch({
+          owner: actionPlan.owner,
+          chainId: actionPlan.chainId,
+          transactions: actionPlan.transactions,
+          onSubmitted: () => setActionState({
+            kind: "waiting",
+            message: actionPlan.kind === "withdraw" ? "Closing the LP and converting everything back to ETH…" : "Robinhood is confirming your compound…",
+          }),
+        });
       }
-      setActionState({ kind: "submitted", message: "Submitted. Your position will refresh after confirmation." });
-      window.setTimeout(() => void loadPositions(), 8_000);
+      await Promise.all([loadPositions(), loadRobinhoodBalance()]);
+      if (actionPlan.kind === "withdraw") {
+        // The exit invalidates the earlier deposit celebration. Returning to Make
+        // must show a fresh form, never a stale "Markets made" state.
+        setPlan(null);
+        setPlanState({ kind: "idle" });
+      }
+      setActionState({
+        kind: "submitted",
+        message: actionPlan.kind === "withdraw" ? "Done. Your position is closed and your ETH is back in your wallet." : "Done. Your earned fees are working in the position again.",
+      });
+      trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : "Compound Confirmed", { chainId: actionPlan.chainId });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : "Wallet submission failed" });
       reportClientError("position-action", error);
@@ -487,14 +563,15 @@ export function PortfolioApp() {
     }
     try {
       setMigrationState({ kind: "signing", message: "Approve this index update in your wallet." });
-      await sendWalletCalls({
-        wallet: wallet as unknown as ConnectedEvmWallet,
+      await sendEvmBatch({
         owner: migrationPlan.owner,
         chainId: migrationPlan.chainId,
         transactions: migrationPlan.transactions,
+        onSubmitted: () => setMigrationState({ kind: "waiting", message: "Robinhood is confirming the index update…" }),
       });
-      setMigrationState({ kind: "submitted", message: "Index update submitted. Your new position will appear after confirmation." });
-      window.setTimeout(() => void loadPositions(), 8_000);
+      await loadPositions();
+      setMigrationState({ kind: "submitted", message: "Your position now matches the latest curated index." });
+      trackProductEvent("Index Migration Confirmed", { chainId: migrationPlan.chainId, migrationId: migrationPlan.migrationId });
     } catch (error) {
       setMigrationState({ kind: "error", message: error instanceof Error ? error.message : "The index update could not be submitted" });
       reportClientError("index-migration", error);
@@ -588,7 +665,8 @@ export function PortfolioApp() {
                   stats={stats}
                   loading={marketsState === "loading"}
                   feeApr={feeApr}
-                  amountError={amountError}
+                  amountError={amountError ?? balanceError}
+                  balanceInsufficient={Boolean(balanceError) && !amountError}
                   maximumConstituents={markets.index.maximumConstituents || INDEX_MARKET_COUNT}
                   ready={ready}
                   fundingState={fundingState}
@@ -599,6 +677,7 @@ export function PortfolioApp() {
                   state={planState}
                   onExecute={() => void executeIndex()}
                   onCancel={() => { setPlan(null); setPlanState({ kind: "idle" }); }}
+                  onViewMarkets={() => changeTab("markets")}
                 />
             </section>
           ) : (
@@ -633,7 +712,7 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
   </div>;
 }
 
-function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amountError, maximumConstituents, ready, fundingState, balance, onFund, onPrepare, plan, state, onExecute, onCancel }: {
+function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amountError, balanceInsufficient, maximumConstituents, ready, fundingState, balance, onFund, onPrepare, plan, state, onExecute, onCancel, onViewMarkets }: {
   amount: string;
   onAmount: (amount: string) => void;
   markets: IndexMarket[];
@@ -641,6 +720,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
   loading: boolean;
   feeApr: number | null;
   amountError: string | null;
+  balanceInsufficient: boolean;
   maximumConstituents: number;
   ready: boolean;
   fundingState: PlanState;
@@ -651,6 +731,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
   state: PlanState;
   onExecute: () => void;
   onCancel: () => void;
+  onViewMarkets: () => void;
 }) {
   const constituentCount = markets.length;
   return (
@@ -674,14 +755,14 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
           <span className="market-stack" role="img" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
             {loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />) : markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />)}
           </span>
-          <span><b>{loading ? "Reading markets" : `${constituentCount} markets`}</b><small>{loading ? "Current index" : constituentCount >= maximumConstituents ? "Full index" : "More with a larger deposit"}</small></span>
+          <span><b>{loading ? "Reading markets" : `${constituentCount} ${constituentCount === 1 ? "market" : "markets"}`}</b><small>{loading ? "Current index" : constituentCount >= maximumConstituents ? "Full index" : "More with a larger deposit"}</small></span>
         </span>
         <span className="action-economics"><small>24h fee APR</small><b>{formatFeeApr(feeApr)}</b></span>
       </div>
 
-      {state.kind !== "idle" ? <PlanPreview plan={plan} state={state} onExecute={onExecute} onCancel={onCancel} /> : (
-        <button className="fund-button" type="button" disabled={!ready || loading || Boolean(amountError)} onClick={onPrepare}>
-          {!ready ? "Preparing wallets…" : loading ? "Reading markets…" : "Make markets"}
+      {state.kind !== "idle" ? <PlanPreview plan={plan} state={state} onExecute={onExecute} onCancel={onCancel} onViewMarkets={onViewMarkets} /> : (
+        <button className="fund-button" type="button" disabled={!ready || loading || (Boolean(amountError) && !balanceInsufficient)} onClick={balanceInsufficient ? onFund : onPrepare}>
+          {!ready ? "Preparing wallets…" : loading ? "Reading markets…" : balanceInsufficient ? "Add ETH to continue" : "Make markets"}
         </button>
       )}
       <p className="action-assurance">Robinhood Chain · Self-custodial</p>
@@ -743,17 +824,18 @@ function handleMenuNavigation(event: ReactKeyboardEvent<HTMLDivElement>) {
   items[next]?.focus();
 }
 
-function PlanPreview({ plan, state, onExecute, onCancel }: { plan: RobinhoodIndexPlan | null; state: PlanState; onExecute: () => void; onCancel: () => void }) {
+function PlanPreview({ plan, state, onExecute, onCancel, onViewMarkets }: { plan: RobinhoodIndexPlan | null; state: PlanState; onExecute: () => void; onCancel: () => void; onViewMarkets: () => void }) {
   const robinhood = plan?.stages.find((stage) => stage.id === "make-robinhood-markets");
   const feeWei = robinhood ? BigInt(robinhood.allocation.serviceFeeWei) : 0n;
   const swapProtection = robinhood ? maximumSwapProtection(robinhood.allocation.markets) : null;
   const busy = state.kind === "planning" || state.kind === "signing" || state.kind === "waiting";
-  const title = state.kind === "ready" ? "Review deposit" : state.kind === "error" ? "Deposit not ready" : state.kind === "submitted" ? "Deposit submitted" : "Preparing deposit";
+  const title = state.kind === "ready" ? "Review deposit" : state.kind === "error" ? "Deposit not ready" : state.kind === "submitted" ? "Markets made" : state.kind === "waiting" ? "Making your markets" : "Preparing deposit";
   return (
     <section className={`plan-preview is-${state.kind}`} aria-live="polite">
       <header><span>{title}</span><button type="button" onClick={onCancel} disabled={busy}>Cancel</button></header>
+      {state.kind === "submitted" ? <SuccessCelebration label="Markets made" /> : null}
       <p>{state.message}</p>
-      {plan ? <>
+      {plan && state.kind !== "submitted" ? <>
         <dl>
           <div><dt>Network</dt><dd><img src={BRAND_ASSETS.robinhood} alt="" />Robinhood Chain</dd></div>
           <div><dt>You’ll open</dt><dd>{plan.constituentCount} Robinhood position{plan.constituentCount === 1 ? "" : "s"}</dd></div>
@@ -767,9 +849,18 @@ function PlanPreview({ plan, state, onExecute, onCancel }: { plan: RobinhoodInde
         <p className="risk-note">Meme prices can fall, and trading fees may not cover losses.</p>
         <button className="fund-button" type="button" onClick={onExecute}>Make markets</button>
       </> : null}
+      {state.kind === "submitted" ? <button className="fund-button" type="button" onClick={onViewMarkets}>View your markets</button> : null}
       {state.kind === "error" ? <button className="secondary-button" type="button" onClick={onCancel}>Try again</button> : null}
     </section>
   );
+}
+
+function SuccessCelebration({ label }: { label: string }) {
+  return <div className="success-celebration" role="img" aria-label={label}>
+    <span className="success-spark success-spark-1" /><span className="success-spark success-spark-2" /><span className="success-spark success-spark-3" /><span className="success-spark success-spark-4" />
+    <img src="/brand/wizzy-mascot-dark.svg" alt="" />
+    <span className="success-check"><CheckIcon /></span>
+  </div>;
 }
 
 function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error"; policy: RobinhoodIndexBreadthPolicy }) {
@@ -851,15 +942,19 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
   onCancelMigration: () => void;
 }) {
   const summary = summarizePositions(positions);
+  const summaryValueEth = positions.reduce((total, position) => total + (positionValueEth(position) ?? 0), 0);
+  const summaryFeesEth = positions.reduce((total, position) => total + (positionFeesEth(position) ?? 0), 0);
   const showPositions = authenticated && positions.length > 0;
+  const settlement = actionPlan && "settlement" in actionPlan ? actionPlan.settlement : undefined;
   return (
     <section className={`position-ledger ${authenticated ? "" : "is-disconnected"}`} id="positions">
       {updates.length ? <IndexUpdatePanel updates={updates} plan={migrationPlan} state={migrationState} onPrepare={onPrepareMigration} onExecute={onExecuteMigration} onCancel={onCancelMigration} /> : null}
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
-          <div><b>{actionPlan ? `${actionPlan.kind === "compound" ? "Reinvest fees" : "Withdraw"} · ${actionPlan.pair}` : "Preparing your position"}</b><p>{actionState.message}{actionState.kind === "ready" && actionPlan?.kind === "compound" ? ` Collect fees, deduct Wizzy’s ${(actionPlan.serviceFeeBps / 100).toFixed(0)}% fee, and add the rest back to this position.` : ""}</p></div>
+          {actionState.kind === "submitted" ? <SuccessCelebration label={actionPlan?.kind === "withdraw" ? "ETH returned" : "Fees compounded"} /> : null}
+          <div><b>{actionPlan ? `${actionPlan.kind === "compound" ? "Reinvest fees" : settlement?.asset === "ETH" ? "Withdraw to ETH" : "Withdraw"} · ${actionPlan.pair}` : "Preparing your position"}</b><p>{actionState.message}{actionState.kind === "ready" && actionPlan?.kind === "compound" ? ` Collect fees, deduct Wizzy’s ${(actionPlan.serviceFeeBps / 100).toFixed(0)}% fee, and add the rest back to this position.` : actionState.kind === "ready" && settlement?.asset === "ETH" ? ` Close the LP, sell ${settlement.marketSymbol}, and unwrap WETH to at least ${trimEth(BigInt(settlement.minimumAmountWei))} ETH in one atomic approval.` : ""}</p></div>
           {actionPlan ? <span>{(actionPlan.serviceFeeBps / 100).toFixed(2)}% Wizzy fee</span> : null}
-          <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>Approve</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing"}>Close</button></div>
+          <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>{actionPlan?.kind === "withdraw" ? "Withdraw to ETH" : "Approve"}</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting"}>Close</button></div>
         </section>
       ) : null}
       {!authenticated ? <PortfolioEmpty variant="disconnected" onPrimary={onStart} /> : null}
@@ -867,18 +962,18 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
       {authenticated && state === "error" ? <PortfolioEmpty variant="error" onPrimary={onRetry} /> : null}
       {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" onPrimary={onStart} /> : null}
       {showPositions ? <section className="portfolio-summary" aria-label="Portfolio summary">
-        <div><span>Position value</span><strong>{summary.priced ? money(summary.valueUsd) : "—"}</strong><small>{summary.priced} of {positions.length} priced</small></div>
-        <div><span>Ready to collect</span><strong>{summary.feesPriced ? money(summary.feesUsd) : "—"}</strong><small>Unclaimed fees</small></div>
+        <div><span>Position value</span><strong>{summary.valueUsd > 0 ? money(summary.valueUsd) : summaryValueEth > 0 ? ethValue(summaryValueEth) : "—"}</strong><small>{summary.valueUsd > 0 ? `${summary.priced} of ${positions.length} priced` : "From live token balances"}</small></div>
+        <div><span>Ready to collect</span><strong>{summary.feesUsd > 0 ? money(summary.feesUsd) : ethValue(summaryFeesEth)}</strong><small>Unclaimed fees</small></div>
         <div><span>Earning now</span><strong>{summary.earning}</strong><small>of {positions.length} positions in range</small></div>
         <div><span>Fee APR</span><strong>{formatFeeAprFraction(summary.feeApr)}</strong><small>Across priced positions</small></div>
       </section> : null}
       {showPositions ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
         <span className="position-pair"><TokenIcon symbol={position.symbol0} src={position.marketId ? stats.get(position.marketId)?.tokenImageUrl : undefined} /><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
-        <span><small>Position value</small><b>{positionValueUsd(position) === undefined ? "—" : money(positionValueUsd(position)!)}</b></span>
-        <span><small>Ready to collect</small><b>{position.feesUsd === undefined ? "—" : money(position.feesUsd)}</b></span>
+        <span><small>Position value</small><b>{positionValueLabel(position)}</b></span>
+        <span><small>Ready to collect</small><b>{positionFeesLabel(position)}</b></span>
         <span><small>Fee APR</small><b>{formatFeeAprFraction(position.feeApr ?? null)}</b></span>
         <PositionRange position={position} />
-        <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed || !position.inRange} title={!position.inRange ? "Rebalancing is required before compounding" : undefined}>Compound</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>Withdraw</button></span>
+        <span className="position-actions"><button type="button" onClick={() => onAction(position, "compound")} disabled={position.closed || !position.inRange} title={!position.inRange ? "Rebalancing is required before compounding" : undefined}>Compound</button><button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{position.chain === "robinhood" ? "Withdraw to ETH" : "Withdraw"}</button></span>
       </article>)}</div> : null}
     </section>
   );
@@ -997,6 +1092,23 @@ function money(value: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 }
 
+function positionValueLabel(position: PositionView): string {
+  const usdValue = positionValueUsd(position);
+  if (usdValue !== undefined && usdValue > 0) return money(usdValue);
+  const eth = positionValueEth(position);
+  return eth === undefined ? "—" : ethValue(eth);
+}
+
+function positionFeesLabel(position: PositionView): string {
+  if (position.feesUsd !== undefined && position.feesUsd > 0) return money(position.feesUsd);
+  const eth = positionFeesEth(position);
+  return eth === undefined ? "—" : ethValue(eth);
+}
+
+function ethValue(value: number): string {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(value)} ETH`;
+}
+
 function compactMoney(value?: number | null): string {
   if (value == null) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);
@@ -1096,4 +1208,5 @@ function ChevronIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><pat
 function ExternalLinkIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M17 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" /></svg>; }
 function DisconnectIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3M14 8l4 4-4 4M18 12H9" /></svg>; }
 function RefreshIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.2-2L20 12M4 12l2.7 5a7 7 0 0 0 11.2-2" /></svg>; }
+function CheckIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9" /></svg>; }
 function XIcon() { return <svg className="x-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" /></svg>; }

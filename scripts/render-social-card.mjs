@@ -25,12 +25,19 @@ process.env.FONTCONFIG_PATH = workDir;
 
 try {
   const { default: sharp } = await import("sharp");
-  const source = await readFile(join(root, "public", "brand", "wizzy-social.svg"));
+  const renders = [
+    ["public/brand/wizzy-social.svg", "public/brand/wizzy-social-unbounded-v1.png"],
+    ["public/brand/x/wizzy-x-profile.svg", "public/brand/x/wizzy-x-profile-400.png"],
+    ["public/brand/x/wizzy-x-banner.svg", "public/brand/x/wizzy-x-banner-1500x500.png"],
+  ];
 
-  const target = join(root, "public", "brand", "wizzy-social-unbounded-v1.png");
-  const pending = `${target}.next`;
-  await sharp(source).png({ compressionLevel: 9, palette: true }).toFile(pending);
-  await rename(pending, target);
+  for (const [sourcePath, targetPath] of renders) {
+    const source = await readFile(join(root, sourcePath));
+    const target = join(root, targetPath);
+    const pending = `${target}.next`;
+    await sharp(source).png({ compressionLevel: 9, palette: true }).toFile(pending);
+    await rename(pending, target);
+  }
 } finally {
   await rm(workDir, { recursive: true, force: true });
 }

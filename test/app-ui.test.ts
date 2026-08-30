@@ -10,6 +10,9 @@ const mascot = readFileSync("public/brand/wizzy-mascot.svg", "utf8");
 const socialSource = readFileSync("public/brand/wizzy-social.svg", "utf8");
 const socialRenderer = readFileSync("scripts/render-social-card.mjs", "utf8");
 const socialCard = readFileSync("public/brand/wizzy-social-unbounded-v1.png");
+const xProfile = readFileSync("public/brand/x/wizzy-x-profile-400.png");
+const xBanner = readFileSync("public/brand/x/wizzy-x-banner-1500x500.png");
+const xBannerSource = readFileSync("public/brand/x/wizzy-x-banner.svg", "utf8");
 const nextConfig = readFileSync("next.config.ts", "utf8");
 
 describe("meme index product UI", () => {
@@ -163,6 +166,17 @@ describe("meme index product UI", () => {
     expect(socialSource).toContain('font-family="Plus Jakarta Sans, Arial, sans-serif"');
     expect(socialRenderer).toContain('"assets", "fonts"');
     expect(socialRenderer).toContain("process.env.FONTCONFIG_FILE");
+  });
+
+  it("ships upload-ready @wizzydotfun profile art", () => {
+    expect(xProfile.readUInt32BE(16)).toBe(400);
+    expect(xProfile.readUInt32BE(20)).toBe(400);
+    expect(xProfile.byteLength).toBeLessThan(2 * 1024 * 1024);
+    expect(xBanner.readUInt32BE(16)).toBe(1500);
+    expect(xBanner.readUInt32BE(20)).toBe(500);
+    expect(xBannerSource).toContain("@WIZZYDOTFUN");
+    expect(xBannerSource).toContain('font-family="Unbounded, sans-serif"');
+    expect(xBannerSource).toContain("Curated by agents on Robinhood Chain.");
   });
 
   it("offers wallet-first login and provisions EVM and Solana wallets for every user", () => {

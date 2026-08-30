@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PRIVY_APP_ID,
@@ -8,6 +9,8 @@ import {
   requirePrivyClient,
 } from "../src/signer/privy.js";
 import { assertWriteAllowed } from "../src/surfaces/hosted.js";
+
+const envExample = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
 
 describe("Privy hosted signer", () => {
   it("defaults the public app id and stays stubbed without a secret", () => {
@@ -22,6 +25,11 @@ describe("Privy hosted signer", () => {
   it("reads app id from either public or server env names", () => {
     expect(loadPrivyEnv({ NEXT_PUBLIC_PRIVY_APP_ID: "app_public" }).appId).toBe("app_public");
     expect(loadPrivyEnv({ PRIVY_APP_ID: "app_server" }).appId).toBe("app_server");
+  });
+
+  it("keeps developer setup on the one paid Privy app", () => {
+    expect(envExample).toContain(`PRIVY_APP_ID=${DEFAULT_PRIVY_APP_ID}`);
+    expect(envExample).toContain(`NEXT_PUBLIC_PRIVY_APP_ID=${DEFAULT_PRIVY_APP_ID}`);
   });
 });
 

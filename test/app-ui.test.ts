@@ -25,21 +25,30 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Pay from");
     expect(portfolio).toContain('name="depositAmount"');
     expect(portfolio).toContain('name="sourceChain"');
-    expect(portfolio).toContain("Your positions, in one place.");
-    expect(portfolio).toContain("Connect your wallet from the header to see value, fees, and range status across the index.");
+    expect(portfolio).toContain("Your market positions");
+    expect(portfolio).toContain("Connect from the header to see value, fees, and range status.");
     expect(portfolio).not.toContain("One wallet. Your markets.");
     expect(portfolio).not.toContain("empty-route");
     expect(portfolio).not.toContain('label: "Positions"');
     expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain("https://www.geckoterminal.com/robinhood/pools");
     expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
-    expect(portfolio).toContain('<img src={BRAND_ASSETS.gecko} alt="" />GeckoTerminal');
+    expect(portfolio).toContain('<span className="gecko-label">Gecko</span>');
     expect(portfolio).not.toMatch(/fomo\.family|app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
     expect(portfolio).not.toMatch(/autopilot|guaranteed returns|UnaBot/i);
     expect(portfolio).not.toMatch(/Observed, not forecast|Positions stay yours|Ask Una/i);
     expect(portfolio).not.toMatch(/one deposit · every market|self-custodial by design/i);
     expect(portfolio).not.toMatch(/Una is independent|not affiliated/i);
+  });
+
+  it("uses deliberate mobile layouts instead of shrinking desktop rows", () => {
+    expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
+    expect(css).toContain(".market-output { display: grid");
+    expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(css).toContain(".position-list article { grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(css).toContain(".portfolio-empty .empty-symbol { display: none; }");
+    expect(css).not.toContain('content: "Explore"');
   });
 
   it("pairs a characterful display face with a restrained trading UI", () => {

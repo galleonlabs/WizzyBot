@@ -513,62 +513,107 @@ svg {
   .index-nav { padding-inline: 12px; }
   .una-wordmark { font-size: 18px; }
   .una-wordmark > span:last-child { display: none; }
-  .index-nav nav button { padding-inline: 9px; font-size: 12px; }
+  .index-nav nav button { padding-inline: 9px; font-size: 13px; }
   .wallet-button { min-width: 0; }
   .wallet-button svg { display: none; }
+  .wallet-button { padding-inline: 13px; font-size: 13px; }
   .index-shell { padding: 0 12px 50px; }
-  .index-hero { gap: 28px; padding: 48px 0 50px; }
-  .hero-copy h1 { font-size: clamp(44px, 13vw, 58px); }
-  .hero-copy > p { max-width: 34ch; margin-top: 15px; font-size: 14px; }
-  .index-showcase { margin-top: 30px; }
-  .hero-token-field { min-height: 66px; }
-  .hero-token { flex-basis: auto; margin-left: -11px; }
-  .hero-token:first-child { margin-left: 0; }
-  .hero-token .token-icon { width: 43px; height: 43px; border-width: 3px; }
+  .index-hero { gap: 26px; padding: 42px 0 48px; }
+  .hero-copy h1 { max-width: 8.5ch; font-size: clamp(40px, 12vw, 50px); line-height: 1; }
+  .hero-copy > p { max-width: 34ch; margin-top: 17px; font-size: 16px; line-height: 1.5; }
+  .index-showcase { margin-top: 28px; }
+  .hero-token-field { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; width: 100%; max-width: 380px; min-height: 48px; padding: 0; }
+  .hero-token { display: grid; min-width: 0; transform: none; }
+  .hero-token .token-icon { width: clamp(38px, 11vw, 44px); height: clamp(38px, 11vw, 44px); border-width: 3px; }
   .hero-token b { display: none; }
-  .brand-rail { gap: 11px; margin-top: 18px; }
-  .brand-logo { font-size: 9px; }
-  .brand-logo img { width: 17px; height: 17px; }
-  .market-action { padding: 14px; }
-  .amount-input input { font-size: 43px; }
-  .funding-choice select { max-width: 175px; }
-  .position-ledger { padding-top: 38px; }
+  .brand-rail { gap: 11px; margin-top: 16px; }
+  .brand-logo { font-size: 11px; }
+  .brand-logo img { width: 20px; height: 20px; }
+  .market-action { padding: 10px; }
+  .amount-field { gap: 11px; padding: 18px; }
+  .amount-field > span:first-child { font-size: 12px; }
+  .amount-input input { font-size: 42px; }
+  .amount-input b { font-size: 14px; }
+  .funding-choice { min-height: 58px; padding-inline: 8px; }
+  .funding-choice > span:first-child { font-size: 12px; }
+  .funding-choice img { width: 24px; height: 24px; }
+  .funding-choice select { max-width: 188px; min-height: 44px; font-size: 16px; }
+  .market-output { display: grid; gap: 15px; padding: 17px 8px 10px; }
+  .market-stack > * { width: 30px; height: 30px; }
+  .market-breadth { gap: 12px; }
+  .market-breadth b { font-size: 13px; }
+  .market-output small { font-size: 12px; }
+  .action-economics { display: flex; align-items: baseline; justify-content: space-between; justify-items: stretch; padding-top: 14px; border-top: 1px solid var(--line); }
+  .action-economics b { font-size: 29px; }
+  .fund-button { font-size: 14px; }
+  .action-assurance { font-size: 11px; }
+  .position-ledger { padding-top: 28px; }
   .position-ledger > header { align-items: flex-start; padding-inline: 3px; }
   .market-table-wrap { overflow: visible; border: 0; background: transparent; }
   .market-table,
   .market-table tbody { display: grid; gap: 8px; width: 100%; }
   .market-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-  .market-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-  .market-table td { display: block; padding: 0; border: 0; font-size: 11px; }
-  .market-table td:first-child { grid-column: 1 / -1; padding-bottom: 11px; border-bottom: 1px solid var(--line); }
+  .market-table tr { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  .market-table td { display: block; min-width: 0; padding: 0; border: 0; font-size: 12px; }
+  .market-table td:first-child { grid-column: 1 / -1; align-self: center; padding-right: 94px; }
+  .market-table td:nth-child(5) { position: absolute; top: 14px; right: 14px; }
   .market-table td:nth-child(2)::before,
   .market-table td:nth-child(3)::before,
-  .market-table td:nth-child(4)::before,
-  .market-table td:nth-child(5)::before { display: block; margin-bottom: 6px; color: var(--muted-2); font-size: 9px; font-weight: 750; text-transform: uppercase; }
+  .market-table td:nth-child(4)::before { display: block; margin-bottom: 6px; color: var(--muted-2); font-size: 10px; font-weight: 750; text-transform: uppercase; }
   .market-table td:nth-child(2)::before { content: "Fee APR"; }
   .market-table td:nth-child(3)::before { content: "24h volume"; }
   .market-table td:nth-child(4)::before { content: "Liquidity"; }
-  .market-table td:nth-child(5)::before { content: "Explore"; }
+  .market-table .token-icon { width: 36px; height: 36px; }
+  .market-table .pair-cell { display: flex; width: 100%; min-width: 0; gap: 9px; }
+  .market-table .pair-cell > span { min-width: 0; }
+  .market-table .pair-cell b { font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; }
+  .market-table .pair-cell small { font-size: 11px; }
+  .market-table .fee-apr { font-size: 14px; }
+  .market-table .cell-note { font-size: 10px; }
+  .market-table .gecko-link { min-height: 44px; gap: 6px; padding-inline: 10px; font-size: 10px; }
+  .market-table .gecko-link img { width: 18px; height: 18px; }
   .market-table .skeleton-row { display: block; }
   .market-table .skeleton-row td { display: block; width: 100%; }
-  .position-list article { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px 16px; padding: 16px; }
+  .position-list article { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 10px; padding: 14px; }
   .position-pair { grid-column: 1 / -1; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .position-pair .token-icon { width: 36px; height: 36px; }
+  .position-pair b { font-size: 12px; }
+  .position-pair small { font-size: 11px; }
   .position-list article > span:nth-child(2),
   .position-list article > span:nth-child(3),
   .position-list article > span:nth-child(4) { display: grid !important; }
+  .position-list article > span > small { font-size: 10px; line-height: 1.35; }
+  .position-list article > span > b { font-size: 12px; }
   .position-range-viz { grid-column: 1 / -1; padding-top: 2px; }
+  .range-heading small,
+  .range-heading b,
+  .range-prices small,
+  .range-prices strong { font-size: 11px; }
   .position-actions { grid-column: 1 / -1; }
-  .position-actions button { flex: 1; min-height: 44px; }
+  .position-actions button { flex: 1; min-height: 44px; font-size: 11px; }
   .portfolio-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .portfolio-summary > div { min-height: 92px; padding: 15px; }
+  .portfolio-summary > div { min-height: 98px; padding: 15px; }
+  .portfolio-summary span,
+  .portfolio-summary small { font-size: 10px; }
+  .portfolio-summary strong { font-size: 20px; }
   .portfolio-summary > div:nth-child(3) { border-left: 0; }
   .portfolio-summary > div:nth-child(n+3) { border-top: 1px solid var(--line); }
   .position-actions { justify-content: flex-end; }
   .action-preview { grid-template-columns: 1fr; }
-  .markets-view { padding-top: 44px; }
+  .markets-view { padding-top: 38px; }
   .markets-view .index-title-row { display: grid; }
-  .index-title-row h1 { font-size: 42px; }
-  .portfolio-empty { align-items: flex-start; padding-block: 24px; }
-  .empty-symbol { width: 42px; height: 42px; border-radius: 11px; }
-  .index-section { margin-top: 46px; padding-top: 28px; }
+  .index-title-row h1 { font-size: clamp(36px, 11vw, 42px); }
+  .index-title-row p { margin-top: 12px; font-size: 15px; }
+  .portfolio-empty { min-height: 0; padding-block: 22px; }
+  .portfolio-empty .empty-symbol { display: none; }
+  .empty-copy h3 { font-size: 23px; }
+  .empty-copy p { margin-top: 9px; font-size: 15px; line-height: 1.5; }
+  .index-section { margin-top: 34px; padding-top: 26px; }
+  .section-title h2 { font-size: 21px; }
+  .section-title p { font-size: 13px; }
+}
+
+@media (max-width: 360px) {
+  .market-table td:first-child { padding-right: 64px; }
+  .market-table .gecko-label { display: none; }
 }

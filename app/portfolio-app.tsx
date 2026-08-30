@@ -555,7 +555,7 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
                 <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b><small className="cell-note">Based on 24h fees</small></td>
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
-                <td><a className="gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" />GeckoTerminal <span aria-hidden="true">↗</span></a></td>
+                <td><a className="gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="gecko-label">Gecko</span><span aria-hidden="true">↗</span></a></td>
               </tr>;
             }) : null}
           </tbody>
@@ -616,7 +616,7 @@ function PortfolioEmpty({ variant, onPrimary }: {
   onPrimary?: () => void;
 }) {
   const content = variant === "disconnected"
-    ? { title: "Your positions, in one place.", body: "Connect your wallet from the header to see value, fees, and range status across the index.", action: "" }
+    ? { title: "Your market positions", body: "Connect from the header to see value, fees, and range status.", action: "" }
     : variant === "error"
       ? { title: "We couldn’t load your positions.", body: "Try again to read your wallet.", action: "Try again" }
     : variant === "empty"

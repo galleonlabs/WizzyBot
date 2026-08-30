@@ -452,7 +452,7 @@ function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingC
     <aside className="market-action" aria-label="Make markets">
       <label className={`amount-field ${amountError ? "is-invalid" : ""}`}>
         <span>You deposit</span>
-        <span className="amount-input"><input inputMode="decimal" value={amount} onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" aria-invalid={Boolean(amountError)} aria-describedby={amountError ? "amount-error" : undefined} /><b>ETH</b></span>
+        <span className="amount-input"><input id="deposit-amount" name="depositAmount" inputMode="decimal" value={amount} onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" aria-invalid={Boolean(amountError)} aria-describedby={amountError ? "amount-error" : undefined} /><b>ETH</b></span>
         {amountError ? <small className="amount-error" id="amount-error">{amountError}</small> : null}
       </label>
 
@@ -460,7 +460,7 @@ function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingC
         <span>Pay from</span>
         <span>
           <img src={relayChainIcon(sourceChainId)} alt="" aria-hidden="true" />
-          <select value={sourceChainId} onChange={(event) => onSourceChain(Number(event.target.value))} aria-label="Pay from network">
+          <select id="source-chain" name="sourceChain" value={sourceChainId} onChange={(event) => onSourceChain(Number(event.target.value))} aria-label="Pay from network">
             {fundingChains.map((chain) => <option value={chain.id} key={chain.id}>{chain.label}</option>)}
           </select>
         </span>

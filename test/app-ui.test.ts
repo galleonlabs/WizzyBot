@@ -21,6 +21,8 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain('id="positions"');
     expect(portfolio).toContain("More with a larger deposit");
     expect(portfolio).toContain("Pay from");
+    expect(portfolio).toContain('name="depositAmount"');
+    expect(portfolio).toContain('name="sourceChain"');
     expect(portfolio).toContain("One wallet. Your markets.");
     expect(portfolio).not.toContain('label: "Positions"');
     expect(portfolio).not.toContain("scrollIntoView");

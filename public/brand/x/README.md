@@ -3,7 +3,7 @@
 Ready-to-upload files:
 
 - `wizzy-x-profile-400.png` — 400×400 PNG profile picture, designed for X's circular crop.
-- `wizzy-x-banner-1500x500.png` — 1500×500 PNG header with key content kept inside the crop-safe centre band and clear of the profile-picture overlay.
+- `wizzy-x-banner-1500x500.png` — 1500×500 text-free header built from a repeating Wizzy pattern and a central full-colour mascot.
 
 Editable SVG sources sit beside each PNG. Regenerate every social asset with `bun run social:render`.
 

@@ -174,9 +174,11 @@ describe("meme index product UI", () => {
     expect(xProfile.byteLength).toBeLessThan(2 * 1024 * 1024);
     expect(xBanner.readUInt32BE(16)).toBe(1500);
     expect(xBanner.readUInt32BE(20)).toBe(500);
-    expect(xBannerSource).toContain("@WIZZYDOTFUN");
-    expect(xBannerSource).toContain('font-family="Unbounded, sans-serif"');
-    expect(xBannerSource).toContain("Curated by agents on Robinhood Chain.");
+    expect(xBannerSource).toContain('id="wizzy-pattern"');
+    expect(xBannerSource).toContain('fill="url(#wizzy-pattern)"');
+    expect(xBannerSource).toContain('href="#pattern-wizzy"');
+    expect(xBannerSource).not.toContain("<text");
+    expect(xBannerSource).not.toContain("@WIZZYDOTFUN");
   });
 
   it("offers wallet-first login and provisions EVM and Solana wallets for every user", () => {

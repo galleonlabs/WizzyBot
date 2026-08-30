@@ -35,7 +35,7 @@ The proposed monthly operating budget is a policy target, not hard-coded routing
 - 25% two-sided protocol-owned market liquidity, subject to liquidity and concentration limits;
 - 15% measured distribution, user education, and capped gas or onboarding support.
 
-Unused budget remains in treasury. Market-liquidity spending must be two-sided and disclosed; it must not be described or operated as price support. Before the treasury controls material value, move custody from the current retrievable hot-wallet backup to a hardware-backed 2-of-3 multisig. Publish treasury addresses and a monthly inflow/outflow ledger without exposing private operational metadata.
+Unused budget remains in treasury. Market-liquidity spending must be two-sided and disclosed; it must not be described or operated as price support. The dedicated Vercel-held EOA remains the treasury, token creator, and registry authority. Publish its address and a monthly inflow/outflow ledger without exposing the key or private operational metadata.
 
 ## Flow mechanics
 
@@ -85,7 +85,7 @@ The final supply and allocation remain open decisions. Before launch, publish on
 
 1. Finalize name, ticker, supply, allocations, vesting, contract controls, risk disclosure, and launch mode.
 2. Keep the dedicated creator address as the only launch signer; do not use it for ordinary product operations.
-3. Move long-lived treasury authority and any retained allocation to a hardware-backed multisig before material value is present.
+3. Verify the dedicated creator/treasury address and its Vercel recovery path before material value is present.
 4. Connect the creator wallet to Pools and review the current Robinhood Chain transaction terms. Pools currently presents ordinary and crowd-launch paths; the connected transaction is the source of truth.
 5. Simulate and independently review the creation transaction, initial liquidity, recipient wallets, creator permissions, and any vesting contracts.
 6. Launch without index inclusion. Record the contract address and transaction hash before any social announcement.

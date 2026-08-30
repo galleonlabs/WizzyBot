@@ -61,7 +61,7 @@ function markdown(report: CuratorReport): string {
   const replacements = report.replacements.length
     ? report.replacements.map((row) => `- ${row.chain}: replace ${row.incumbentSymbol} with ${row.candidateSymbol} (${row.aprMultiple.toFixed(1)}× median fee APR)`).join("\n")
     : "- None.";
-  return `# Una index curator\n\nGenerated ${report.generatedAt}. Catalog changes remain code-reviewed.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
+  return `# Una index curator\n\nGenerated ${report.generatedAt}. Policy-valid changes publish to the onchain registry automatically.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
 }
 
 export async function runCurator(options: { stateDir?: string; persist?: boolean; observedAt?: string } = {}): Promise<CuratorReport> {

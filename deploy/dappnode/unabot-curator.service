@@ -8,7 +8,9 @@ Type=oneshot
 WorkingDirectory=%h/projects/personal/UnaBot
 Environment=NODE_ENV=production
 Environment=UNABOT_CURATOR_STATE_DIR=%S/unabot-curator
-ExecStart=%h/.local/share/unabot-bun/bin/bun src/curator/cli.ts
+Environment=UNABOT_BUN_BIN=%h/.local/share/unabot-bun/bin/bun
+EnvironmentFile=-%h/.config/unabot/curator.env
+ExecStart=/usr/bin/env bash scripts/run-curator-service.sh
 UMask=0077
 StateDirectory=unabot-curator
 StateDirectoryMode=0700

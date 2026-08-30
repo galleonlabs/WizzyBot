@@ -7,6 +7,7 @@ import {
 } from "viem";
 import { addressesFor, chainOf } from "../chains.js";
 import { loadEnv } from "../config/env.js";
+import { getCuratorConfig } from "../curator/config.js";
 import { makePublicClient } from "../signer/broadcast.js";
 import {
   chainCatalog,
@@ -46,8 +47,18 @@ export const unaIndexRegistryAbi = [
   { type: "function", name: "paused", stateMutability: "view", inputs: [], outputs: [{ type: "bool" }] },
   { type: "function", name: "evidenceHash", stateMutability: "view", inputs: [], outputs: [{ type: "bytes32" }] },
   { type: "function", name: "evidenceURI", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  { type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  { type: "function", name: "curator", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "FACTORY", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "QUOTE_TOKEN", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  {
+    type: "function",
+    name: "pause",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "reasonHash", type: "bytes32" }],
+    outputs: [],
+  },
+  { type: "function", name: "unpause", stateMutability: "nonpayable", inputs: [], outputs: [] },
   {
     type: "function",
     name: "getMarkets",
@@ -143,7 +154,7 @@ export function resolveRegistryMarkets(snapshot: IndexRegistrySnapshot): Curated
   const expected = addressesFor("robinhood");
   if (snapshot.factory.toLowerCase() !== expected.factory.toLowerCase()) throw new Error("The Una registry uses an unexpected factory");
   if (snapshot.quoteToken.toLowerCase() !== expected.weth.toLowerCase()) throw new Error("The Una registry uses an unexpected quote token");
-  const known = new Map(chainCatalog("robinhood").markets.map((market) => [market.id, market]));
+  const known = registryMetadata();
   const ids = new Set<string>();
   const markets = snapshot.markets.map((market) => {
     if (ids.has(market.id)) throw new Error(`The onchain Una index repeats ${market.id}`);
@@ -206,17 +217,51 @@ export async function getRobinhoodIndexState(): Promise<RobinhoodIndexState> {
 function catalogWithRegistryMarkets(markets: CuratedMarket[], version: number): MarketCatalog {
   const byId = new Map(markets.map((market) => [market.id, market]));
   const catalog = getMarketCatalog();
+  const existing = new Set(chainCatalog("robinhood").markets.map((market) => market.id));
   return {
     ...catalog,
     version,
     chains: catalog.chains.map((chain) => chain.slug !== "robinhood" ? chain : {
       ...chain,
-      markets: chain.markets.map((market) => byId.get(market.id) ?? {
-        ...market,
-        status: market.status === "watch" ? "watch" as const : "paused" as const,
-      }),
+      markets: [
+        ...chain.markets.map((market) => byId.get(market.id) ?? {
+          ...market,
+          status: market.status === "watch" ? "watch" as const : "paused" as const,
+        }),
+        ...markets.filter((market) => !existing.has(market.id)),
+      ],
     }) as MarketCatalog["chains"],
   };
+}
+
+function registryMetadata(): Map<string, CuratedMarket> {
+  const chain = chainCatalog("robinhood");
+  const known = new Map(chain.markets.map((market) => [market.id, market]));
+  const palette = ["#5ef0b6", "#f4c851", "#8ba8ff", "#ff8a62", "#d39aff", "#ff6f83"];
+  for (const candidate of getCuratorConfig().candidates.filter((row) => row.chain === "robinhood")) {
+    if (known.has(candidate.id)) continue;
+    const colorIndex = [...candidate.id].reduce((sum, character) => sum + character.charCodeAt(0), 0) % palette.length;
+    known.set(candidate.id, {
+      id: candidate.id,
+      name: candidate.name,
+      symbol: candidate.symbol,
+      token: candidate.token,
+      tokenDecimals: 18,
+      quoteToken: chain.markets[0]!.quoteToken,
+      quoteSymbol: chain.markets[0]!.quoteSymbol,
+      quoteDecimals: chain.markets[0]!.quoteDecimals,
+      protocol: "V3",
+      pool: candidate.pool,
+      fee: candidate.feePips,
+      tickSpacing: 1,
+      rangeWidthPct: 1,
+      weightBps: 1,
+      status: "watch",
+      risk: candidate.risk,
+      color: palette[colorIndex]!,
+    });
+  }
+  return known;
 }
 
 function parseMarket(raw: RawMarket): RegistryMarket {

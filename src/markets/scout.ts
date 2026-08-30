@@ -21,8 +21,8 @@ export type MarketScoutRow = {
 };
 
 /**
- * Deterministic evidence packet for the conversational agent. The model may
- * explain these signals but cannot change catalog membership or weights.
+ * Deterministic evidence packet for the curator. Contract publication remains
+ * bounded by the policy engine and the canonical-factory registry checks.
  */
 export async function scoutMarkets(chain?: ChainSlug): Promise<{
   role: "advisory";
@@ -42,9 +42,9 @@ export async function scoutMarkets(chain?: ChainSlug): Promise<{
     catalogVersion: catalog.version,
     updatedAt: catalog.updatedAt,
     methodology: [
-      "Catalog membership and weights come from reviewed version-controlled configuration.",
+      "Membership and weights come from the versioned onchain curator registry when it is configured.",
       "Liquidity, volume, price movement, and fee pace are short-window market signals, not return forecasts.",
-      "The agent may explain evidence and flag review candidates; only a code-reviewed catalog change can alter execution.",
+      "The curator may apply a policy-valid replacement; hard security failures pause new deposits.",
     ],
     markets: rows,
   };

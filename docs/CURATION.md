@@ -16,7 +16,7 @@ Pool capacity is capped at 1% of median TVL. Social data helps discover and veri
 
 Missing provider data is reported as unavailable, not as a failed liquidity or volume threshold. A clean security result remains valid for 24 hours so a transient provider outage cannot manufacture a risk call; any security flag still triggers review immediately.
 
-Catalog changes remain code-reviewed because they alter new deposits. Paused markets stay in the catalog so existing positions remain visible and withdrawable.
+The curator is the decision-maker. A `review` incumbent remains until an eligible candidate earns a policy-valid replacement; it is not an operator approval queue. A `pause` recommendation stops all new registry-backed deposits immediately. Eligible replacements inherit the outgoing market's weight and range width, preserving a 10,000-basis-point snapshot without exposing arbitrary model-generated calldata.
 
 ## Robinhood launch index
 
@@ -36,6 +36,7 @@ MICRODUCK, GG, and COPPERINU are tracked as Robinhood candidates but are too new
 ```bash
 bun run curate:index -- --no-write
 bun run curate:index -- --state-dir ~/.local/state/unabot-curator
+bun run registry:sync -- --report=~/.local/state/unabot-curator/latest.json
 ```
 
 The dappnode timer persists:
@@ -44,4 +45,4 @@ The dappnode timer persists:
 - `latest.json` — machine-readable calls and replacements.
 - `latest.md` — the operator review.
 
-Candidate addresses and the thresholds live in `src/config/curator.json`. Active weights live in `src/config/markets.json` and `src/config/solana-markets.json`.
+Candidate addresses and thresholds live in `src/config/curator.json`. Once deployed, `UnaIndexRegistry` is authoritative for Robinhood membership and weights. `registry:sync` is dry-run by default; the dappnode service adds `--live` only when a registry address and the single Una private key are present in its restricted environment file.

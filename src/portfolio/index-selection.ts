@@ -103,7 +103,7 @@ export function selectMemeIndexMarkets(totalAmountWei: bigint): IndexBreadthTier
 
 /**
  * The launch index is intentionally network-specific. Each viable 0.05 ETH
- * unit adds the next code-reviewed Robinhood market by curator weight.
+ * unit adds the next onchain Robinhood market by curator weight.
  */
 export function getRobinhoodIndexBreadthPolicy(indexMarkets: Array<{ id: string; weightBps: number }> = activeMarkets("robinhood")): RobinhoodIndexBreadthPolicy {
   const markets = indexMarkets

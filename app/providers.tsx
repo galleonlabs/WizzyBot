@@ -6,7 +6,7 @@ import { abstract, arbitrum, blast, ink, linea, mainnet, mode, optimism, scroll,
 import { base, robinhoodChain } from "./lib/chains";
 
 /** Una Privy app (public). Secret is never shipped. */
-const DEFAULT_PRIVY_APP_ID = "cmteeqkjc03e20cjl59c9kbwu";
+const DEFAULT_PRIVY_APP_ID = "cmtft1kti01cf0dl73c3zpuem";
 
 const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? process.env.PRIVY_APP_ID ?? DEFAULT_PRIVY_APP_ID;
 const solanaRpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";

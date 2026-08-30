@@ -26,14 +26,9 @@ This boundary is enforced by a repository test over shipped source and public as
 
 ## Wallet and custody controls
 
-The current creator/treasury EOA is a dedicated bootstrap wallet whose private key is stored as a retrievable, encrypted, production-only Vercel secret. The application does not read it. This satisfies recoverability, not long-term custody.
+The creator/treasury/registry EOA is a dedicated wallet whose private key is stored as a retrievable, encrypted, production-only Vercel secret. The application does not read it. The same key is installed only in the restricted dappnode curator service so policy-valid registry updates can be autonomous. There is deliberately no multisig.
 
-Before the wallet controls material value:
-
-1. Create a hardware-backed 2-of-3 multisig with separately stored recovery material.
-2. Transfer retained token allocation, treasury funds, and any transferable contract authority to the multisig.
-3. Verify the transfer onchain and publish only the relevant public addresses.
-4. Remove the hot key from application infrastructure once no operational dependency remains, retaining recovery material through an approved offline process.
+Before the wallet controls material value, re-verify the Vercel recovery path, project-administrator list, dappnode file permissions, and public address. The key must never be placed in client variables, source, shell history, logs, screenshots, analytics, or social tooling.
 
 Assume every funding transaction is publicly attributable through chain analysis. Use a documented lawful funding path and accurate accounting. Do not use mixers, circular transfers, false counterparties, or obfuscation to manufacture anonymity.
 

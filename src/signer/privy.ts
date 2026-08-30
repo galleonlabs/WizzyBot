@@ -7,7 +7,7 @@ import { CHAIN_ID } from "../constants.js";
 import { slugForChainId, viemChainFor } from "../chains.js";
 
 /** Public Privy app id. Safe to ship. Secret stays in env. */
-export const DEFAULT_PRIVY_APP_ID = "cmteeqkjc03e20cjl59c9kbwu";
+export const DEFAULT_PRIVY_APP_ID = "cmtft1kti01cf0dl73c3zpuem";
 
 export const PRIVY_STUB_MESSAGE =
   "Privy live signing is stubbed until PRIVY_APP_SECRET is set. Also set NEXT_PUBLIC_PRIVY_APP_ID or PRIVY_APP_ID (defaults to the public app id) and optionally PRIVY_WALLET_ID plus PRIVY_AUTHORIZATION_KEY.";

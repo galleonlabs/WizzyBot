@@ -26,17 +26,19 @@ Cross-chain entry still requires a destination-chain action after Relay fills. E
 - Owner and curator rotations are two-step transfers so a mistyped address cannot seize authority.
 - The contract stores the current snapshot; events preserve the version history for indexers and audits.
 
-The intended ownership topology is a multisig owner and a dedicated low-balance curator publisher. The publisher key can update membership and weights or pause. It cannot transfer ownership, rotate itself, or resume a paused registry.
+The deployment owner and curator are intentionally the same dedicated Una EOA: `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`. Its retrievable private key is stored as a production-only Vercel secret and copied only to the restricted dappnode curator environment. This is a user-selected single-key topology; there is no multisig or human co-sign gate.
+
+Every six-hour curator run derives one of three actions: no change, a policy-valid whole-snapshot replacement, or an immediate registry pause on a hard security failure. The sync path is dry-run by default, checks the current version, simulates against Robinhood Chain, verifies the configured signer is the contract curator, and only then broadcasts. A market under `review` remains until an eligible candidate satisfies the replacement policy.
 
 ## Threat assessment
 
 | Threat | Control | Remaining risk |
 | --- | --- | --- |
-| Curator key compromise | Atomic validation, exact weight sum, market cap, canonical-factory pool verification, owner-controlled curator rotation, immediate pause | A compromised curator can still select a genuine but economically bad pool until the owner pauses; deployment should add a timelock or owner co-sign if responsiveness permits. |
+| Una key compromise | Atomic validation, exact weight sum, market cap, canonical-factory pool verification, target allowlisting, and expected-version checks | The one key controls registry, treasury, and future token creation. Compromise is catastrophic; Vercel and dappnode access must remain tightly restricted and the key must never enter logs or client code. |
 | Stale curator job | Expected-version check | The curator must re-read and re-evaluate after a version conflict. |
 | Partial or malformed update | Whole-snapshot publish and strict field validation | Economic safety of a syntactically valid pool remains an offchain review responsibility. |
 | Unbounded gas/storage | 32-market cap and 200-byte evidence URI cap | Publishing cost grows linearly with index breadth. |
-| Owner address typo | Two-step ownership and curator transfers | Multisig signer policy remains operational, not contractual. |
+| Owner address typo | Deployment uses the already-derived and independently verified treasury address | There is no second signer or recovery quorum. |
 | Security incident | Curator-or-owner pause; owner-only unpause | Existing positions remain exposed to their underlying pools; pause only stops Una from treating the registry as depositable. |
 | Backend censorship or drift | Product reads the versioned contract state and report hash | RPC availability and chain reorgs still require normal client retry/finality handling. |
 
@@ -45,13 +47,14 @@ The intended ownership topology is a multisig owner and a dedicated low-balance 
 Before deployment:
 
 1. Independently review and fuzz the registry.
-2. Select the Robinhood Chain multisig owner and dedicated curator publisher.
-3. Decide whether curator publishes should be immediate or timelocked.
-4. Publish the initial six-market snapshot from `src/config/markets.json` and verify it on Blockscout.
-5. Configure `UNA_INDEX_REGISTRY_ADDRESS`, switch planning and UI reads to the registry, and fail closed when it is paused or unavailable.
-6. Run one canary deposit and compare every minted position with the registry version shown at signing.
+2. Fund the dedicated Una address and deploy with that same address as owner and curator.
+3. Publish the curator-derived initial snapshot and verify it on Blockscout.
+4. Configure `UNA_INDEX_REGISTRY_ADDRESS`, switch planning and UI reads to the registry, and fail closed when it is paused or unavailable.
+5. Run one canary deposit and compare every minted position with the registry version shown at signing.
 
-Mainnet deployment spends funds and creates durable public state, so it requires explicit approval of the chain, owner, curator, and transaction cost.
+Mainnet deployment is approved for Robinhood Chain once the dedicated Una address is funded. The current dry-run is about 1.24 million gas; fund at least 0.001 ETH to cover deployment, initial publication, and fee movement. The deploy script raises that minimum automatically if twice the current deployment estimate is higher.
+
+`bun run registry:deploy` estimates the current transaction and predicted address without broadcasting. `bun run registry:deploy -- --live` refuses a signer other than the configured Una treasury, refuses an underfunded address, deploys owner and curator as that same address, and verifies the receipt address. After deployment, set `UNA_INDEX_REGISTRY_ADDRESS` and run `bun run registry:sync` before using `--live`.
 
 ## Primary references
 

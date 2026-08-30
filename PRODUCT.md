@@ -23,17 +23,17 @@ Una turns “be the market maker” into a consumer action. It should feel as di
 - Privy creates and manages the user's self-custodial EVM and Solana wallets under one identity.
 - There is no public allocation builder, destination-network selector, pool selector, range editor, bridge picker, or portfolio-split control. “Pay from” is a checkout choice only: Relay moves ETH from a supported source network into the single Robinhood Chain product.
 - Una publishes one Robinhood index at launch. Each viable 0.05 ETH unit adds the next curator-ranked market, up to the full six-market index; users never choose the count or allocation.
-- Initial inclusion requires at least 30 days of pool history, at least $75,000 in live liquidity, a WETH quote, and a verified Uniswap v3 execution path. An active market that later crosses a monitoring threshold moves to review; security failures or a liquidity collapse trigger a pause recommendation. Pool status and weights remain code-reviewed curator policy.
+- Initial inclusion requires at least 30 days of pool history, at least $75,000 in live liquidity, a WETH quote, and a verified Uniswap v3 execution path. An active market that later crosses a monitoring threshold moves to review; security failures or a liquidity collapse pause the onchain registry. The curator applies deterministic membership and weight policy without an operator vote.
 - Relay moves ETH from the selected supported source network to Robinhood Chain. Una selects the reviewed pool and liquidity range for every market.
 - The product vocabulary is deposit, earn fees, your liquidity, collect, and withdraw. Protocol mechanics belong in receipts and disclosures, not the primary action.
 - Portfolio state should be derived from wallets, LP positions, chain events, and live market data. Avoid a database where onchain or version-controlled state is authoritative.
 - “Markets” is the single home for current positions and the live Robinhood index. Existing Base and Solana positions remain readable and withdrawable without promoting those networks in the launch product.
-- The agent is internal index machinery: it scouts inclusion candidates, monitors pool risk, and helps operators review allocation and range policy. It is not a public chat or transaction surface. Deterministic transaction and risk rules remain authoritative.
+- The agent is internal index machinery: it scouts inclusion candidates, monitors pool risk, and publishes the evidence used by deterministic allocation and range policy. It is not a public chat or transaction surface. Deterministic transaction and risk rules remain authoritative.
 
 ## Capabilities and Constraints
 
 - Launch one network-specific index on Robinhood Chain (chain ID 4663). Keep the existing Base, Robinhood, and Solana engines intact for later per-network products; do not present a blended multi-chain index in the MVP.
-- Maintain an operator-controlled, code-reviewed allowlist for every asset and pool.
+- Accept only pools validated by the canonical Uniswap v3 factory and tracked by the curator evidence universe; the onchain registry is authoritative for new deposits.
 - The active launch set is CASHCAT, PONS, AI, CHUMP, STONKBROKER, and PONSGUY against WETH on reviewed Uniswap v3 pools.
 - Base uses reviewed Uniswap v3 and Aerodrome Slipstream pools; Solana uses Meteora DLMM. Those engines and paused markets remain readable and withdrawable for later network-specific launches.
 - Minimize approvals and confirmations with wallet batching, Relay, Privy embedded wallets, and direct single-token liquidity zaps. Never claim one cryptographic signature when destination networks require additional approvals.

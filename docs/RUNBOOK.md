@@ -109,7 +109,7 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 | `UNABOT_SOLANA_TREASURY` | Public Solana fee recipient. Required to prepare Solana withdraw and reinvest actions. |
 | `UNABOT_ETH_USD` | Optional USD/ETH fallback for skip math. |
 | `TELEGRAM_BOT_TOKEN` | Telegram surface. Never commit. |
-| `PRIVY_APP_ID` / `NEXT_PUBLIC_PRIVY_APP_ID` | Public app id: `cmteeqkjc03e20cjl59c9kbwu` |
+| `PRIVY_APP_ID` / `NEXT_PUBLIC_PRIVY_APP_ID` | Public app id: `cmtft1kti01cf0dl73c3zpuem` |
 | `PRIVY_APP_SECRET` | Required for hosted live signing and Privy route auth. Leave empty for dry-run / stub. **Do not put the value in this file.** |
 | `PRIVY_AUTHORIZATION_KEY` | Optional Wallet API authorization key. Later. |
 | `PRIVY_WALLET_ID` | Optional hosted wallet id. |
@@ -119,13 +119,13 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 
 Never log env values.
 
-Production EVM treasury custody: Vercel stores the public address and a retrievable production-only private-key backup. Access is limited to Vercel project administrators; the application does not read the key. Rotate to a hardware-backed multisig before the wallet holds material value.
+Production EVM authority: Vercel stores the public address and the retrievable production-only private key used by the treasury, token creator, registry owner, and curator. The application does not read the key. The dappnode curator receives the same key through a mode-0600 environment file only after registry deployment.
 
 Production Solana treasury custody: Vercel stores only the public address. The independent private key is in the Mac login Keychain under service `unabot-solana-treasury`.
 
-Market allowlist changes ship through `src/config/markets.json` and `src/config/solana-markets.json`. Never delete an entry that may still have open positions. Mark it `paused` or `watch` so wallet positions remain discoverable and withdrawable; only `active` entries receive new liquidity.
+Before the registry is configured, market allowlist changes fall back to `src/config/markets.json`. After deployment, Robinhood membership and weights come from `UnaIndexRegistry`; metadata for tracked candidates remains version-controlled so existing positions stay readable and withdrawable.
 
-The persistent research workflow is documented in `docs/CURATION.md`. `bun run curate:index` records advisory market evidence and replacement studies; it never edits either catalog.
+The persistent workflow is documented in `docs/CURATION.md`. `bun run curate:index` records evidence and replacement decisions. `bun run registry:sync` converts only policy-valid decisions into simulated or live registry calls.
 
 ## Dry-run vs live
 

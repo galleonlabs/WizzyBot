@@ -31,7 +31,9 @@
     "eve:dev": "node scripts/bundle-hosted.mjs && eve dev",
     "eve:deploy": "eve deploy --project unabot",
     "curate:index": "bun src/curator/cli.ts",
-    "registry:calldata": "bun scripts/registry-calldata.ts"
+    "registry:deploy": "bun scripts/registry-deploy.ts",
+    "registry:calldata": "bun scripts/registry-calldata.ts",
+    "registry:sync": "bun scripts/registry-sync.ts"
   },
   "engines": {
     "node": ">=20"

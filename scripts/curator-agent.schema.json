@@ -4,8 +4,8 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "verdict", "summary", "candidateReviews", "replacement"],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "verdict": { "enum": ["no_change", "replace"] },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "verdict": { "type": "string", "enum": ["no_change", "replace"] },
     "summary": { "type": "string" },
     "candidateReviews": {
       "type": "array",
@@ -15,7 +15,7 @@
         "required": ["candidateId", "identity", "rationale", "sources"],
         "properties": {
           "candidateId": { "type": "string" },
-          "identity": { "enum": ["reviewed", "watch"] },
+          "identity": { "type": "string", "enum": ["reviewed", "watch"] },
           "rationale": { "type": "array", "items": { "type": "string" } },
           "sources": {
             "type": "array",

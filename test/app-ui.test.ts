@@ -63,18 +63,18 @@ describe("meme index product UI", () => {
   });
 
   it("keeps Una eye-first at icon scale", () => {
-    expect(mascot).toContain('rx="14" ry="20"');
-    expect(mascot).toContain('rx="4.5" ry="6.5"');
+    expect(mascot).toContain('rx="15.5" ry="22.5"');
+    expect(mascot).toContain('rx="5" ry="7"');
     expect(mascot).not.toContain('rx="9" ry="13"');
   });
 
-  it("keeps Una a simple light blob with a pronounced hood, tiny limbs, and an oversized staff", () => {
+  it("keeps Una one near-circular hooded blob with no neck, tiny limbs, and an oversized staff", () => {
+    expect(mascot).toContain("near-circular hooded light blob with no neck");
     expect(mascot).toContain("tiny hands and feet");
-    expect(mascot).toContain('rx="72" ry="58"');
-    expect(mascot).toContain("M33 70c17-6 29-22 35-43");
-    expect(mascot).toContain("M86 215c-4 4-5 10-1 13");
-    expect(mascot).toContain("m220 14 18 22-19 23-16-24 17-21Z");
-    expect(mascot).not.toContain("M43 56c13-4 20-14 25-29");
+    expect(mascot).toContain("M72 44C77 23 93 10 113 10");
+    expect(mascot).toContain("M89 219c-3 3-4 8-1 11");
+    expect(mascot).toContain("m221 11 20 23-20 25-18-25 18-23Z");
+    expect(mascot).not.toContain('ellipse cx="109" cy="166"');
   });
 
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {

@@ -39,6 +39,11 @@ type HostedPortfolioSurface = {
     venue?: "uniswap-v3" | "aerodrome-slipstream";
     positionManager?: string;
   }) => Promise<unknown>;
+  planIndexMigration: (input: {
+    owner: string;
+    tokenId: bigint;
+    migrationId: string;
+  }) => Promise<unknown>;
   quoteBaseToRobinhoodEth: (input: { owner: string; amountInWei: bigint }) => Promise<unknown>;
   quoteEthToRobinhood: (input: { owner: string; amountInWei: bigint; originChainId: number }) => Promise<unknown>;
   ETH_FUNDING_CHAINS: readonly { id: number; label: string }[];
@@ -68,6 +73,7 @@ export const getMemeIndexBreadthPolicy = hosted.getMemeIndexBreadthPolicy;
 export const getRobinhoodIndexBreadthPolicy = hosted.getRobinhoodIndexBreadthPolicy;
 export const getRobinhoodIndexState = hosted.getRobinhoodIndexState;
 export const planPositionAction = hosted.planPositionAction;
+export const planIndexMigration = hosted.planIndexMigration;
 export const quoteBaseToRobinhoodEth = hosted.quoteBaseToRobinhoodEth;
 export const quoteEthToRobinhood = hosted.quoteEthToRobinhood;
 export const ETH_FUNDING_CHAINS = hosted.ETH_FUNDING_CHAINS;

@@ -7,6 +7,7 @@
     "rebalanceBps": 15,
     "compoundBps": 200
   },
+  "migrations": [],
   "chains": [
     {
       "slug": "base",

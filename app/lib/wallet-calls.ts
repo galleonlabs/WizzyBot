@@ -49,7 +49,7 @@ export async function sendWalletCalls(input: {
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`This wallet could not submit Una's atomic batch. Use the Privy embedded wallet or another EIP-5792 wallet. ${detail}`);
+    throw new Error(`This wallet could not submit Wizzy's atomic batch. Use the Privy embedded wallet or another EIP-5792 wallet. ${detail}`);
   }
   const id = callsId(result);
   if (!id) throw new Error("wallet did not return a batch identifier");

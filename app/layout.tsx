@@ -3,7 +3,7 @@ import { Plus_Jakarta_Sans, Unbounded } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
-const themeBootScript = `(()=>{try{const saved=localStorage.getItem("una-theme");const theme=saved==="system"||saved==="light"||saved==="dark"?saved:"dark";if(theme==="system")return;document.documentElement.dataset.theme=theme;const meta=document.createElement("meta");meta.name="theme-color";meta.id="una-theme-color";meta.content=theme==="dark"?"#09090d":"#f8f5ef";document.head.appendChild(meta)}catch{document.documentElement.dataset.theme="dark"}})()`;
+const themeBootScript = `(()=>{try{const saved=localStorage.getItem("wizzy-theme")||localStorage.getItem("una-theme");const theme=saved==="system"||saved==="light"||saved==="dark"?saved:"dark";if(theme==="system")return;document.documentElement.dataset.theme=theme;const meta=document.createElement("meta");meta.name="theme-color";meta.id="wizzy-theme-color";meta.content=theme==="dark"?"#09090d":"#f8f5ef";document.head.appendChild(meta)}catch{document.documentElement.dataset.theme="dark"}})()`;
 
 const sans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -20,19 +20,20 @@ const display = Unbounded({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://unabot.vercel.app"),
-  title: "Una: Make Meme Markets",
-  description: "Deposit ETH into a curated index of meme markets, starting with Robinhood Chain.",
+  metadataBase: new URL("https://wizzy.meme"),
+  alternates: { canonical: "/" },
+  title: "Wizzy: Make Meme Markets",
+  description: "Deposit ETH into a curated index of meme markets and earn, updated and managed by agents on Robinhood Chain.",
   openGraph: {
-    title: "Una: Make Meme Markets",
-    description: "The actively curated Robinhood Una Index.",
-    siteName: "Una",
+    title: "Wizzy: Make Meme Markets",
+    description: "The actively curated Robinhood Wizzy Index.",
+    siteName: "Wizzy",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Una: Make Meme Markets",
-    description: "The actively curated Robinhood Una Index.",
+    title: "Wizzy: Make Meme Markets",
+    description: "The actively curated Robinhood Wizzy Index.",
   },
 };
 

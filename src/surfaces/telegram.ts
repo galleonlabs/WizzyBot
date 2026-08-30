@@ -7,13 +7,13 @@ export const TELEGRAM_TOKEN_HELP =
 export function telegramBootMessage(token: string | undefined): string {
   if (!token) {
     return [
-      "Una telegram surface started (no token).",
+      "Wizzy telegram surface started (no token).",
       TELEGRAM_TOKEN_HELP,
       PRODUCT_LINE,
       "Dry-run is the default. Live writes still require an explicit yes.",
     ].join("\n");
   }
-  return `Una. ${PRODUCT_LINE} Dry-run unless --live. Live writes require yes.`;
+  return `Wizzy. ${PRODUCT_LINE} Dry-run unless --live. Live writes require yes.`;
 }
 
 export function telegramRequiresConfirm(text: string, live: boolean): boolean {

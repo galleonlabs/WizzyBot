@@ -1,6 +1,6 @@
 # Production runbook
 
-How to run Una. The consumer web index covers Base, Robinhood Chain, and Solana. The operator CLI covers EVM position primitives. Users keep every EVM LP NFT and Solana DLMM position.
+How to run Wizzy. The consumer web index covers Base, Robinhood Chain, and Solana. The operator CLI covers EVM position primitives. Users keep every EVM LP NFT and Solana DLMM position.
 
 **Never commit `.env`.** Copy `.env.example` locally. `.env` is gitignored. Do not paste secrets into git, Vercel project settings screenshots, or this file.
 
@@ -104,8 +104,8 @@ Set these in `.env` locally or in the Vercel project `unabot`. Values here are p
 | `UNISWAP_API_KEY` | Optional. Write paths use Uniswap LP + Trading APIs when set. Never commit. |
 | `UNABOT_PRIVATE_KEY` | CLI `--live` signer. `0x` + 32-byte hex. Never commit. Hosted agent does **not** use this. |
 | `UNABOT_TREASURY` | Optional override. Product fees go here. |
-| `UNA_TREASURY_PRIVATE_KEY` | Retrievable production custody backup for the Una EVM treasury and future token-creation wallet. The app does not read it. Never expose it to client code or logs. |
-| `UNA_TOKEN_CREATOR_ADDRESS` | Public address reserved for a future Una token launch. |
+| `UNA_TREASURY_PRIVATE_KEY` | Legacy-compatible key name for the Wizzy EVM treasury and future token-creation wallet. The app does not read it. Never expose it to client code or logs. |
+| `UNA_TOKEN_CREATOR_ADDRESS` | Legacy-compatible key name for the public address reserved for a future Wizzy token launch. |
 | `UNABOT_SOLANA_TREASURY` | Public Solana fee recipient. Required to prepare Solana withdraw and reinvest actions. |
 | `UNABOT_ETH_USD` | Optional USD/ETH fallback for skip math. |
 | `TELEGRAM_BOT_TOKEN` | Telegram surface. Never commit. |

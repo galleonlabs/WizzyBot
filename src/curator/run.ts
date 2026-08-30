@@ -61,7 +61,7 @@ export function renderCuratorMarkdown(report: CuratorReport): string {
   const replacements = report.replacements.length
     ? report.replacements.map((row) => `- ${row.chain}: replace ${row.incumbentSymbol} with ${row.candidateSymbol} (${row.aprMultiple.toFixed(1)}× median fee APR)`).join("\n")
     : "- None.";
-  return `# Una index curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live index. This report supplies evidence and policy-valid proposals for the curator agent to apply through the normal tested deployment path.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
+  return `# Wizzy index curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live index. This report supplies evidence and policy-valid proposals for the curator agent to apply through the normal tested deployment path.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
 }
 
 export async function runCurator(options: { stateDir?: string; persist?: boolean; observedAt?: string } = {}): Promise<CuratorReport> {

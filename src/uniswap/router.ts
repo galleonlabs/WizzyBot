@@ -26,7 +26,7 @@ function v3Path(tokenIn: Address, fee: number, tokenOut: Address): Hex {
 
 /**
  * Single-hop v3 exact-in via Universal Router 2.0.
- * Rebalance swaps pay the DEX pool fee only — UnaBot adds no swap take.
+ * Rebalance swaps pay the DEX pool fee only — Wizzy adds no swap take.
  */
 export function exactInV3Tx(args: {
   tokenIn: Address;

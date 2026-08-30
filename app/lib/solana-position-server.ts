@@ -226,7 +226,7 @@ export async function planSolanaPositionAction(input: {
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + ACTION_TTL_MS).toISOString(),
     notices: input.action === "compound"
-      ? ["Claims the position fees, pays Una’s disclosed fee, and adds the remainder back to the same Meteora position."]
+      ? ["Claims the position fees, pays Wizzy’s disclosed fee, and adds the remainder back to the same Meteora position."]
       : ["Removes and closes the Meteora position. You receive both pool assets directly in your Solana wallet."],
   };
 }
@@ -323,10 +323,10 @@ async function buildWithdrawTransactions(input: {
   const merged = mergeTransactionsWhenFits(last.transaction, fee, input.owner);
   if (merged) {
     last.transaction = merged;
-    last.label = "Withdraw liquidity and pay the disclosed Una fee";
+    last.label = "Withdraw liquidity and pay the disclosed Wizzy fee";
     return steps;
   }
-  return [...steps, { id: "service-fee", label: "Pay the disclosed Una fee", transaction: fee }];
+  return [...steps, { id: "service-fee", label: "Pay the disclosed Wizzy fee", transaction: fee }];
 }
 
 async function buildCompoundTransactions(input: {
@@ -362,9 +362,9 @@ async function buildCompoundTransactions(input: {
     const merged = mergeTransactionsWhenFits(last.transaction, fee, input.owner);
     if (merged) {
       last.transaction = merged;
-      last.label = "Collect fees and pay the disclosed Una fee";
+      last.label = "Collect fees and pay the disclosed Wizzy fee";
     } else {
-      steps.push({ id: "service-fee", label: "Pay the disclosed Una fee", transaction: fee });
+      steps.push({ id: "service-fee", label: "Pay the disclosed Wizzy fee", transaction: fee });
     }
   }
   return [...steps, { id: "reinvest", label: "Reinvest fees in the same position", transaction: add }];

@@ -89,6 +89,7 @@ export async function planAllocation(input: {
   amountWei: bigint;
   marketIds?: readonly string[];
   markets?: readonly CuratedMarket[];
+  serviceFeeBps?: number;
 }): Promise<AllocationPlan> {
   if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
   const owner = getAddress(input.owner);
@@ -101,7 +102,8 @@ export async function planAllocation(input: {
   const activeWeight = markets.reduce((sum, market) => sum + market.weightBps, 0);
   if (activeWeight <= 0) throw new Error("selected market weights must be positive");
 
-  const feeBps = getMarketCatalog().fees.allocateBps;
+  const feeBps = input.serviceFeeBps ?? getMarketCatalog().fees.allocateBps;
+  if (!Number.isSafeInteger(feeBps) || feeBps < 0 || feeBps > 10_000) throw new Error("service fee must be valid basis points");
   const serviceFee = bpsOf(input.amountWei, feeBps);
   const net = input.amountWei - serviceFee;
   if (net <= 0n) throw new Error("allocation is too small after fees");
@@ -179,7 +181,7 @@ export async function planAllocation(input: {
       "Every LP NFT is minted directly to your wallet.",
       "One atomic wallet batch is requested on this chain; if any call fails, the entire batch reverts.",
       "Quoted outputs and ranges expire. Re-plan instead of signing an expired batch.",
-      "Una selects the reviewed Uniswap or Aerodrome venue for each market; there is no pool builder to configure.",
+      "Wizzy selects the reviewed Uniswap or Aerodrome venue for each market; there is no pool builder to configure.",
       "Any unused WETH or meme tokens remain in your wallet.",
     ],
   };

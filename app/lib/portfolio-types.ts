@@ -41,6 +41,13 @@ export type MarketCatalog = {
     rebalanceBps: number;
     compoundBps: number;
   };
+  migrations: Array<{
+    id: string;
+    chain: "robinhood";
+    fromMarketId: string;
+    toMarketId: string;
+    effectiveAt: string;
+  }>;
   chains: CuratedChain[];
 };
 
@@ -244,6 +251,28 @@ export type PositionActionPlan = {
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: `0x${string}`; symbol: string; amount: string }>;
+  transactions: WalletTransaction[];
+  createdAt: string;
+  expiresAt: string;
+  notices: string[];
+};
+
+export type IndexMigrationPlan = {
+  kind: "index-migration";
+  owner: `0x${string}`;
+  chain: "robinhood";
+  chainId: 4663;
+  migrationId: string;
+  indexVersion: number;
+  tokenId: string;
+  fromMarket: { id: string; symbol: string };
+  toMarket: { id: string; symbol: string };
+  migratedAmountFloorWei: string;
+  serviceFeeBps: number;
+  serviceFeeWei: string;
+  expectedConfirmations: 1;
+  execution: "wallet_sendCalls";
+  atomic: true;
   transactions: WalletTransaction[];
   createdAt: string;
   expiresAt: string;

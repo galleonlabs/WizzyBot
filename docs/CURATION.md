@@ -1,10 +1,10 @@
 # Index curation
 
-Una launches with one Robinhood Chain index. The curator answers three questions every six hours:
+Wizzy launches with one Robinhood Chain index. The curator answers three questions every six hours:
 
 1. Is each active pool safe and liquid enough to keep?
 2. Which tracked candidate has proved it can earn more without reducing capacity?
-3. How much new Una capital can each pool absorb?
+3. How much new Wizzy capital can each pool absorb?
 
 ## Policy
 
@@ -45,5 +45,7 @@ The dappnode timer persists:
 - `latest.md` — the operator review.
 
 Candidate addresses and thresholds live in `src/config/curator.json`. Robinhood membership, weights, and availability live in `src/config/markets.json`. The curator report supplies the evidence and policy-valid proposal; the curator agent changes the catalog and ships it through the normal tested deployment path. The dappnode service never signs or broadcasts a registry transaction.
+
+Every constituent replacement must keep the outgoing market in the catalog as inactive and add a `migrations` entry naming its active successor and effective date. The replacement inherits the outgoing weight and range width. Markets uses that manifest to offer affected wallets a one-approval migration of only the retired position; unrelated positions remain untouched.
 
 The deferred `registry:sync` command remains available for a future onchain-registry review, but it is manual, dry-run by default, and outside the current operating workflow.

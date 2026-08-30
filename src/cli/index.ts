@@ -342,7 +342,7 @@ program
   .description("Chat. Live writes need yes.")
   .action(async (_opts, cmd) => {
     const rl = createInterface({ input, output });
-    console.log(`Una chat. ${PRODUCT_LINE} Type help or quit.`);
+    console.log(`Wizzy chat. ${PRODUCT_LINE} Type help or quit.`);
     try {
       while (true) {
         const line = (await rl.question("> ")).trim();
@@ -522,7 +522,7 @@ function chainedStart(sink: AlertSink, intervalMs: number, live: boolean): void 
     void chainSink(sink, slug).emit({
       level: "info",
       kind: "keeper",
-      message: `Una keeper starting interval=${intervalMs}ms live=${live}`,
+      message: `Wizzy keeper starting interval=${intervalMs}ms live=${live}`,
       at: new Date().toISOString(),
       dryRun: !live,
     });

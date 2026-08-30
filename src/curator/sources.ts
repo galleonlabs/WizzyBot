@@ -140,7 +140,7 @@ function candidateDefinition(candidate: CuratorCandidate): MarketDefinition {
 
 async function getJson<T>(url: string): Promise<T | null> {
   try {
-    const response = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Una-Curator/1" }, signal: AbortSignal.timeout(10_000) });
+    const response = await fetch(url, { headers: { Accept: "application/json", "User-Agent": "Wizzy-Curator/1" }, signal: AbortSignal.timeout(10_000) });
     if (!response.ok) return null;
     return await response.json() as T;
   } catch {
@@ -228,7 +228,7 @@ function getSolanaMintSecurity(token: string): Promise<SolanaMintSecurity | null
     try {
       const response = await fetch(process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "User-Agent": "Una-Curator/1" },
+        headers: { "Content-Type": "application/json", "User-Agent": "Wizzy-Curator/1" },
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: 1,

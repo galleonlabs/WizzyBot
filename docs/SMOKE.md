@@ -20,7 +20,7 @@ unabot pool --token0 0x4200000000000000000000000000000000000006 \
 
 ## list
 
-`0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42` — Una treasury; no positions at creation.
+`0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42` — Wizzy treasury; no positions at creation.
 
 Public LP `0x7E80D84DacF9b6E9B1dCD99bC572395A7ABB8f19` (via `https://base.publicnode.com`):
 

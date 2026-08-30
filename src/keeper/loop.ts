@@ -266,7 +266,7 @@ export async function runLoop(deps: KeeperDeps, signal?: AbortSignal): Promise<v
     deps.sink,
     "info",
     "keeper",
-    `Una keeper starting interval=${deps.intervalMs}ms live=${deps.live}`,
+    `Wizzy keeper starting interval=${deps.intervalMs}ms live=${deps.live}`,
     undefined,
     { dryRun: !deps.live },
   );

@@ -1,8 +1,8 @@
-# Una token and index flywheel
+# Wizzy token and index flywheel
 
 ## Decision
 
-Treat the Una token as a **10% target sleeve**, not an asset that is guaranteed to remain exactly 10% at every moment.
+Treat the Wizzy token as a **10% target sleeve**, not an asset that is guaranteed to remain exactly 10% at every moment.
 
 - Target weight: 10%
 - No-trade band: 8–12%
@@ -14,16 +14,16 @@ This creates genuine buy flow from net index deposits after the sleeve is activa
 
 ## Current product fees
 
-All currently implemented consumer fees route to the dedicated Una treasury at `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`. They do not route to token holders and do not automatically buy the future token.
+All currently implemented consumer fees route to the dedicated Wizzy treasury at `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`. They do not route to token holders and do not automatically buy the future token.
 
 | Action | Implemented charge | Current destination |
 | --- | --- | --- |
-| Create index positions | 0.15% of the gross allocation on each destination | Una treasury |
-| Reinvest position fees | 2% of the unclaimed fees being reinvested | Una treasury |
-| Withdraw a position | 0.15% of the conservative, slippage-adjusted withdrawal basis | Una treasury |
+| Create index positions | 0.15% of the gross allocation on each destination | Wizzy treasury |
+| Reinvest position fees | 2% of the unclaimed fees being reinvested | Wizzy treasury |
+| Withdraw a position | 0.15% of the conservative, slippage-adjusted withdrawal basis | Wizzy treasury |
 | Rebalance | 0.15% is reserved in the catalog, but the launch web product does not expose or collect it yet | No launch-web collection |
 
-Relay and network fees are separate third-party costs and are shown in the plan before signing. Changing any Una fee requires a code change, tests, user-facing disclosure, and a treasury review.
+Relay and network fees are separate third-party costs and are shown in the plan before signing. Changing any Wizzy fee requires a code change, tests, user-facing disclosure, and a treasury review.
 
 ## Treasury policy before token activation
 
@@ -39,16 +39,16 @@ Unused budget remains in treasury. Market-liquidity spending must be two-sided a
 
 ## Flow mechanics
 
-For a net deposit `D`, the intended Una-token purchase is approximately `D × 10%`, subject to liquidity, the 8–12% band, and execution limits. Redemptions unwind the sleeve proportionally. Weight drift inside the band does not trigger a trade.
+For a net deposit `D`, the intended Wizzy-token purchase is approximately `D × 10%`, subject to liquidity, the 8–12% band, and execution limits. Redemptions unwind the sleeve proportionally. Weight drift inside the band does not trigger a trade.
 
-The token's price must not determine its own eligibility or target weight. Una's curator can pause or remove the sleeve for a security failure, broken market, or insufficient liquidity, but cannot increase the weight to defend price.
+The token's price must not determine its own eligibility or target weight. Wizzy's curator can pause or remove the sleeve for a security failure, broken market, or insufficient liquidity, but cannot increase the weight to defend price.
 
 The flywheel is therefore:
 
 1. Users deposit into the index and receive self-custodied market positions.
-2. Una earns the disclosed product fees above; trading fees remain with users except for the disclosed reinvest or withdrawal charge.
+2. Wizzy earns the disclosed product fees above; trading fees remain with users except for the disclosed reinvest or withdrawal charge.
 3. Treasury funds product quality, security, two-sided liquidity, and measured distribution.
-4. After every activation gate passes, net index deposits allocate roughly 10% to the Una sleeve; redemptions sell the corresponding share.
+4. After every activation gate passes, net index deposits allocate roughly 10% to the Wizzy sleeve; redemptions sell the corresponding share.
 5. Better product utility and distribution can bring more deposits and fee revenue, but the product must remain useful without token appreciation.
 
 ## Activation gates
@@ -97,13 +97,13 @@ No token transaction, funding transfer, Pools signature, or custody migration sh
 
 ## X account sequence
 
-Create the Una X account as a separate public identity using dedicated recovery details, a password-manager-generated credential, passkey or hardware key, and no reused profile copy or avatars. The account must not claim Robinhood, Uniswap, Pools, or Fomo affiliation.
+Create the Wizzy X account as a separate public identity using dedicated recovery details, a password-manager-generated credential, passkey or hardware key, and no reused profile copy or avatars. The account must not claim Robinhood, Uniswap, Pools, or Fomo affiliation.
 
-Before launch, it may explain Una's product and publish risk education without implying that a token already exists. After onchain verification, pin one canonical post containing the contract address, chain, pool, supply disclosure, treasury links, and anti-scam warning. Never announce a contract address obtained only from an unconfirmed creation screen.
+Before launch, it may explain Wizzy's product and publish risk education without implying that a token already exists. After onchain verification, pin one canonical post containing the contract address, chain, pool, supply disclosure, treasury links, and anti-scam warning. Never announce a contract address obtained only from an unconfirmed creation screen.
 
 ## Conflict controls
 
-The Una token is a related-party constituent. The product must disclose that the operator controls the product treasury and may hold tokens. Treasury wallets, creator wallets, team allocation, vesting, fees, and any future buyback policy must be public before activation.
+The Wizzy token is a related-party constituent. The product must disclose that the operator controls the product treasury and may hold tokens. Treasury wallets, creator wallets, team allocation, vesting, fees, and any future buyback policy must be public before activation.
 
 Index inclusion must not be presented as an investment guarantee. The token qualifies through a separate, auditable sleeve policy rather than being ranked against ordinary meme markets by an operator-controlled score.
 

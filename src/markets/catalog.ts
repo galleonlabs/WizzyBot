@@ -37,6 +37,14 @@ const ChainMarketSchema = z.object({
   markets: z.array(MarketSchema).min(1),
 });
 
+const MarketMigrationSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  chain: z.literal("robinhood"),
+  fromMarketId: z.string().regex(/^[a-z0-9-]+$/),
+  toMarketId: z.string().regex(/^[a-z0-9-]+$/),
+  effectiveAt: z.string().date(),
+});
+
 const CatalogSchema = z.object({
   version: z.number().int().positive(),
   updatedAt: z.string().date(),
@@ -46,6 +54,7 @@ const CatalogSchema = z.object({
     rebalanceBps: z.number().int().min(0).max(10_000),
     compoundBps: z.number().int().min(0).max(10_000),
   }),
+  migrations: z.array(MarketMigrationSchema).default([]),
   chains: z.array(ChainMarketSchema).length(2),
 }).superRefine((catalog, ctx) => {
   const ids = new Set<string>();
@@ -76,13 +85,37 @@ const CatalogSchema = z.object({
       }
     }
   }
+  const migrations = new Set<string>();
+  const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood");
+  for (const [index, migration] of catalog.migrations.entries()) {
+    if (migrations.has(migration.id)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index, "id"], message: `duplicate migration id ${migration.id}` });
+    }
+    migrations.add(migration.id);
+    const from = robinhood?.markets.find((market) => market.id === migration.fromMarketId);
+    const to = robinhood?.markets.find((market) => market.id === migration.toMarketId);
+    if (!from || !to) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index], message: "migration markets must remain in the Robinhood catalog" });
+      continue;
+    }
+    if (from.status === "active" || to.status !== "active") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index], message: "migration must move from an inactive market to an active market" });
+    }
+    if (from.weightBps !== to.weightBps || from.rangeWidthPct !== to.rangeWidthPct) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index], message: "replacement must inherit the outgoing weight and range width" });
+    }
+  }
 });
 
 export type CuratedMarket = z.infer<typeof MarketSchema>;
 export type CuratedChain = z.infer<typeof ChainMarketSchema>;
 export type MarketCatalog = z.infer<typeof CatalogSchema>;
 
-const catalog: MarketCatalog = CatalogSchema.parse(rawCatalog);
+export function parseMarketCatalog(input: unknown): MarketCatalog {
+  return CatalogSchema.parse(input);
+}
+
+const catalog: MarketCatalog = parseMarketCatalog(rawCatalog);
 
 export function getMarketCatalog(): MarketCatalog {
   return catalog;

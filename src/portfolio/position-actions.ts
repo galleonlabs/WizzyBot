@@ -68,7 +68,7 @@ export async function planPositionAction(input: {
       .filter((market) => market.protocol === "AERODROME_SLIPSTREAM" && market.aerodromeDeployment)
       .map((market) => market.aerodromeDeployment!)
       .find((id) => aerodromeDeployment(id).positionManager.toLowerCase() === input.positionManager!.toLowerCase());
-    if (!deploymentId) throw new Error("position manager is not in Una's curated Aerodrome catalog");
+    if (!deploymentId) throw new Error("position manager is not in Wizzy's curated Aerodrome catalog");
     snapshot = await new AerodromeSlipstreamAdapter(client, deploymentId).readPosition(input.tokenId);
   } else {
     snapshot = await new V3Adapter(client).readPosition(input.tokenId);
@@ -78,7 +78,7 @@ export async function planPositionAction(input: {
     market.pool.toLowerCase() === snapshot.pool.toLowerCase()
     && (snapshot.venue === "aerodrome-slipstream") === (market.protocol === "AERODROME_SLIPSTREAM"),
   );
-  if (!configured) throw new Error("position pool is not in Una's curated market catalog");
+  if (!configured) throw new Error("position pool is not in Wizzy's curated market catalog");
   return buildPositionActionPlan(snapshot, owner, input.chain, input.action, env.treasury);
 }
 
@@ -133,7 +133,7 @@ export function buildPositionActionPlan(
     expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString(),
     notices: action === "compound"
       ? [
-          "Fees are collected to your wallet, Una's disclosed fee is transferred, and the remainder is added to the same self-custodied NFT.",
+          "Fees are collected to your wallet, Wizzy's disclosed fee is transferred, and the remainder is added to the same self-custodied NFT.",
           "No swap is forced: any token amount that does not fit the current range ratio remains in your wallet.",
         ]
       : [

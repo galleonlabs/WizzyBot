@@ -20,6 +20,7 @@ import {
   type RobinhoodIndexBreadthPolicy,
   type RobinhoodIndexBreadthTier,
   type RobinhoodIndexPlan,
+  type IndexMigrationPlan,
   type PositionActionPlan,
   type SolanaCuratedMarket,
 } from "./lib/portfolio-types";
@@ -38,6 +39,12 @@ type IndexMarket = {
   chain: IndexChain;
   indexWeightBps: number;
 };
+type AvailableIndexUpdate = {
+  migrationId: string;
+  position: PositionView;
+  fromSymbol: string;
+  toSymbol: string;
+};
 
 const INDEX_MARKET_COUNT = 6;
 const FOMO_URL = "https://fomo.family/r/makemememarkets";
@@ -50,7 +57,7 @@ const BRAND_ASSETS = {
 } as const;
 
 const EMPTY_MARKETS: MarketsPayload = {
-  catalog: { version: 1, updatedAt: "", fees: { allocateBps: 15, withdrawBps: 15, rebalanceBps: 15, compoundBps: 200 }, chains: [] },
+  catalog: { version: 1, updatedAt: "", fees: { allocateBps: 15, withdrawBps: 15, rebalanceBps: 15, compoundBps: 200 }, migrations: [], chains: [] },
   solana: {
     slug: "solana",
     chainId: 792703809,
@@ -91,6 +98,8 @@ export function PortfolioApp() {
   const [planState, setPlanState] = useState<PlanState>({ kind: "idle" });
   const [actionPlan, setActionPlan] = useState<AnyPositionActionPlan | null>(null);
   const [actionState, setActionState] = useState<PlanState>({ kind: "idle" });
+  const [migrationPlan, setMigrationPlan] = useState<IndexMigrationPlan | null>(null);
+  const [migrationState, setMigrationState] = useState<PlanState>({ kind: "idle" });
   const positionsRequestRef = useRef(0);
 
   const wallet = useMemo(() => {
@@ -136,7 +145,7 @@ export function PortfolioApp() {
   }, [address, authenticated, solanaAddress, solanaReady]);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("una-theme");
+    const saved = window.localStorage.getItem("wizzy-theme") ?? window.localStorage.getItem("una-theme");
     if (saved === "system" || saved === "light" || saved === "dark") setTheme(saved);
   }, []);
 
@@ -186,6 +195,21 @@ export function PortfolioApp() {
   }, [activeMarkets, markets.index, selectedTier]);
   const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
   const feeApr = weightedFeeApr(selectedMarkets, stats);
+  const availableIndexUpdates = useMemo<AvailableIndexUpdate[]>(() => {
+    const robinhood = markets.catalog.chains.find((chain) => chain.slug === "robinhood");
+    if (!robinhood) return [];
+    const symbols = new Map(robinhood.markets.map((market) => [market.id, market.symbol]));
+    return markets.catalog.migrations
+      .filter((migration) => Date.parse(migration.effectiveAt) <= Date.now())
+      .flatMap((migration) => positions
+      .filter((position) => position.chain === "robinhood" && !position.closed && position.marketId === migration.fromMarketId && position.tokenId)
+      .map((position) => ({
+        migrationId: migration.id,
+        position,
+        fromSymbol: symbols.get(migration.fromMarketId) ?? position.symbol0,
+        toSymbol: symbols.get(migration.toMarketId) ?? "the new market",
+      })));
+  }, [markets.catalog, positions]);
 
   function changeTab(next: ViewTab) {
     setTab(next);
@@ -201,15 +225,15 @@ export function PortfolioApp() {
     if (next === "system") delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = next;
     try {
-      window.localStorage.setItem("una-theme", next);
+      window.localStorage.setItem("wizzy-theme", next);
     } catch {
       // The selected theme still applies for this session when storage is unavailable.
     }
-    const existingMeta = document.getElementById("una-theme-color");
+    const existingMeta = document.getElementById("wizzy-theme-color");
     if (next === "system") existingMeta?.remove();
     else {
       const meta = existingMeta ?? document.head.appendChild(document.createElement("meta"));
-      meta.id = "una-theme-color";
+      meta.id = "wizzy-theme-color";
       meta.setAttribute("name", "theme-color");
       meta.setAttribute("content", next === "dark" ? "#09090d" : "#f8f5ef");
     }
@@ -336,6 +360,46 @@ export function PortfolioApp() {
     }
   }
 
+  async function prepareIndexMigration(update: AvailableIndexUpdate) {
+    if (!address || !update.position.tokenId) return;
+    setMigrationPlan(null);
+    setMigrationState({ kind: "planning", message: `Quoting ${update.fromSymbol} → ${update.toSymbol}…` });
+    try {
+      const response = await fetch("/api/portfolio/migrate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ owner: address, tokenId: update.position.tokenId, migrationId: update.migrationId }),
+      });
+      const payload = await response.json() as { plan?: IndexMigrationPlan; error?: string };
+      if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not prepare the index update");
+      setMigrationPlan(payload.plan);
+      setMigrationState({ kind: "ready", message: "Review the replacement and fee before updating." });
+    } catch (error) {
+      setMigrationState({ kind: "error", message: error instanceof Error ? error.message : "Could not prepare the index update" });
+    }
+  }
+
+  async function executeIndexMigration() {
+    if (!migrationPlan || !wallet || !address) return;
+    if (Date.now() >= Date.parse(migrationPlan.expiresAt)) {
+      setMigrationState({ kind: "error", message: "This update quote expired. Prepare it again." });
+      return;
+    }
+    try {
+      setMigrationState({ kind: "signing", message: "Approve this index update in your wallet." });
+      await sendWalletCalls({
+        wallet: wallet as unknown as ConnectedEvmWallet,
+        owner: address,
+        chainId: migrationPlan.chainId,
+        transactions: migrationPlan.transactions,
+      });
+      setMigrationState({ kind: "submitted", message: "Index update submitted. Your new position will appear after confirmation." });
+      window.setTimeout(() => void loadPositions(), 8_000);
+    } catch (error) {
+      setMigrationState({ kind: "error", message: error instanceof Error ? error.message : "The index update could not be submitted" });
+    }
+  }
+
   const positionLedger = (
     <PositionLedger
       authenticated={authenticated || previewMode}
@@ -349,18 +413,24 @@ export function PortfolioApp() {
       actionState={actionState}
       onExecute={executePositionAction}
       onCancel={() => { setActionPlan(null); setActionState({ kind: "idle" }); }}
+      updates={availableIndexUpdates}
+      migrationPlan={migrationPlan}
+      migrationState={migrationState}
+      onPrepareMigration={(update) => void prepareIndexMigration(update)}
+      onExecuteMigration={() => void executeIndexMigration()}
+      onCancelMigration={() => { setMigrationPlan(null); setMigrationState({ kind: "idle" }); }}
     />
   );
 
   return (
     <main className="index-app">
       <header className="index-nav">
-        <button className="una-wordmark" type="button" onClick={() => changeTab("overview")} aria-label="Una overview">
-          <picture className="una-mark" aria-hidden="true">
-            {theme === "system" ? <source media="(prefers-color-scheme: dark)" srcSet="/brand/una-mascot-dark.svg" /> : null}
-            <img src={theme === "dark" ? "/brand/una-mascot-dark.svg" : "/brand/una-mascot-light.svg"} alt="" />
+        <button className="wizzy-wordmark" type="button" onClick={() => changeTab("overview")} aria-label="Wizzy overview">
+          <picture className="wizzy-mark" aria-hidden="true">
+            {theme === "system" ? <source media="(prefers-color-scheme: dark)" srcSet="/brand/wizzy-mascot-dark.svg" /> : null}
+            <img src={theme === "dark" ? "/brand/wizzy-mascot-dark.svg" : "/brand/wizzy-mascot-light.svg"} alt="" />
           </picture>
-          <span>Una</span>
+          <span>Wizzy</span>
         </button>
         <nav aria-label="Primary navigation">
           {([{ id: "overview", label: "Make" }, { id: "markets", label: "Markets" }] as const).map((item) => (
@@ -389,7 +459,7 @@ export function PortfolioApp() {
                 <div className="hero-stage">
                   <div className="hero-copy">
                     <h1>Make Meme Markets</h1>
-                    <p>Deposit ETH into a curated index of meme markets, starting with Robinhood Chain.</p>
+                    <p>Deposit ETH into a curated index of meme markets and earn.<br /><span>Updated and managed by agents on Robinhood Chain.</span></p>
                   </div>
                   <IndexShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
                 </div>
@@ -416,7 +486,7 @@ export function PortfolioApp() {
           ) : (
             <section className="index-main markets-view">
               <header className="index-title-row">
-                <div><h1>Robinhood Una Index</h1><p>{positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Una agents regularly review which markets qualify."}</p></div>
+                <div><h1>Robinhood Wizzy Index</h1><p>{positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Wizzy agents regularly review which markets qualify."}</p></div>
               </header>
               {positionLedger}
               <section className="index-section">
@@ -433,11 +503,10 @@ export function PortfolioApp() {
 }
 
 function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {
-  return <div className="index-showcase" aria-label="Robinhood Una Index">
+  return <div className="index-showcase" aria-label="Robinhood Wizzy Index">
     <div className="network-lockup" aria-label="Built on Robinhood Chain">
       <img src={BRAND_ASSETS.robinhood} alt="" />
       <span className="network-name"><small>Built on</small><b>Robinhood Chain</b></span>
-      <span className="network-count">{loading ? "Curating index" : `${markets.length} curated markets`}</span>
     </div>
     <div className={`hero-token-field ${loading ? "is-loading" : ""}`}>
       {(loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
@@ -478,15 +547,7 @@ function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingC
         {amountError ? <small className="amount-error" id="amount-error">{amountError}</small> : null}
       </label>
 
-      <label className="funding-choice">
-        <span>Pay from</span>
-        <span>
-          <img src={relayChainIcon(sourceChainId)} alt="" aria-hidden="true" />
-          <select id="source-chain" name="sourceChain" value={sourceChainId} onChange={(event) => onSourceChain(Number(event.target.value))} aria-label="Pay from network">
-            {fundingChains.map((chain) => <option value={chain.id} key={chain.id}>{chain.label}</option>)}
-          </select>
-        </span>
-      </label>
+      <ChainPicker value={sourceChainId} chains={fundingChains} onChange={onSourceChain} />
 
       <div className={`market-output ${loading ? "is-loading" : ""}`} aria-label="Index markets">
         <span className="market-breadth">
@@ -500,12 +561,53 @@ function MarketAction({ amount, onAmount, sourceChainId, onSourceChain, fundingC
 
       {state.kind !== "idle" ? <PlanPreview plan={plan} state={state} onExecute={onExecute} onCancel={onCancel} /> : (
         <button className="fund-button" type="button" disabled={!ready || loading || Boolean(amountError)} onClick={onPrepare}>
-          {!ready ? "Preparing wallets…" : loading ? "Reading markets…" : "Make markets"}<ArrowIcon />
+          {!ready ? "Preparing wallets…" : loading ? "Reading markets…" : "Make markets"}
         </button>
       )}
       <p className="action-assurance">Robinhood Chain · Self-custodial</p>
     </aside>
   );
+}
+
+function ChainPicker({ value, chains, onChange }: { value: number; chains: EthFundingChain[]; onChange: (chainId: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = chains.find((chain) => chain.id === value) ?? chains[0];
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
+  if (!selected) return null;
+  return <div className="funding-choice" ref={rootRef}>
+    <span>Pay from</span>
+    <button className="chain-picker-trigger" type="button" onClick={() => setOpen((current) => !current)} aria-haspopup="listbox" aria-expanded={open} aria-controls="source-chain-options">
+      <img src={relayChainIcon(selected.id)} alt="" />
+      <span><b>{selected.label}</b><small>ETH network</small></span>
+      <ChevronIcon />
+    </button>
+    {open ? <div className="chain-picker-popover" id="source-chain-options" role="listbox" aria-label="Pay from network">
+      <header><b>Pay from</b><small>Choose where your ETH is now</small></header>
+      <div className="chain-picker-options">
+        {chains.map((chain) => <button type="button" role="option" aria-selected={chain.id === value} key={chain.id} onClick={() => { onChange(chain.id); setOpen(false); }}>
+          <img src={relayChainIcon(chain.id)} alt="" />
+          <span>{chain.label}</span>
+          {chain.id === value ? <CheckIcon /> : null}
+        </button>)}
+      </div>
+    </div> : null}
+    <input type="hidden" id="source-chain" name="sourceChain" value={value} />
+  </div>;
 }
 
 function PlanPreview({ plan, state, onExecute, onCancel }: { plan: RobinhoodIndexPlan | null; state: PlanState; onExecute: () => void; onCancel: () => void }) {
@@ -521,19 +623,21 @@ function PlanPreview({ plan, state, onExecute, onCancel }: { plan: RobinhoodInde
     <section className={`plan-preview is-${state.kind}`} aria-live="polite">
       <header><span>{title}</span><button type="button" onClick={onCancel} disabled={busy}>Cancel</button></header>
       <p>{state.message}</p>
-      {plan ? <dl>
-        <div><dt>Deposit</dt><dd>{trimEth(BigInt(plan.totalAmountWei))} ETH</dd></div>
-        <div><dt>Pay from</dt><dd>{plan.sourceChainLabel}</dd></div>
-        <div><dt>Markets</dt><dd>{plan.constituentCount} on Robinhood</dd></div>
-        <div><dt>Una fee</dt><dd>{trimEth(feeWei)} ETH</dd></div>
-        {funding ? <><div><dt>Relay fee</dt><dd>{relayFee > 0 ? `$${relayFee.toFixed(2)}` : "Included"}</dd></div><div><dt>Bridge price change</dt><dd>{formatPercent(relayImpact)}</dd></div></> : null}
-        <div><dt>Swap protection</dt><dd>{swapProtection}</dd></div>
-        <div><dt>Network fee</dt><dd>Shown by your wallet</dd></div>
-      </dl> : <div className="plan-loading"><i /><i /><i /></div>}
+      {plan ? <>
+        <div className="review-amount"><span>You deposit</span><strong>{trimEth(BigInt(plan.totalAmountWei))}<small> ETH</small></strong></div>
+        <dl>
+          <div><dt>Pay from</dt><dd><img src={relayChainIcon(plan.sourceChainId)} alt="" />{plan.sourceChainLabel}</dd></div>
+          <div><dt>You’ll open</dt><dd>{plan.constituentCount} Robinhood position{plan.constituentCount === 1 ? "" : "s"}</dd></div>
+          <div><dt>Wizzy fee</dt><dd>{trimEth(feeWei)} ETH</dd></div>
+          {funding ? <><div><dt>Relay fee</dt><dd>{relayFee > 0 ? `$${relayFee.toFixed(2)}` : "Included"}</dd></div><div><dt>Bridge price change</dt><dd>{formatPercent(relayImpact)}</dd></div></> : null}
+          <div><dt>Swap protection</dt><dd>{swapProtection}</dd></div>
+          <div><dt>Network fee</dt><dd>Shown by your wallet</dd></div>
+        </dl>
+      </> : <div className="plan-loading"><i /><i /><i /></div>}
       {state.kind === "ready" && plan ? <>
-        <p className="approval-note">{funding ? `Two wallet approvals: deposit from ${plan.sourceChainLabel}, then open ${plan.constituentCount} market positions.` : `One wallet approval opens ${plan.constituentCount} market positions.`} Every position belongs to your wallet.</p>
+        <p className="approval-note">{funding ? `Two approvals: move your ETH from ${plan.sourceChainLabel}, then open the positions.` : "One approval opens every position."} Everything stays in your wallet.</p>
         <p className="risk-note">Meme prices can fall, and trading fees may not cover losses.</p>
-        <button className="fund-button" type="button" onClick={onExecute}>Make markets<ArrowIcon /></button>
+        <button className="fund-button" type="button" onClick={onExecute}>Make markets</button>
       </> : null}
       {state.kind === "error" ? <button className="secondary-button" type="button" onClick={onCancel}>Try again</button> : null}
     </section>
@@ -560,8 +664,8 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
-                  <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span><span className="market-link-external" aria-hidden="true">↗</span></a>
-                  <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span><span className="market-link-external" aria-hidden="true">↗</span></a>
+                  <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
+                  <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a>
                 </span></td>
               </tr>;
             }) : null}
@@ -572,7 +676,7 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
   );
 }
 
-function PositionLedger({ authenticated, positions, state, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel }: {
+function PositionLedger({ authenticated, positions, state, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel, updates, migrationPlan, migrationState, onPrepareMigration, onExecuteMigration, onCancelMigration }: {
   authenticated: boolean;
   positions: PositionView[];
   state: "idle" | "loading" | "ready" | "error";
@@ -584,15 +688,22 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
   actionState: PlanState;
   onExecute: () => void;
   onCancel: () => void;
+  updates: AvailableIndexUpdate[];
+  migrationPlan: IndexMigrationPlan | null;
+  migrationState: PlanState;
+  onPrepareMigration: (update: AvailableIndexUpdate) => void;
+  onExecuteMigration: () => void;
+  onCancelMigration: () => void;
 }) {
   const summary = summarizePositions(positions);
   const showPositions = authenticated && positions.length > 0;
   return (
     <section className="position-ledger" id="positions">
+      {updates.length ? <IndexUpdatePanel updates={updates} plan={migrationPlan} state={migrationState} onPrepare={onPrepareMigration} onExecute={onExecuteMigration} onCancel={onCancelMigration} /> : null}
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
-          <div><b>{actionPlan ? `${actionPlan.kind === "compound" ? "Reinvest fees" : "Withdraw"} · ${actionPlan.pair}` : "Preparing your position"}</b><p>{actionState.message}{actionState.kind === "ready" && actionPlan?.kind === "compound" ? ` Collect fees, deduct Una’s ${(actionPlan.serviceFeeBps / 100).toFixed(0)}% fee, and add the rest back to this position.` : ""}</p></div>
-          {actionPlan ? <span>{(actionPlan.serviceFeeBps / 100).toFixed(2)}% Una fee</span> : null}
+          <div><b>{actionPlan ? `${actionPlan.kind === "compound" ? "Reinvest fees" : "Withdraw"} · ${actionPlan.pair}` : "Preparing your position"}</b><p>{actionState.message}{actionState.kind === "ready" && actionPlan?.kind === "compound" ? ` Collect fees, deduct Wizzy’s ${(actionPlan.serviceFeeBps / 100).toFixed(0)}% fee, and add the rest back to this position.` : ""}</p></div>
+          {actionPlan ? <span>{(actionPlan.serviceFeeBps / 100).toFixed(2)}% Wizzy fee</span> : null}
           <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>Approve</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing"}>Close</button></div>
         </section>
       ) : null}
@@ -618,6 +729,34 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
   );
 }
 
+function IndexUpdatePanel({ updates, plan, state, onPrepare, onExecute, onCancel }: {
+  updates: AvailableIndexUpdate[];
+  plan: IndexMigrationPlan | null;
+  state: PlanState;
+  onPrepare: (update: AvailableIndexUpdate) => void;
+  onExecute: () => void;
+  onCancel: () => void;
+}) {
+  const busy = state.kind === "planning" || state.kind === "signing";
+  if (state.kind !== "idle") return <section className={`index-update-panel is-${state.kind}`} aria-live="polite">
+    <header><span><b>{plan ? `${plan.fromMarket.symbol} → ${plan.toMarket.symbol}` : "Preparing index update"}</b><small>{state.message}</small></span><button type="button" onClick={onCancel} disabled={busy}>Close</button></header>
+    {plan ? <dl>
+      <div><dt>Position replaced</dt><dd>{plan.fromMarket.symbol} → {plan.toMarket.symbol}</dd></div>
+      <div><dt>Amount moving</dt><dd>At least {trimEth(BigInt(plan.migratedAmountFloorWei))} ETH</dd></div>
+      <div><dt>Wizzy rebalance fee</dt><dd>{trimEth(BigInt(plan.serviceFeeWei))} ETH</dd></div>
+      <div><dt>Approval</dt><dd>One atomic wallet batch</dd></div>
+    </dl> : null}
+    {state.kind === "ready" ? <><p>If any step fails, your original position remains unchanged. Other index positions are untouched.</p><button className="small-primary" type="button" onClick={onExecute}>Update position</button></> : null}
+    {state.kind === "error" ? <button className="secondary-button" type="button" onClick={onCancel}>Dismiss</button> : null}
+  </section>;
+  return <section className="index-update-panel" aria-label="Index update available">
+    <div className="index-update-copy"><span className="update-mark"><RefreshIcon /></span><span><b>Index updated</b><small>{updates.length === 1 ? `${updates[0]!.fromSymbol} has been replaced by ${updates[0]!.toSymbol}.` : `${updates.length} positions can move to the latest index.`}</small></span></div>
+    <div className="index-update-actions">
+      {updates.map((update) => <button className="small-primary" type="button" key={`${update.migrationId}-${update.position.tokenId}`} onClick={() => onPrepare(update)}>Review {update.fromSymbol} update</button>)}
+    </div>
+  </section>;
+}
+
 function PortfolioEmpty({ variant, onPrimary }: {
   variant: "disconnected" | "loading" | "error" | "empty";
   onPrimary?: () => void;
@@ -627,14 +766,14 @@ function PortfolioEmpty({ variant, onPrimary }: {
     : variant === "error"
       ? { title: "We couldn’t load your positions.", body: "Try again to read your wallet.", action: "Try again" }
     : variant === "empty"
-        ? { title: "No positions yet.", body: "Make markets to open positions across the Robinhood Una Index.", action: "Make markets" }
+        ? { title: "No positions yet.", body: "Make markets to open positions across the Robinhood Wizzy Index.", action: "Make markets" }
         : { title: "Reading your positions.", body: "Your liquidity will appear here.", action: "" };
   return <section className={`portfolio-empty is-${variant}`} aria-live={variant === "loading" ? "polite" : undefined}>
     <span className="empty-symbol"><WalletIcon /></span>
     <div className="empty-copy">
       <h3>{content.title}</h3>
       <p>{content.body}</p>
-      {onPrimary && content.action ? <button type="button" onClick={onPrimary}>{content.action}<ArrowIcon /></button> : null}
+      {onPrimary && content.action ? <button type="button" onClick={onPrimary}>{content.action}</button> : null}
     </div>
   </section>;
 }
@@ -805,4 +944,6 @@ function VenueTrail({ chain }: { chain: IndexChain }) {
 }
 
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }
-function ArrowIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>; }
+function ChevronIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" /></svg>; }
+function CheckIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>; }
+function RefreshIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.2-2L20 12M4 12l2.7 5a7 7 0 0 0 11.2-2" /></svg>; }

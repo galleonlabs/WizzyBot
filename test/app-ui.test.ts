@@ -6,14 +6,15 @@ const portfolio = readFileSync("app/portfolio-app.tsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
 const providers = readFileSync("app/providers.tsx", "utf8");
-const mascot = readFileSync("public/brand/una-mascot.svg", "utf8");
+const mascot = readFileSync("public/brand/wizzy-mascot.svg", "utf8");
 const nextConfig = readFileSync("next.config.ts", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
     expect(page).toContain("PortfolioApp");
     expect(portfolio).toContain("Make Meme Markets");
-    expect(portfolio).toContain("Deposit ETH into a curated index of meme markets, starting with Robinhood Chain.");
+    expect(portfolio).toContain("Deposit ETH into a curated index of meme markets and earn.");
+    expect(portfolio).toContain("Updated and managed by agents on Robinhood Chain.");
     expect(portfolio).toContain("Make markets");
     expect(portfolio).toContain("Fee APR");
     expect(portfolio).toContain("Based on 24h fees");
@@ -25,6 +26,8 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Pay from");
     expect(portfolio).toContain('name="depositAmount"');
     expect(portfolio).toContain('name="sourceChain"');
+    expect(portfolio).toContain("Choose where your ETH is now");
+    expect(portfolio).not.toContain("<select");
     expect(portfolio).toContain("Your market positions");
     expect(portfolio).toContain("Connect from the header to see value, fees, and range status.");
     expect(portfolio).not.toContain("One wallet. Your markets.");
@@ -36,6 +39,7 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
     expect(portfolio).toContain("Trade on Fomo");
     expect(portfolio).toContain("Trade ${market.symbol}/WETH on Fomo");
+    expect(portfolio).not.toContain("market-link-external");
     expect(portfolio).not.toMatch(/app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
     expect(portfolio).not.toMatch(/autopilot|guaranteed returns|UnaBot/i);
@@ -50,7 +54,7 @@ describe("meme index product UI", () => {
     expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(css).toContain(".position-list article { grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(css).toContain(".portfolio-empty .empty-symbol { display: none; }");
-    expect(css).toContain(".market-link-label,");
+    expect(css).toContain(".market-link-label { display: none; }");
     expect(css).not.toContain('content: "Explore"');
   });
 
@@ -65,17 +69,18 @@ describe("meme index product UI", () => {
     expect(css).toContain("--surface: #111116");
     expect(css).toContain("@media (prefers-color-scheme: dark)");
     expect(css).toContain(':root[data-theme="dark"]');
+    expect(layout).toContain('localStorage.getItem("wizzy-theme")');
     expect(layout).toContain('localStorage.getItem("una-theme")');
     expect(layout).toContain('saved==="system"||saved==="light"||saved==="dark"?saved:"dark"');
     expect(portfolio).toContain('useState<ThemePreference>("dark")');
-    expect(portfolio).toContain('window.localStorage.setItem("una-theme", next)');
+    expect(portfolio).toContain('window.localStorage.setItem("wizzy-theme", next)');
     expect(portfolio).toContain('Theme: ${capitalize(theme)}');
     expect(css).not.toMatch(/#FC72FF|#FF37C7|#ff007a/i);
     expect(css).not.toContain("Instrument Serif");
     expect(css).not.toMatch(/gradient/i);
   });
 
-  it("reduces Una to one oversized hooded head", () => {
+  it("reduces Wizzy to one oversized hooded head", () => {
     expect(mascot).toContain("single oversized hooded head");
     expect(mascot).toContain("M33 98C47 76 68 64 86 48");
     expect(mascot).toContain("M48 104C61 80 91 68 127 68");
@@ -84,7 +89,7 @@ describe("meme index product UI", () => {
     expect(mascot).not.toMatch(/staff|crystal|hands|feet|stroke=/i);
   });
 
-  it("keeps Una eye-first at icon scale", () => {
+  it("keeps Wizzy eye-first at icon scale", () => {
     expect(mascot).toContain('rx="22" ry="32"');
     expect(mascot).toContain('rx="7" ry="10"');
     expect(mascot).not.toContain('rx="15.5" ry="22.5"');
@@ -100,14 +105,14 @@ describe("meme index product UI", () => {
   });
 
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {
-    expect(portfolio).toContain("Robinhood Una Index");
+    expect(portfolio).toContain("Robinhood Wizzy Index");
     expect(portfolio).toContain("Built on Robinhood Chain");
-    expect(portfolio).toContain("curated markets");
-    expect(portfolio).toContain("Una agents regularly review which markets qualify.");
+    expect(portfolio).not.toContain("curated markets");
+    expect(portfolio).toContain("Wizzy agents regularly review which markets qualify.");
     expect(portfolio).toContain("Actively curated as meme markets change.");
     expect(portfolio).toContain('src={BRAND_ASSETS.robinhood}');
     expect(portfolio).toContain("Self-custodial");
-    expect(portfolio).toContain("Two wallet approvals: deposit from");
+    expect(portfolio).toContain("Two approvals: move your ETH from");
     expect(portfolio).toContain('useState("1.00")');
     expect(portfolio).toContain("useState(4663)");
     expect(portfolio).not.toContain("v{markets.catalog.version}");
@@ -118,12 +123,29 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("Deposit ETH. Earn trading fees across Base, Robinhood, and Solana.");
     expect(css).toContain(".index-hero { grid-template-columns: 1fr; gap: 48px; padding: 68px 0 64px");
     expect(css).toContain("min-height: 44px");
-    expect(css).not.toContain("position: fixed");
+    expect(css).toContain(".chain-picker-popover");
+    expect(css).toContain("position: fixed");
+    expect(css).toContain(".index-update-panel");
+    expect(portfolio).toContain("Index updated");
+    expect(portfolio).toContain("Update position");
+    expect(portfolio).toContain("/api/portfolio/migrate");
   });
 
-  it("provisions a Privy Solana wallet for new and existing email users", () => {
-    expect(providers).toContain('loginMethods: ["email"]');
+  it("ships the Wizzy identity and canonical domain without stale public Una assets", () => {
+    expect(layout).toContain('new URL("https://wizzy.meme")');
+    expect(layout).toContain('title: "Wizzy: Make Meme Markets"');
+    expect(layout).toContain('siteName: "Wizzy"');
+    expect(portfolio).toContain('aria-label="Wizzy overview"');
+    expect(portfolio).toContain('/brand/wizzy-mascot-dark.svg');
+    expect(portfolio).not.toContain('/brand/una-mascot');
+    expect(mascot).toContain("Wizzy mascot");
+  });
+
+  it("offers wallet-first login and provisions EVM and Solana wallets for every user", () => {
+    expect(providers).toContain('loginMethods: ["wallet", "email"]');
+    expect(providers).toContain('ethereum: { createOnLogin: "all-users" }');
     expect(providers).toContain('solana: { createOnLogin: "all-users" }');
+    expect(providers).toContain("defaultChain: robinhoodChain");
     expect(providers).toContain('"solana:mainnet"');
   });
 

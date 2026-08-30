@@ -23,5 +23,6 @@ export { getRobinhoodIndexBreadthPolicy } from "./portfolio/index-selection.js";
 export { getRobinhoodIndexState, readIndexRegistry, resolveRegistryMarkets, unaIndexRegistryAbi } from "./index/registry.js";
 export { getMemeIndexBreadthPolicy } from "./portfolio/index-selection.js";
 export { planPositionAction } from "./portfolio/position-actions.js";
+export { planIndexMigration } from "./portfolio/index-migration.js";
 export { quoteBaseToRobinhoodEth, quoteBaseToSolanaSol, quoteEthToRobinhood, relayIntentStatus } from "./relay/client.js";
 export { ETH_FUNDING_CHAINS } from "./relay/origins.js";

@@ -1,8 +1,8 @@
-# Una
+# Wizzy
 
 The one-click market maker for memes. One reviewed index across Base, Robinhood Chain, and Solana.
 
-The consumer chooses an ETH amount and makes markets. Una chooses the chains, pools, weights, swaps, bridges, and ranges.
+The consumer chooses an ETH amount and makes markets. Wizzy chooses the chains, pools, weights, swaps, bridges, and ranges.
 
 ## Rules
 
@@ -15,7 +15,7 @@ The consumer chooses an ETH amount and makes markets. Una chooses the chains, po
 - The user owns every EVM LP NFT and Solana DLMM position. No vault custody.
 - Prefer tools over guessing on-chain state. Label short-window APR and projections as trailing pace, never promised returns.
 - AI explains market evidence, risk, and transaction plans. It cannot change the curated catalog, bypass deterministic allowlists, or authorize a transaction.
-- Consumer writes must be returned to the client wallet for signing. Never imply that chat confirmation gives Una custody or server-side signing authority.
+- Consumer writes must be returned to the client wallet for signing. Never imply that chat confirmation gives Wizzy custody or server-side signing authority.
 - Use consumer language first: deposit, fees, reinvest, withdraw. Keep protocol mechanics in receipts or direct answers.
 - Live writes stop for a confirm card, then Privy signs. Chat confirmation never substitutes for wallet approval.
 

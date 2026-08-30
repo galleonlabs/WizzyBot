@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeMarkets, chainCatalog, getMarketCatalog } from "../src/markets/catalog.js";
+import { activeMarkets, chainCatalog, getMarketCatalog, parseMarketCatalog } from "../src/markets/catalog.js";
 import { deriveGeckoMarketStats, deriveMarketStats } from "../src/markets/stats.js";
 import { activeSolanaMarkets, getSolanaMarketCatalog } from "../src/markets/solana-catalog.js";
 import { deriveSolanaMarketStats } from "../src/markets/solana-stats.js";
@@ -8,6 +8,7 @@ import { weightedBudgets } from "../src/portfolio/allocation.js";
 describe("curated meme markets", () => {
   it("keeps every active chain portfolio at 100%", () => {
     const catalog = getMarketCatalog();
+    expect(catalog.migrations).toEqual([]);
     for (const chain of catalog.chains) {
       expect(activeMarkets(chain.slug).reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
     }
@@ -22,6 +23,25 @@ describe("curated meme markets", () => {
     const amounts = weightedBudgets(101n, [3_000, 3_000, 2_500, 1_500]);
     expect(amounts).toEqual([30n, 30n, 25n, 16n]);
     expect(amounts.reduce((sum, amount) => sum + amount, 0n)).toBe(101n);
+  });
+
+  it("only accepts curator migrations that preserve the outgoing index slot", () => {
+    const candidate = structuredClone(getMarketCatalog());
+    const robinhood = candidate.chains.find((chain) => chain.slug === "robinhood")!;
+    const outgoing = robinhood.markets.find((market) => market.id === "robinhood-cashcat")!;
+    outgoing.status = "paused";
+    robinhood.markets.push({ ...outgoing, id: "robinhood-cashcat-next", name: "Cashcat Next", symbol: "CASHNEXT", status: "active" });
+    candidate.migrations.push({
+      id: "cashcat-next",
+      chain: "robinhood",
+      fromMarketId: outgoing.id,
+      toMarketId: "robinhood-cashcat-next",
+      effectiveAt: "2026-08-30",
+    });
+
+    expect(() => parseMarketCatalog(candidate)).not.toThrow();
+    robinhood.markets.at(-1)!.weightBps -= 1;
+    expect(() => parseMarketCatalog(candidate)).toThrow("active market weights must sum to 10,000 bps");
   });
 
   it("keeps the hidden Solana index at 100% with maintained Meteora pools", () => {

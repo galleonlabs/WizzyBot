@@ -166,7 +166,7 @@ export function planCompound(
         to: ADDRESSES.universalRouter,
         data: "0x",
         value: 0n,
-        description: "Universal Router v3 exact-in (no UnaBot swap fee)",
+        description: "Universal Router v3 exact-in (no Wizzy swap fee)",
       },
     });
   }
@@ -468,4 +468,3 @@ export function formatReceipt(receipt: ActionReceipt): string {
   ];
   return lines.filter(Boolean).join("\n");
 }
-

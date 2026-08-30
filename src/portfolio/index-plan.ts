@@ -173,8 +173,8 @@ export async function planRobinhoodIndex(input: {
     ] : [allocationStage],
     notices: [
       bridge
-        ? `Una moves ETH from ${source.label} to Robinhood Chain, then creates every market position your deposit supports.`
-        : "Una creates every market position your deposit supports directly on Robinhood Chain.",
+        ? `Wizzy moves ETH from ${source.label} to Robinhood Chain, then creates every market position your deposit supports.`
+        : "Wizzy creates every market position your deposit supports directly on Robinhood Chain.",
       `${bridge ? "Two wallet approvals" : "One wallet approval"}. Every position remains self-custodial.`,
       "Fee APR changes with trading activity. Meme prices can fall, and trading fees may not cover losses.",
     ],
@@ -182,7 +182,7 @@ export async function planRobinhoodIndex(input: {
 }
 
 /**
- * Builds the one public Una product: a ranked, versioned meme-liquidity index.
+ * Builds the one public Wizzy product: a ranked, versioned meme-liquidity index.
  * Deposit size controls breadth; chain, market, and range choices are not inputs.
  */
 export async function planMemeIndex(input: {
@@ -279,7 +279,7 @@ export async function planMemeIndex(input: {
       },
     ],
     notices: [
-      "Una opens as many reviewed markets as your deposit can support, then chooses the networks, pools, and liquidity ranges.",
+      "Wizzy opens as many reviewed markets as your deposit can support, then chooses the networks, pools, and liquidity ranges.",
       "The Base batch funds every network in one intent. Privy then asks for the destination-wallet signatures each network requires.",
       "Every EVM LP NFT and Solana DLMM position is created in wallets controlled by this Privy identity.",
       "Fee APR changes with trading activity. Meme prices can fall, and trading fees may not cover losses.",

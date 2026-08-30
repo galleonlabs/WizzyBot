@@ -1,8 +1,8 @@
-# Una launch privacy
+# Wizzy launch privacy
 
 ## Security objective
 
-Una can operate under a public pseudonym. It cannot honestly promise total anonymity.
+Wizzy can operate under a public pseudonym. It cannot honestly promise total anonymity.
 
 GitHub, Vercel, Privy, Pools, X, infrastructure providers, payment providers, legal advisers, and public blockchains may retain or expose operator information. Blockchain funding and wallet activity are public and may be linkable. The policy is to prevent unnecessary public attribution while keeping lawful records and accurate disclosures—not to conceal ownership from providers, regulators, counterparties, or users who are entitled to know it.
 
@@ -10,9 +10,9 @@ GitHub, Vercel, Privy, Pools, X, infrastructure providers, payment providers, le
 
 - The source repository remains private.
 - The public product, metadata, assets, links, treasury labels, and API responses must contain no personal or Galleon identity.
-- The dedicated Una treasury and token-creator address must not be reused for unrelated activity.
+- The dedicated Wizzy treasury and token-creator address must not be reused for unrelated activity.
 - Private keys never enter source, browser code, screenshots, logs, analytics, support messages, or social drafts.
-- Product claims use Una as the product identity and disclose related-party token control when that fact becomes relevant.
+- Product claims use Wizzy as the product identity and disclose related-party token control when that fact becomes relevant.
 
 This boundary is enforced by a repository test over shipped source and public assets. It is also rechecked against the deployed HTML, JavaScript, metadata, headers, images, and API responses before a public launch.
 
@@ -21,7 +21,7 @@ This boundary is enforced by a repository test over shipped source and public as
 1. Keep the repository private. Existing private Git history contains operator authorship and must not be published as-is.
 2. If open-sourcing becomes a goal, create a separately reviewed public history or explicitly approve a one-time history rewrite before publication. Do not rewrite the working repository casually.
 3. Keep Vercel project ownership, Git remote URLs, source maps, analytics payloads, error reports, and generated metadata out of public pages.
-4. Use generic support and security contact identities created for Una before those addresses are exposed.
+4. Use generic support and security contact identities created for Wizzy before those addresses are exposed.
 5. Run secret, identity-string, source-map, junk-file, and response-header scans on the exact production commit.
 
 ## Wallet and custody controls
@@ -34,7 +34,7 @@ Assume every funding transaction is publicly attributable through chain analysis
 
 ## Pools and X separation
 
-- Use dedicated Una credentials and recovery channels, stored in the password manager and protected with passkeys or hardware keys.
+- Use dedicated Wizzy credentials and recovery channels, stored in the password manager and protected with passkeys or hardware keys.
 - Do not reuse personal usernames, biographies, profile images, recovery email addresses, phone numbers, browser autofill, or public wallet labels.
 - Before submitting to Pools, verify the selected account, chain, creator address, recipients, and transaction simulation.
 - Before posting on X, verify the final onchain contract address from independent chain data and use the same canonical address everywhere.

@@ -6,7 +6,7 @@ export type WalletTransaction = {
 };
 
 export type EthereumProvider = {
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+  request(args: { method: string; params?: unknown[]; sponsor?: boolean }): Promise<unknown>;
 };
 
 export type ConnectedEvmWallet = {
@@ -36,6 +36,7 @@ export async function sendWalletCalls(input: {
   try {
     result = await provider.request({
       method: "wallet_sendCalls",
+      ...(input.chainId === 4663 ? { sponsor: true } : {}),
       params: [{
         from: input.owner,
         chainId: `0x${input.chainId.toString(16)}`,

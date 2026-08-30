@@ -1,5 +1,5 @@
 [Unit]
-Description=Collect Una index evidence every six hours
+Description=Research and curate the Una index every six hours
 
 [Timer]
 OnCalendar=*-*-* 00/6:00:00

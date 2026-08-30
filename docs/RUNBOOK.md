@@ -125,7 +125,7 @@ Production Solana treasury custody: Vercel stores only the public address. The i
 
 Robinhood membership and weights come from `src/config/markets.json`. Metadata for tracked candidates remains version-controlled so existing positions stay readable and withdrawable.
 
-The persistent workflow is documented in `docs/CURATION.md`. `bun run curate:index` records evidence and replacement proposals; the curator agent applies valid changes to the catalog and ships the tested deployment. Registry tooling is deferred and is not part of the production workflow.
+The persistent workflow is documented in `docs/CURATION.md`. The dappnode timer collects evidence, runs a read-only web-research agent, validates its structured decision against deterministic policy, and ships only tested centralized catalog changes. Registry contract tooling is deferred and is not part of the production workflow.
 
 ## Dry-run vs live
 

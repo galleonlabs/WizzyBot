@@ -9,15 +9,18 @@ WorkingDirectory=%h/projects/personal/UnaBot
 Environment=NODE_ENV=production
 Environment=UNABOT_CURATOR_STATE_DIR=%S/unabot-curator
 Environment=UNABOT_BUN_BIN=%h/.local/share/unabot-bun/bin/bun
+Environment=UNABOT_CURATOR_AGENT_ENABLED=1
 EnvironmentFile=-%h/.config/unabot/curator.env
 ExecStart=/usr/bin/env bash scripts/run-curator-service.sh
 UMask=0077
 StateDirectory=unabot-curator
 StateDirectoryMode=0700
+TimeoutStartSec=1h
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
+ReadWritePaths=%h/projects/personal/UnaBot
 RestrictSUIDSGID=true
 LockPersonality=true
 

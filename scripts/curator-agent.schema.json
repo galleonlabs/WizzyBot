@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "verdict", "summary", "candidateReviews", "replacement"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "verdict": { "enum": ["no_change", "replace"] },
+    "summary": { "type": "string" },
+    "candidateReviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidateId", "identity", "rationale", "sources"],
+        "properties": {
+          "candidateId": { "type": "string" },
+          "identity": { "enum": ["reviewed", "watch"] },
+          "rationale": { "type": "array", "items": { "type": "string" } },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["url", "title", "finding"],
+              "properties": {
+                "url": { "type": "string" },
+                "title": { "type": "string" },
+                "finding": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "replacement": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fromMarketId", "toMarketId", "rationale"],
+          "properties": {
+            "fromMarketId": { "type": "string" },
+            "toMarketId": { "type": "string" },
+            "rationale": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -68,7 +68,11 @@ export type CuratorPolicy = z.infer<typeof PolicySchema>;
 export type CuratorCandidate = z.infer<typeof CandidateSchema>;
 export type CuratorConfig = z.infer<typeof CuratorConfigSchema>;
 
-const config = CuratorConfigSchema.parse(rawConfig);
+export function parseCuratorConfig(input: unknown): CuratorConfig {
+  return CuratorConfigSchema.parse(input);
+}
+
+const config = parseCuratorConfig(rawConfig);
 
 export function getCuratorConfig(): CuratorConfig {
   return config;

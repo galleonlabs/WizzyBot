@@ -44,8 +44,15 @@ The dappnode timer persists:
 - `latest.json` — machine-readable calls and replacements.
 - `latest.md` — the operator review.
 
-Candidate addresses and thresholds live in `src/config/curator.json`; the catalog remains the reviewed metadata allowlist. Robinhood membership, weights, pause state, and stable-slot replacements are canonical in `UnaIndexRegistry`. The product reads that snapshot directly and derives affected-wallet migrations from its onchain replacement records.
+Candidate addresses, identity state, and thresholds live in `src/config/curator.json`. Robinhood membership, weights, and replacement migrations live in `src/config/markets.json`; this version-controlled catalog is the production registry.
 
-Every constituent replacement inherits the outgoing weight and range width. The registry records the old and new market IDs, allowing Markets to offer affected wallets a one-approval migration of only the retired position while leaving unrelated positions untouched.
+Every constituent replacement inherits the outgoing weight and range width. The catalog keeps the outgoing market inactive and records a migration to its active successor, allowing Markets to offer affected wallets a one-approval migration without touching unrelated positions.
 
-`registry:sync` is the controlled publication path. It is dry-run by default, validates a fresh curator report, simulates the exact contract action, and requires the dedicated curator signer for `--live`.
+The dappnode timer runs a two-layer curator every six hours:
+
+1. The deterministic collector updates 30 days of liquidity, volume, fee, age, and security observations and produces policy-valid proposals.
+2. A read-only, web-enabled research agent verifies candidate identity, provenance, contract and pool evidence, social history, and manipulation risk. Websites are evidence only and cannot instruct the agent.
+3. A deterministic updater accepts identity evidence only with multiple cited sources and accepts a replacement only when the rules report already contains the exact proposal.
+4. Changes run the complete test, typecheck, and production-build gate in a disposable Git worktree. The service refuses stale or unexpected changes, then pushes only the candidate registry, centralized market catalog, and generated hosted bundle.
+
+The curator has no treasury key and cannot publish contracts or transact. A Git push triggers the normal Vercel deployment, preserving a reviewable history and rollback path.

@@ -1,6 +1,6 @@
 # Una onchain architecture
 
-Status: active on Robinhood Chain. `UnaIndexRegistry` is deployed at `0x429cbC121Af66fFa3C382dE4C776d2f2bC37cd4c`; the production product reads its versioned snapshot when `UNA_INDEX_REGISTRY_ADDRESS` is configured.
+Status: deferred. A registry contract was deployed during testing, but production does not configure `UNA_INDEX_REGISTRY_ADDRESS`, does not read that contract, and does not publish curator decisions onchain. The version-controlled catalog remains authoritative.
 
 ## Decision
 
@@ -12,9 +12,9 @@ The public MIT-licensed `revert-finance/v3utils` repository contains Auto-Range 
 
 Cross-chain entry still requires a destination-chain action after Relay fills. EIP-5792 batches calls on one chain; it cannot make an asynchronous bridge plus destination execution one atomic transaction. A destination receiver contract could automate that second action later, but it would need tightly constrained calldata, refund behavior, bridge authentication, and an audit before receiving user funds.
 
-## Onchain index registry
+## Deferred onchain index registry
 
-`UnaIndexRegistry` provides the canonical onchain snapshot for the Robinhood Una Index:
+`UnaIndexRegistry` remains an optional future design for a canonical onchain snapshot:
 
 - The full index is replaced atomically; partial updates are impossible.
 - Weights must total exactly 10,000 basis points.
@@ -27,9 +27,9 @@ Cross-chain entry still requires a destination-chain action after Relay fills. E
 - The contract stores the current snapshot; events preserve the version history for indexers and audits.
 - Stable-slot replacements are recorded onchain so the product can derive user migration actions without a backend manifest.
 
-The deployment owner and curator are the same dedicated Una EOA: `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`, matching the current single-signer operating model.
+The unused deployed instance is owned and curated by the dedicated Una EOA. It remains inert while the production environment omits its address.
 
-Every curator run produces evidence and one of three recommendations: no change, a policy-valid whole-index replacement, or an immediate pause on a hard security failure. `registry:sync` validates the report, simulates the exact contract action, and publishes with the configured curator key only when run with `--live`.
+The active curator updates the centralized catalog through a tested Git release. `registry:deploy`, `registry:calldata`, and `registry:sync` are retained for future review and must not be part of the dappnode curator workflow.
 
 ## Threat assessment
 
@@ -43,9 +43,9 @@ Every curator run produces evidence and one of three recommendations: no change,
 | Security incident | Curator-or-owner pause; owner-only unpause | Existing positions remain exposed to their underlying pools; pause only stops Wizzy from treating the registry as depositable. |
 | Backend censorship or drift | Product reads the versioned contract state and report hash | RPC availability and chain reorgs still require normal client retry/finality handling. |
 
-## Activation evidence
+## Prior test evidence
 
-The contract test suite fuzzes weight invariants and covers authorization, pause recovery, canonical-pool validation, version conflicts, and stable-slot replacements. A Robinhood mainnet-state fork then proved a six-position buy, an onchain curator replacement, the affected LP migration, and complete withdrawal of all six positions. A funded production canary remains required before calling the wallet-facing lifecycle transaction-backed on mainnet.
+The contract test suite and a Robinhood mainnet-state fork proved the design, including a six-position buy, replacement migration, and full withdrawal. That evidence does not activate the contract or make it production authority.
 
 `bun run registry:deploy` estimates the current transaction and predicted address without broadcasting. `bun run registry:deploy -- --live` refuses a signer other than the configured Wizzy treasury, refuses an underfunded address, deploys owner and curator as that same address, and verifies the receipt address. After deployment, set the legacy-compatible `UNA_INDEX_REGISTRY_ADDRESS` and run `bun run registry:sync` before using `--live`.
 

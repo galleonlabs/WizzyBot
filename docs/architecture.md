@@ -14,7 +14,7 @@ Wizzy is self-custodial portfolio software. The wallet owns every LP NFT and sig
 | Cross-chain intent and fill status | Relay quote plus Relay intent status, tied to its request ID |
 | AI explanations and suggestions | Advisory only; never transaction authority |
 
-The six-hour curator produces evidence and policy-valid replacement proposals. The curator agent reviews those outputs, updates `src/config/markets.json`, and ships the normal tested application deployment. There is no onchain publication or registry gas cost in the current launch architecture.
+The six-hour dappnode curator combines deterministic evidence with read-only deep web research. The rules engine alone authorizes replacements; the research agent can verify identity or veto a proposal, but cannot invent an executable change. A validated update changes the centralized JSON catalog in a disposable worktree, passes the full release gate, and ships through Git/Vercel. There is no onchain publication or registry gas cost in the current launch architecture.
 
 ## Index deposit path
 
@@ -54,7 +54,7 @@ Solana token fees land in associated token accounts controlled by `UNABOT_SOLANA
 
 Revert's position tooling makes the useful comparison set concrete: pool and fee tier, NFT ID, owner, asset amounts, PnL, fee APR, total return, age, range state, time in range, and performance versus holding. Wizzy should show those at position level and aggregate value, fees, chain allocation, range health, and risk at portfolio level.
 
-Annualized numbers are unstable for young or briefly active positions. Wizzy labels trailing windows, withholds APR for insufficient history, and presents scenarios rather than guaranteed projections. Market curation is deterministic and reviewable; AI may explain inclusions, exclusions, risks, and proposed range changes but cannot silently alter the allowlist or sign.
+Annualized numbers are unstable for young or briefly active positions. Wizzy labels trailing windows, withholds APR for insufficient history, and presents scenarios rather than guaranteed projections. Market curation is reviewable and fail-closed: AI research may update candidate identity and approve only a deterministic policy proposal; it cannot bypass thresholds, create arbitrary calldata, access signing keys, or transact.
 
 ## Compounding
 

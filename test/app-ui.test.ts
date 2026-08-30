@@ -36,9 +36,7 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain("https://www.geckoterminal.com/robinhood/pools");
     expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
-    expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
-    expect(portfolio).toContain("Trade on Fomo");
-    expect(portfolio).toContain("Trade ${market.symbol}/WETH on Fomo");
+    expect(portfolio).not.toMatch(/fomo\.family|Trade on Fomo/i);
     expect(portfolio).not.toContain("market-link-external");
     expect(portfolio).not.toMatch(/app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
@@ -61,6 +59,10 @@ describe("meme index product UI", () => {
   it("pairs a characterful display face with a restrained trading UI", () => {
     expect(layout).toContain("Unbounded");
     expect(layout).toContain("Plus_Jakarta_Sans");
+    expect(layout).toContain("@vercel/analytics/next");
+    expect(layout).toContain("@vercel/speed-insights/next");
+    expect(layout).toContain("<Analytics />");
+    expect(layout).toContain("<SpeedInsights />");
     expect(layout).not.toContain("Bricolage_Grotesque");
     expect(layout).not.toContain("Instrument_Serif");
     expect(css).toContain("font-family: var(--font-display)");
@@ -145,6 +147,8 @@ describe("meme index product UI", () => {
     expect(providers).toContain('loginMethods: ["wallet", "email"]');
     expect(providers).toContain('ethereum: { createOnLogin: "all-users" }');
     expect(providers).toContain('solana: { createOnLogin: "all-users" }');
+    expect(providers).toContain("toSolanaWalletConnectors");
+    expect(providers).toContain("solana: { connectors: solanaConnectors }");
     expect(providers).toContain("defaultChain: robinhoodChain");
     expect(providers).toContain('"solana:mainnet"');
   });
@@ -153,7 +157,7 @@ describe("meme index product UI", () => {
     expect(nextConfig).toContain(
       "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com https://assets.relay.link https://www.geckoterminal.com",
     );
-    expect(nextConfig).toContain("https://fomo.family");
+    expect(nextConfig).not.toContain("https://fomo.family");
     expect(nextConfig).not.toMatch(/avatars\.githubusercontent\.com/);
     expect(nextConfig).not.toContain("img-src *");
   });

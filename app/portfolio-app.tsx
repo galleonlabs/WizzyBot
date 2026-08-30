@@ -28,6 +28,7 @@ import { type SolanaPositionActionPlan } from "./lib/solana-position-server";
 import { executeSolanaPositionAction } from "./lib/solana-wallet";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
 import { relaySucceeded, sendWalletCalls, type ConnectedEvmWallet } from "./lib/wallet-calls";
+import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 
 type ViewTab = "overview" | "markets";
 type ThemePreference = "system" | "light" | "dark";
@@ -47,12 +48,10 @@ type AvailableIndexUpdate = {
 };
 
 const INDEX_MARKET_COUNT = 6;
-const FOMO_URL = "https://fomo.family/r/makemememarkets";
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
   robinhood: "https://assets.relay.link/icons/4663/light.png",
   solana: "https://assets.relay.link/icons/792703809/light.png",
-  fomo: "https://fomo.family/favicon.svg",
   gecko: "https://www.geckoterminal.com/favicon.ico",
 } as const;
 
@@ -101,6 +100,7 @@ export function PortfolioApp() {
   const [migrationPlan, setMigrationPlan] = useState<IndexMigrationPlan | null>(null);
   const [migrationState, setMigrationState] = useState<PlanState>({ kind: "idle" });
   const positionsRequestRef = useRef(0);
+  const authStateRef = useRef<"loading" | "signed-in" | "signed-out">("loading");
 
   const wallet = useMemo(() => {
     const preferred = user?.wallet?.address?.toLowerCase();
@@ -137,10 +137,11 @@ export function PortfolioApp() {
         .filter((row): row is PositionView => Boolean(row));
       setPositions(next);
       setPositionsState("ready");
-    } catch {
+    } catch (error) {
       if (requestId !== positionsRequestRef.current) return;
       setPositions([]);
       setPositionsState("error");
+      reportClientError("positions", error);
     }
   }, [address, authenticated, solanaAddress, solanaReady]);
 
@@ -148,6 +149,15 @@ export function PortfolioApp() {
     const saved = window.localStorage.getItem("wizzy-theme") ?? window.localStorage.getItem("una-theme");
     if (saved === "system" || saved === "light" || saved === "dark") setTheme(saved);
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const next = authenticated ? "signed-in" : "signed-out";
+    if (authStateRef.current !== next) {
+      trackProductEvent(authenticated ? "Session Restored" : "Session Ready", { authenticated });
+      authStateRef.current = next;
+    }
+  }, [authenticated, ready]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -165,7 +175,10 @@ export function PortfolioApp() {
         setMarkets(payload);
         setMarketsState("ready");
       })
-      .catch(() => setMarketsState("error"));
+      .catch((error) => {
+        setMarketsState("error");
+        reportClientError("markets", error);
+      });
   }, []);
 
   useEffect(() => {
@@ -239,9 +252,18 @@ export function PortfolioApp() {
     }
   }
 
+  function startLogin(source: "header" | "make-markets") {
+    trackProductEvent("Login Started", { source });
+    try {
+      login();
+    } catch (error) {
+      reportClientError("auth", error);
+    }
+  }
+
   async function prepareIndex() {
     if (!authenticated || !address) {
-      await login();
+      startLogin("make-markets");
       return;
     }
     let amountWei: bigint;
@@ -253,6 +275,7 @@ export function PortfolioApp() {
     }
     setPlanState({ kind: "planning", message: "Getting the latest price for your deposit…" });
     setPlan(null);
+    trackProductEvent("Index Quote Started", { originChainId: sourceChainId });
     try {
       const response = await fetch("/api/portfolio/index", {
         method: "POST",
@@ -263,8 +286,10 @@ export function PortfolioApp() {
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not prepare the index deposit");
       setPlan(payload.plan);
       setPlanState({ kind: "ready", message: "Review your deposit and fees before continuing." });
+      trackProductEvent("Index Quote Ready", { originChainId: sourceChainId, constituents: payload.plan.constituentCount });
     } catch (error) {
       setPlanState({ kind: "error", message: error instanceof Error ? error.message : "Could not prepare the index deposit" });
+      reportClientError("index-plan", error);
     }
   }
 
@@ -282,6 +307,7 @@ export function PortfolioApp() {
       return;
     }
     try {
+      trackProductEvent("Index Submit Started", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
       if (funding) {
         setPlanState({ kind: "signing", message: `Approve your ETH deposit from ${funding.chainLabel}.` });
         await sendWalletCalls({ wallet: connected, owner: address, chainId: funding.chainId, transactions: funding.transactions });
@@ -292,9 +318,11 @@ export function PortfolioApp() {
       setPlanState({ kind: "signing", message: `Approve ${plan.constituentCount} Robinhood market positions.` });
       await sendWalletCalls({ wallet: connected, owner: address, chainId: robinhood.chainId, transactions: robinhood.transactions });
       setPlanState({ kind: "submitted", message: "Your Robinhood positions are being confirmed. They will appear in Markets shortly." });
+      trackProductEvent("Index Submitted", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
       window.setTimeout(() => void loadPositions(), 8_000);
     } catch (error) {
       setPlanState({ kind: "error", message: error instanceof Error ? error.message : "The deposit could not be completed" });
+      reportClientError("index-submit", error);
     }
   }
 
@@ -328,6 +356,7 @@ export function PortfolioApp() {
       setActionState({ kind: "ready", message: "Ready for your wallet approval." });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : `Could not prepare ${action}` });
+      reportClientError("position-action", error);
     }
   }
 
@@ -357,6 +386,7 @@ export function PortfolioApp() {
       window.setTimeout(() => void loadPositions(), 8_000);
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : "Wallet submission failed" });
+      reportClientError("position-action", error);
     }
   }
 
@@ -376,6 +406,7 @@ export function PortfolioApp() {
       setMigrationState({ kind: "ready", message: "Review the replacement and fee before updating." });
     } catch (error) {
       setMigrationState({ kind: "error", message: error instanceof Error ? error.message : "Could not prepare the index update" });
+      reportClientError("index-migration", error);
     }
   }
 
@@ -397,6 +428,7 @@ export function PortfolioApp() {
       window.setTimeout(() => void loadPositions(), 8_000);
     } catch (error) {
       setMigrationState({ kind: "error", message: error instanceof Error ? error.message : "The index update could not be submitted" });
+      reportClientError("index-migration", error);
     }
   }
 
@@ -442,11 +474,11 @@ export function PortfolioApp() {
             <ThemeIcon preference={theme} />
           </button>
           {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
-            <button className="wallet-button" type="button" onClick={() => void logout()} title="Sign out">
+            <button className="wallet-button" type="button" onClick={() => { trackProductEvent("Logout Started"); void logout(); }} title="Sign out">
               <WalletIcon /> {short(address ?? "Wallet")}
             </button>
           ) : (
-            <button className="wallet-button wallet-connect" type="button" onClick={() => void login()}><WalletIcon /> Connect</button>
+            <button className="wallet-button wallet-connect" type="button" onClick={() => startLogin("header")}><WalletIcon /> Connect</button>
           )}
         </div>
       </header>
@@ -665,7 +697,6 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
                   <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
-                  <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a>
                 </span></td>
               </tr>;
             }) : null}

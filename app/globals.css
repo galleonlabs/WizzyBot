@@ -551,6 +551,27 @@ svg {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
+.fatal-error {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.fatal-error > div {
+  width: min(100%, 520px);
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+}
+
+.fatal-error h1 { margin: 0 0 12px; font-family: var(--font-display); font-size: clamp(28px, 5vw, 44px); }
+.fatal-error p { margin: 0 0 24px; color: var(--muted); line-height: 1.6; }
+.fatal-error button { min-height: 44px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--coral); color: #111116; font-weight: 800; }
+
 @media (max-width: 1060px) {
   .portfolio-summary { grid-template-columns: repeat(2, 1fr); }
   .portfolio-summary > div:nth-child(3) { border-left: 0; }

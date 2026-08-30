@@ -183,7 +183,7 @@ export async function waitForPrivyTransaction(input: {
   const startedAt = Date.now();
   let lastStatus: unknown;
   while (Date.now() - startedAt < timeoutMs) {
-    const response = await fetcher(`/api/privy/calls?transactionId=${encodeURIComponent(input.id)}`, { cache: "no-store" });
+    const response = await fetcher(`/api/privy/calls?transactionId=${encodeURIComponent(input.id)}`);
     lastStatus = await response.json() as unknown;
     if (!response.ok) throw new Error(apiErrorMessage(lastStatus, "Could not check the Privy transaction"));
     const terminal = privyTransactionTerminalState(lastStatus);

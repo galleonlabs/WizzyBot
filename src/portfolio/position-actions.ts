@@ -257,7 +257,7 @@ type RebalanceSwap = {
 
 async function quoteRebalanceSwap(
   client: PublicClient,
-  chain: EvmChainKey,
+  chain: ChainSlug,
   tokenIn: Address,
   tokenOut: Address,
   amountIn: bigint,

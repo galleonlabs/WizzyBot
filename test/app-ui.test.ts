@@ -26,7 +26,7 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Make markets");
     expect(portfolio).toContain("Fee APR");
     expect(portfolio).toContain("Based on 24h fees");
-    expect(portfolio).toContain("Inside the index");
+    expect(portfolio).toContain("Robinhood Wizzy Index");
     expect(portfolio).toContain("Earning now");
     expect(portfolio).toContain('{ id: "markets", label: "Markets" }');
     expect(portfolio).toContain('id="positions"');
@@ -37,8 +37,8 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain('className="market-stack" role="img"');
     expect(portfolio).toContain("Choose where your ETH is now");
     expect(portfolio).not.toContain("<select");
-    expect(portfolio).toContain("Your market positions");
-    expect(portfolio).toContain("Connect from the header to see value, fees, and range status.");
+    expect(portfolio).toContain("Reveal your markets");
+    expect(portfolio).toContain("Connect to see position value, fees, range status, and index updates.");
     expect(portfolio).not.toContain("One wallet. Your markets.");
     expect(portfolio).not.toContain("empty-route");
     expect(portfolio).not.toContain('label: "Positions"');
@@ -131,6 +131,31 @@ describe("meme index product UI", () => {
     expect(ghostDark).not.toMatch(/gradient|filter|text/i);
   });
 
+  it("uses one live Markets surface differently before and after wallet connection", () => {
+    expect(portfolio).toContain("const hasPortfolioAccess = authenticated || previewMode");
+    expect(portfolio).toContain('hasPortfolioAccess ? "Your markets" : "The live index"');
+    expect(portfolio).toContain("{hasPortfolioAccess ? positionLedger : null}");
+    expect(portfolio).toContain("{!hasPortfolioAccess ? positionLedger : null}");
+    expect(portfolio).toContain('className="index-snapshot');
+    expect(portfolio).toContain("Index composition");
+    expect(portfolio).toContain("Curator weights");
+    expect(portfolio).toContain("Across the index");
+    expect(portfolio).toContain('action: "Connect wallet"');
+    expect(css).toContain(".composition-track");
+    expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
+  });
+
+  it("gives navigation and market state changes a playful motion system", () => {
+    expect(portfolio).toContain("startViewTransition");
+    expect(portfolio).toContain("window.requestAnimationFrame");
+    expect(portfolio).toContain('matchMedia("(prefers-reduced-motion: reduce)")');
+    expect(css).toContain("view-transition-name: wizzy-view");
+    expect(css).toContain("@keyframes view-fold-in");
+    expect(css).toContain("@keyframes index-segment-assemble");
+    expect(css).toContain("@keyframes popover-open");
+    expect(css).toContain("::view-transition-new(wizzy-view) { animation: none; }");
+  });
+
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {
     expect(portfolio).toContain("Robinhood Wizzy Index");
     expect(portfolio).toContain("Built on Robinhood Chain");
@@ -168,6 +193,16 @@ describe("meme index product UI", () => {
     expect(mascot).toContain("Wizzy mascot");
   });
 
+  it("links the official Wizzy X account in the app and share metadata", () => {
+    expect(portfolio).toContain('href="https://x.com/wizzydotmeme"');
+    expect(portfolio).toContain('aria-label="Follow Wizzy on X"');
+    expect(portfolio).toContain('title="@wizzydotmeme on X"');
+    expect(portfolio).toContain('className="x-icon"');
+    expect(css).toContain(".social-button .x-icon { fill: currentColor; stroke: none; }");
+    expect(layout).toContain('site: "@wizzydotmeme"');
+    expect(layout).toContain('creator: "@wizzydotmeme"');
+  });
+
   it("ships a complete large social-share contract", () => {
     expect(layout).toContain('card: "summary_large_image"');
     expect(layout).toContain('url: "/"');
@@ -186,7 +221,7 @@ describe("meme index product UI", () => {
     expect(socialRenderer).toContain("process.env.FONTCONFIG_FILE");
   });
 
-  it("ships upload-ready @wizzydotfun profile art", () => {
+  it("ships upload-ready X profile art", () => {
     expect(xProfile.readUInt32BE(16)).toBe(400);
     expect(xProfile.readUInt32BE(20)).toBe(400);
     expect(xProfile.byteLength).toBeLessThan(2 * 1024 * 1024);

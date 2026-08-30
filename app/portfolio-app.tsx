@@ -46,6 +46,9 @@ type AvailableIndexUpdate = {
   fromSymbol: string;
   toSymbol: string;
 };
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (update: () => void | Promise<void>) => { finished: Promise<void> };
+};
 
 const INDEX_MARKET_COUNT = 6;
 const BRAND_ASSETS = {
@@ -223,13 +226,26 @@ export function PortfolioApp() {
         toSymbol: symbols.get(migration.toMarketId) ?? "the new market",
       })));
   }, [markets.catalog, positions]);
+  const hasPortfolioAccess = authenticated || previewMode;
 
   function changeTab(next: ViewTab) {
-    setTab(next);
-    const url = new URL(window.location.href);
-    if (next === "overview") url.searchParams.delete("view");
-    else url.searchParams.set("view", next);
-    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    if (next === tab) return;
+    const update = () => {
+      setTab(next);
+      const url = new URL(window.location.href);
+      if (next === "overview") url.searchParams.delete("view");
+      else url.searchParams.set("view", next);
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    };
+    const transitionDocument = document as ViewTransitionDocument;
+    if (transitionDocument.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      transitionDocument.startViewTransition(async () => {
+        update();
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      });
+    } else {
+      update();
+    }
   }
 
   function cycleTheme() {
@@ -252,7 +268,7 @@ export function PortfolioApp() {
     }
   }
 
-  function startLogin(source: "header" | "make-markets") {
+  function startLogin(source: "header" | "make-markets" | "markets") {
     trackProductEvent("Login Started", { source });
     try {
       login();
@@ -434,11 +450,11 @@ export function PortfolioApp() {
 
   const positionLedger = (
     <PositionLedger
-      authenticated={authenticated || previewMode}
+      authenticated={hasPortfolioAccess}
       positions={positions}
       state={positionsState}
       stats={stats}
-      onStart={() => changeTab("overview")}
+      onStart={() => hasPortfolioAccess ? changeTab("overview") : startLogin("markets")}
       onRetry={() => void loadPositions()}
       onAction={preparePositionAction}
       actionPlan={actionPlan}
@@ -452,6 +468,14 @@ export function PortfolioApp() {
       onExecuteMigration={() => void executeIndexMigration()}
       onCancelMigration={() => { setMigrationPlan(null); setMigrationState({ kind: "idle" }); }}
     />
+  );
+  const indexLedger = (
+    <section className="index-section index-catalog">
+      <header className="section-title">
+        <div><h2>Robinhood Wizzy Index</h2><p>Actively curated as meme markets change.</p></div>
+      </header>
+      <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} policy={markets.index} />
+    </section>
   );
 
   return (
@@ -478,15 +502,18 @@ export function PortfolioApp() {
           ))}
         </nav>
         <div className="nav-actions">
+          <a className="social-button" href="https://x.com/wizzydotmeme" target="_blank" rel="noreferrer" aria-label="Follow Wizzy on X" title="@wizzydotmeme on X" onClick={() => trackProductEvent("X Opened", { location: "header" })}>
+            <XIcon />
+          </a>
           <button className="theme-button" type="button" onClick={cycleTheme} aria-label={`Theme: ${capitalize(theme)}. Switch to ${theme === "dark" ? "light" : theme === "light" ? "system" : "dark"}.`} title={`Theme: ${capitalize(theme)}`}>
             <ThemeIcon preference={theme} />
           </button>
           {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
-            <button className="wallet-button" type="button" onClick={() => { trackProductEvent("Logout Started"); void logout(); }} title="Sign out">
-              <WalletIcon /> {short(address ?? "Wallet")}
+            <button className="wallet-button" type="button" onClick={() => { trackProductEvent("Logout Started"); void logout(); }} aria-label={`Sign out ${short(address ?? "wallet")}`} title="Sign out">
+              <WalletIcon /><span>{short(address ?? "Wallet")}</span>
             </button>
           ) : (
-            <button className="wallet-button wallet-connect" type="button" onClick={() => startLogin("header")}><WalletIcon /> Connect</button>
+            <button className="wallet-button wallet-connect" type="button" onClick={() => startLogin("header")} aria-label="Connect wallet"><WalletIcon /><span>Connect</span></button>
           )}
         </div>
       </header>
@@ -526,15 +553,11 @@ export function PortfolioApp() {
           ) : (
             <section className="index-main markets-view">
               <header className="index-title-row">
-                <div><h1>Robinhood Wizzy Index</h1><p>{positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Wizzy agents regularly review which markets qualify."}</p></div>
+                <div><h1>{hasPortfolioAccess ? "Your markets" : "The live index"}</h1><p>{hasPortfolioAccess ? (positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Your wallet is connected. New positions appear here.") : "Wizzy agents regularly review which markets qualify."}</p></div>
               </header>
-              {positionLedger}
-              <section className="index-section">
-                <header className="section-title">
-                  <div><h2>Inside the index</h2><p>Actively curated as meme markets change.</p></div>
-                </header>
-                <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} policy={markets.index} />
-              </section>
+              {hasPortfolioAccess ? positionLedger : null}
+              {indexLedger}
+              {!hasPortfolioAccess ? positionLedger : null}
             </section>
           )}
       </div>
@@ -691,6 +714,7 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
   return (
     <section className="market-ledger">
       <div className="market-table-wrap">
+        <IndexSnapshot markets={orderedMarkets} stats={stats} state={state} />
         <table className="market-table">
           <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>Liquidity</th><th>Explore</th></tr></thead>
           <tbody>
@@ -715,6 +739,32 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
   );
 }
 
+function IndexSnapshot({ markets, stats, state }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error" }) {
+  const volume = markets.reduce((sum, { market }) => sum + (stats.get(market.id)?.volume24hUsd ?? 0), 0);
+  const liquidity = markets.reduce((sum, { market }) => sum + (stats.get(market.id)?.liquidityUsd ?? 0), 0);
+  const feeApr = weightedFeeApr(markets, stats);
+  const compositionLabel = markets.map(({ market, indexWeightBps }) => `${market.symbol} ${(indexWeightBps / 100).toFixed(0)}%`).join(", ");
+  return <section className={`index-snapshot is-${state}`} aria-label="Live index snapshot">
+    <div className="index-snapshot-top">
+      <span className="snapshot-origin"><img src={BRAND_ASSETS.robinhood} alt="" /><span><small>Live on</small><b>Robinhood Chain</b></span></span>
+      <dl className="index-vitals">
+        <div><dt>Fee APR</dt><dd>{formatFeeApr(feeApr)}</dd><small>Based on 24h fees</small></div>
+        <div><dt>24h volume</dt><dd>{state === "ready" ? compactMoney(volume) : "—"}</dd><small>Across the index</small></div>
+        <div><dt>Liquidity</dt><dd>{state === "ready" ? compactMoney(liquidity) : "—"}</dd><small>Across the index</small></div>
+      </dl>
+    </div>
+    <div className="index-composition">
+      <span className="composition-heading"><b>Index composition</b><small>Curator weights</small></span>
+      <span className={`composition-track ${state === "loading" ? "is-loading" : ""}`} role="img" aria-label={compositionLabel || "Reading index composition"}>
+        {state === "loading" ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />) : markets.map(({ market, indexWeightBps }, index) => <i className="composition-segment" key={market.id} style={{ "--market-color": market.color, "--market-index": index, "--market-weight": indexWeightBps } as CSSProperties} />)}
+      </span>
+      {state === "ready" ? <span className="composition-key">
+        {markets.map(({ market, indexWeightBps }, index) => <span className="composition-item" key={market.id} style={{ "--market-index": index } as CSSProperties}><TokenIcon symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}</b><small>{(indexWeightBps / 100).toFixed(0)}%</small></span></span>)}
+      </span> : null}
+    </div>
+  </section>;
+}
+
 function PositionLedger({ authenticated, positions, state, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel, updates, migrationPlan, migrationState, onPrepareMigration, onExecuteMigration, onCancelMigration }: {
   authenticated: boolean;
   positions: PositionView[];
@@ -737,7 +787,7 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
   const summary = summarizePositions(positions);
   const showPositions = authenticated && positions.length > 0;
   return (
-    <section className="position-ledger" id="positions">
+    <section className={`position-ledger ${authenticated ? "" : "is-disconnected"}`} id="positions">
       {updates.length ? <IndexUpdatePanel updates={updates} plan={migrationPlan} state={migrationState} onPrepare={onPrepareMigration} onExecute={onExecuteMigration} onCancel={onCancelMigration} /> : null}
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
@@ -746,7 +796,7 @@ function PositionLedger({ authenticated, positions, state, stats, onStart, onRet
           <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>Approve</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing"}>Close</button></div>
         </section>
       ) : null}
-      {!authenticated ? <PortfolioEmpty variant="disconnected" /> : null}
+      {!authenticated ? <PortfolioEmpty variant="disconnected" onPrimary={onStart} /> : null}
       {authenticated && (state === "idle" || state === "loading") ? <PortfolioEmpty variant="loading" /> : null}
       {authenticated && state === "error" ? <PortfolioEmpty variant="error" onPrimary={onRetry} /> : null}
       {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" onPrimary={onStart} /> : null}
@@ -801,7 +851,7 @@ function PortfolioEmpty({ variant, onPrimary }: {
   onPrimary?: () => void;
 }) {
   const content = variant === "disconnected"
-    ? { title: "Your market positions", body: "Connect from the header to see value, fees, and range status.", action: "" }
+    ? { title: "Reveal your markets", body: "Connect to see position value, fees, range status, and index updates.", action: "Connect wallet" }
     : variant === "error"
       ? { title: "We couldn’t load your positions.", body: "Try again to read your wallet.", action: "Try again" }
     : variant === "empty"
@@ -986,3 +1036,4 @@ function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path
 function ChevronIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" /></svg>; }
 function CheckIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>; }
 function RefreshIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.2-2L20 12M4 12l2.7 5a7 7 0 0 0 11.2-2" /></svg>; }
+function XIcon() { return <svg className="x-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" /></svg>; }

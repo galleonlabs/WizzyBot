@@ -518,6 +518,12 @@ export function PortfolioApp() {
         });
       }
       await Promise.all([loadPositions(), loadRobinhoodBalance()]);
+      if (actionPlan.kind === "withdraw") {
+        // The exit invalidates the earlier deposit celebration. Returning to Make
+        // must show a fresh form, never a stale "Markets made" state.
+        setPlan(null);
+        setPlanState({ kind: "idle" });
+      }
       setActionState({
         kind: "submitted",
         message: actionPlan.kind === "withdraw" ? "Done. Your position is closed and your ETH is back in your wallet." : "Done. Your earned fees are working in the position again.",

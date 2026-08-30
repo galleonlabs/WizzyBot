@@ -77,6 +77,17 @@ describe("meme index product UI", () => {
     expect(css).not.toContain('content: "Explore"');
   });
 
+  it("keeps narrow-phone navigation, success panels, and actions reachable", () => {
+    expect(css).toContain("@media (max-width: 360px)");
+    expect(css).toContain(".wizzy-wordmark > span { position: absolute");
+    expect(css).toContain(".social-button { display: none; }");
+    expect(css).toContain(".action-preview.is-submitted { grid-template-columns: auto minmax(0, 1fr)");
+    expect(css).toContain(".action-preview.is-submitted > .action-buttons { grid-column: 1 / -1; }");
+    expect(css).toContain(".market-link { width: 48px; min-height: 48px");
+    expect(css).toContain(".position-actions button,\n  .action-buttons button { min-height: 48px; }");
+    expect(css).toContain(".empty-action { width: 100%; min-height: 48px");
+  });
+
   it("pairs a characterful display face with a restrained trading UI", () => {
     expect(layout).toContain("Unbounded");
     expect(layout).toContain("Plus_Jakarta_Sans");

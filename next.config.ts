@@ -5,7 +5,7 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com",
   "font-src 'self' data:",
   "object-src 'none'",
   "base-uri 'self'",

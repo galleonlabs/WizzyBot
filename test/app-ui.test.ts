@@ -7,6 +7,7 @@ const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
 const providers = readFileSync("app/providers.tsx", "utf8");
 const mascot = readFileSync("public/brand/una-mascot.svg", "utf8");
+const nextConfig = readFileSync("next.config.ts", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
@@ -100,5 +101,12 @@ describe("meme index product UI", () => {
     expect(providers).toContain('loginMethods: ["email"]');
     expect(providers).toContain('solana: { createOnLogin: "all-users" }');
     expect(providers).toContain('"solana:mainnet"');
+  });
+
+  it("allows every reviewed market-image host without weakening the rest of the image policy", () => {
+    expect(nextConfig).toContain(
+      "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com",
+    );
+    expect(nextConfig).not.toContain("img-src *");
   });
 });

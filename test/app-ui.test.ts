@@ -59,6 +59,12 @@ describe("meme index product UI", () => {
     expect(mascot).not.toMatch(/#ff6f83|#e85570/i);
   });
 
+  it("keeps Una eye-first at icon scale", () => {
+    expect(mascot).toContain('rx="13" ry="18"');
+    expect(mascot).toContain('rx="4.5" ry="6.5"');
+    expect(mascot).not.toContain('rx="9" ry="13"');
+  });
+
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {
     expect(portfolio).toContain("Robinhood Una Index");
     expect(portfolio).toContain("Una agents regularly review which markets qualify.");

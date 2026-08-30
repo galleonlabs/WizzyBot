@@ -40,10 +40,12 @@ type IndexMarket = {
 };
 
 const INDEX_MARKET_COUNT = 6;
+const FOMO_URL = "https://fomo.family/r/makemememarkets";
 const BRAND_ASSETS = {
   base: "https://assets.relay.link/icons/8453/light.png",
   robinhood: "https://assets.relay.link/icons/4663/light.png",
   solana: "https://assets.relay.link/icons/792703809/light.png",
+  fomo: "https://fomo.family/favicon.svg",
   gecko: "https://www.geckoterminal.com/favicon.ico",
 } as const;
 
@@ -432,6 +434,11 @@ export function PortfolioApp() {
 
 function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {
   return <div className="index-showcase" aria-label="Robinhood Una Index">
+    <div className="network-lockup" aria-label="Built on Robinhood Chain">
+      <img src={BRAND_ASSETS.robinhood} alt="" />
+      <span className="network-name"><small>Built on</small><b>Robinhood Chain</b></span>
+      <span className="network-count">{loading ? "Curating index" : `${markets.length} curated markets`}</span>
+    </div>
     <div className={`hero-token-field ${loading ? "is-loading" : ""}`}>
       {(loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
         <span className="hero-token" key={market.id} style={{ "--token-index": index } as CSSProperties}>
@@ -439,9 +446,6 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
           {market.symbol ? <b>{market.symbol}</b> : null}
         </span>
       ))}
-    </div>
-    <div className="brand-rail" aria-label="Network">
-      <BrandLogo brand="robinhood" label="Robinhood" />
     </div>
   </div>;
 }
@@ -555,7 +559,10 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
                 <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b><small className="cell-note">Based on 24h fees</small></td>
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
-                <td><a className="gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="gecko-label">Gecko</span><span aria-hidden="true">↗</span></a></td>
+                <td><span className="market-links">
+                  <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span><span className="market-link-external" aria-hidden="true">↗</span></a>
+                  <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span><span className="market-link-external" aria-hidden="true">↗</span></a>
+                </span></td>
               </tr>;
             }) : null}
           </tbody>

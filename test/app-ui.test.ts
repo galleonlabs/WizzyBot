@@ -33,8 +33,10 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain("https://www.geckoterminal.com/robinhood/pools");
     expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
-    expect(portfolio).toContain('<span className="gecko-label">Gecko</span>');
-    expect(portfolio).not.toMatch(/fomo\.family|app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
+    expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
+    expect(portfolio).toContain("Trade on Fomo");
+    expect(portfolio).toContain("Trade ${market.symbol}/WETH on Fomo");
+    expect(portfolio).not.toMatch(/app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
     expect(portfolio).not.toMatch(/autopilot|guaranteed returns|UnaBot/i);
     expect(portfolio).not.toMatch(/Observed, not forecast|Positions stay yours|Ask Una/i);
@@ -48,6 +50,7 @@ describe("meme index product UI", () => {
     expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(css).toContain(".position-list article { grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(css).toContain(".portfolio-empty .empty-symbol { display: none; }");
+    expect(css).toContain(".market-link-label,");
     expect(css).not.toContain('content: "Explore"');
   });
 
@@ -98,9 +101,11 @@ describe("meme index product UI", () => {
 
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {
     expect(portfolio).toContain("Robinhood Una Index");
+    expect(portfolio).toContain("Built on Robinhood Chain");
+    expect(portfolio).toContain("curated markets");
     expect(portfolio).toContain("Una agents regularly review which markets qualify.");
     expect(portfolio).toContain("Actively curated as meme markets change.");
-    expect(portfolio).toContain('brand="robinhood"');
+    expect(portfolio).toContain('src={BRAND_ASSETS.robinhood}');
     expect(portfolio).toContain("Self-custodial");
     expect(portfolio).toContain("Two wallet approvals: deposit from");
     expect(portfolio).toContain('useState("1.00")');
@@ -126,7 +131,8 @@ describe("meme index product UI", () => {
     expect(nextConfig).toContain(
       "img-src 'self' data: blob: https://coin-images.coingecko.com https://assets.geckoterminal.com https://cdn.dexscreener.com https://assets.relay.link https://www.geckoterminal.com",
     );
-    expect(nextConfig).not.toMatch(/fomo\.family|avatars\.githubusercontent\.com/);
+    expect(nextConfig).toContain("https://fomo.family");
+    expect(nextConfig).not.toMatch(/avatars\.githubusercontent\.com/);
     expect(nextConfig).not.toContain("img-src *");
   });
 });

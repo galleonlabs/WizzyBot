@@ -20,6 +20,11 @@ type HostedPortfolioSurface = {
     scannedBlocks: number;
     rpcRequests: 2;
   }>;
+  mergePoolActivityItems: <T extends { id: string; blockNumber: string }>(
+    previous: readonly T[],
+    fresh: readonly T[],
+    limit?: number,
+  ) => T[];
   fetchSolanaMarketStats: () => Promise<unknown>;
   planAllocation: (input: {
     owner: string;
@@ -81,6 +86,7 @@ export const getMarketCatalog = hosted.getMarketCatalog;
 export const getSolanaMarketCatalog = hosted.getSolanaMarketCatalog;
 export const fetchMarketStats = hosted.fetchMarketStats;
 export const fetchRecentPoolActivity = hosted.fetchRecentPoolActivity;
+export const mergePoolActivityItems = hosted.mergePoolActivityItems;
 export const fetchSolanaMarketStats = hosted.fetchSolanaMarketStats;
 export const planAllocation = hosted.planAllocation;
 export const planDualChainAllocation = hosted.planDualChainAllocation;

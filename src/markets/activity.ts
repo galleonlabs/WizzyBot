@@ -19,6 +19,9 @@ export const V3_BURN_EVENT = parseAbiItem(
 
 const BLOCK_WINDOW = 1_000n;
 const REDUCED_BLOCK_WINDOW = 250n;
+// PublicNode serves Robinhood eth_getLogs without a token below ~64 blocks.
+const NARROW_BLOCK_WINDOW = 48n;
+const PUBLICNODE_ROBINHOOD_RPC = "https://robinhood-rpc.publicnode.com";
 const ACTIVITY_LIMIT = 16;
 const ROBINHOOD_EXPLORER = "https://robinhoodchain.blockscout.com";
 
@@ -115,10 +118,11 @@ export async function fetchRecentPoolActivity(options: {
           ...(defaultRpcUrl !== rpcUrl
             ? [{ client: activityClientFor(defaultRpcUrl), blockWindow: options.blockWindow }]
             : []),
-          // The public RPC is load balanced across nodes with inconsistent
-          // eth_getLogs range caps, so a final narrow scan recovers when the
-          // full window lands on a strict node.
+          // The official public RPC rate limits shared serverless egress IPs
+          // and its nodes enforce inconsistent eth_getLogs range caps, so
+          // retry narrower, then fall through to an independent provider.
           { client: activityClientFor(defaultRpcUrl), blockWindow: REDUCED_BLOCK_WINDOW },
+          { client: activityClientFor(PUBLICNODE_ROBINHOOD_RPC), blockWindow: NARROW_BLOCK_WINDOW },
         ];
   let lastError: unknown;
   for (const [index, attempt] of attempts.entries()) {
@@ -162,6 +166,30 @@ async function scanPoolActivity(
     scannedBlocks: Number(toBlock - fromBlock + 1n),
     rpcRequests: 2,
   };
+}
+
+/**
+ * Folds a fresh scan into previously served items so narrow fallback windows
+ * accumulate a full rail instead of replacing it. Newest first, deduped by
+ * id, capped at the rail length.
+ */
+export function mergePoolActivityItems<T extends { id: string; blockNumber: string }>(
+  previous: readonly T[],
+  fresh: readonly T[],
+  limit = ACTIVITY_LIMIT,
+): T[] {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const item of [...fresh, ...previous].sort((a, b) => {
+    const delta = BigInt(b.blockNumber) - BigInt(a.blockNumber);
+    return delta === 0n ? a.id.localeCompare(b.id) : delta > 0n ? 1 : -1;
+  })) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    merged.push(item);
+    if (merged.length >= limit) break;
+  }
+  return merged;
 }
 
 function formatActivityEth(value: bigint): string {

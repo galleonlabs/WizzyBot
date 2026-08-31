@@ -1,20 +1,28 @@
 import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
-import { fetchRecentPoolActivity } from "../../lib/portfolio-server";
+import { fetchRecentPoolActivity, mergePoolActivityItems } from "../../lib/portfolio-server";
 import type { PoolActivityPayload } from "../../lib/portfolio-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Survives across requests on a reused instance so narrow fallback scans
+// accumulate a full rail and a failed refresh serves recent real events
+// instead of an empty "unavailable" strip.
+let lastGood: PoolActivityPayload | null = null;
+
 const getPoolActivity = unstable_cache(async (): Promise<PoolActivityPayload> => {
   try {
     const activity = await fetchRecentPoolActivity();
-    return { state: "ready", ...activity };
+    const items = mergePoolActivityItems(lastGood?.items ?? [], activity.items);
+    lastGood = { state: "ready", ...activity, items };
+    return lastGood;
   } catch (error) {
     console.error("[pool-activity] refresh failed", rpcErrorChain(error));
+    if (lastGood?.items.length) return lastGood;
     return { state: "unavailable", items: [], asOfBlock: null, scannedBlocks: 0, rpcRequests: 2 };
   }
-}, ["wizzy-pool-activity-v3"], { revalidate: 60, tags: ["pool-activity"] });
+}, ["wizzy-pool-activity-v4"], { revalidate: 60, tags: ["pool-activity"] });
 
 export async function GET() {
   return NextResponse.json(await getPoolActivity(), {

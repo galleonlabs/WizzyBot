@@ -3,6 +3,7 @@ import type { Address, Hash } from "viem";
 import {
   derivePoolActivity,
   fetchRecentPoolActivity,
+  mergePoolActivityItems,
   type DecodedPoolActivityLog,
   type PoolActivityClient,
 } from "../src/markets/activity.js";
@@ -80,7 +81,7 @@ describe("pool activity", () => {
     const calls: bigint[] = [];
     const strictThenPermissive: PoolActivityClient = {
       getBlockNumber: vi.fn(async () => 10_000n),
-      getLogs: vi.fn(async (input) => {
+      getLogs: vi.fn(async (input: { fromBlock: bigint; toBlock: bigint }) => {
         calls.push(input.toBlock - input.fromBlock + 1n);
         if (calls.length === 1) throw new Error("invalid params");
         return [] as DecodedPoolActivityLog[];
@@ -89,6 +90,15 @@ describe("pool activity", () => {
     const result = await fetchRecentPoolActivity({ clients: [strictThenPermissive, strictThenPermissive] });
     expect(result).toMatchObject({ asOfBlock: "10000", items: [] });
     expect(calls).toEqual([1_000n, 1_000n]);
+  });
+
+  it("merges fresh scans into prior items newest-first without duplicates", () => {
+    const item = (id: string, blockNumber: string) => ({ id, blockNumber });
+    const previous = [item("c", "300"), item("a", "100")];
+    const fresh = [item("d", "400"), item("c", "300"), item("b", "200")];
+    expect(mergePoolActivityItems(previous, fresh).map((row) => row.id)).toEqual(["d", "c", "b", "a"]);
+    expect(mergePoolActivityItems(previous, fresh, 2).map((row) => row.id)).toEqual(["d", "c"]);
+    expect(mergePoolActivityItems([], [])).toEqual([]);
   });
 
   it("rethrows when every client fails", async () => {

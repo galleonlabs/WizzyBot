@@ -26,7 +26,7 @@ const socialTitle = "Wizzy: Make Stable Yield";
 const socialDescription =
   "One USDC deposit across Base's most trusted yield vaults. Curated by agents, self-custodial, withdraw any time.";
 const socialImage = {
-  url: "/brand/wizzy-social-unbounded-v1.png",
+  url: "/brand/wizzy-social-stable-v1.png",
   width: 1200,
   height: 630,
   alt: "Wizzy mascot beside the words ‘Make Stable Yield’, with an invitation to deposit USDC and earn vault yield.",

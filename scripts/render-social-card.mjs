@@ -27,6 +27,7 @@ try {
   const { default: sharp } = await import("sharp");
   const renders = [
     ["public/brand/wizzy-social.svg", "public/brand/wizzy-social-unbounded-v1.png"],
+    ["public/brand/wizzy-social-stable.svg", "public/brand/wizzy-social-stable-v1.png"],
     ["public/brand/x/wizzy-x-profile.svg", "public/brand/x/wizzy-x-profile-400.png"],
     ["public/brand/x/wizzy-x-banner.svg", "public/brand/x/wizzy-x-banner-1500x500.png"],
   ];

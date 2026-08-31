@@ -134,6 +134,13 @@ export function AchievementCenter({
     setRecord(local);
     void (async () => {
       try {
+        // Privy issues the access token shortly after login; wait briefly and
+        // skip quietly if it is still warming up. The next action syncs.
+        for (let attempt = 0; attempt < 3 && active; attempt += 1) {
+          if (await getAccessToken()) break;
+          if (attempt === 2) return;
+          await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+        }
         if (!active) return;
         await requestAuthoritativeRecord({ type: "sync" });
       } catch (error) {
@@ -141,7 +148,7 @@ export function AchievementCenter({
       }
     })();
     return () => { active = false; };
-  }, [owner, requestAuthoritativeRecord]);
+  }, [owner, getAccessToken, requestAuthoritativeRecord]);
 
   const recordAction = useCallback(async (evidence: AchievementActionEvidence) => {
     try {

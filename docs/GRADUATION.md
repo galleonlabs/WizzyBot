@@ -27,11 +27,10 @@ Operator decision, 2026-08-31: **activate the sleeve at graduation.** This delib
    bun scripts/activate-wizzy-sleeve.ts --token=0x... --pool=0x...
    ```
    Default weight is 500 bps with a 10% hard cap; the script refuses a zero-liquidity pool and a second sleeve.
-3. Review the diff: one new `robinhood-wizzy` sleeve market, ordinaries rescaled to 9,500 bps, catalog version bumped. Nothing else.
-4. Ship the sleeve disclosure UI in the same release: related-party tag on the market row and composition bar, sleeve target and current weight, pause reason when paused. This is a Stage 3 gate, deliberately left for the activation release.
-5. Full gate: `bun run test && bun run typecheck && bun run build:web`.
-6. Merge to `main`, verify the deploy live: `/api/markets` shows the sleeve, a deposit quote allocates the sleeve share to WIZZY/WETH at every tier, Markets page discloses it.
-7. Public comms per [TOKEN_FLYWHEEL.md](TOKEN_FLYWHEEL.md): one canonical pinned post with the contract, pool, sleeve status, and related-party disclosure. Never describe the sleeve as guaranteed demand, price support, yield, or a floor.
+3. Review the diff: one new `robinhood-wizzy` sleeve market, ordinaries rescaled to 9,500 bps, catalog version bumped. Nothing else. No new UI ships with activation (operator decision, 2026-08-31): WIZZY renders as an ordinary market row through the existing data-driven surfaces.
+4. Full gate: `bun run test && bun run typecheck && bun run build:web`.
+5. Merge to `main`, verify the deploy live: `/api/markets` shows the sleeve, a deposit quote allocates the sleeve share to WIZZY/WETH at every tier, and WIZZY appears on the Markets page.
+6. Public comms per [TOKEN_FLYWHEEL.md](TOKEN_FLYWHEEL.md): one canonical pinned post with the contract, pool, and sleeve status. Never describe the sleeve as guaranteed demand, price support, yield, or a floor.
 
 ## Standing constraints after activation
 

@@ -22,6 +22,10 @@ const REDUCED_BLOCK_WINDOW = 250n;
 // PublicNode serves Robinhood eth_getLogs without a token below ~64 blocks.
 const NARROW_BLOCK_WINDOW = 48n;
 const PUBLICNODE_ROBINHOOD_RPC = "https://robinhood-rpc.publicnode.com";
+// After the primary rpc rejects a scan, go straight to the narrow provider
+// for a while instead of paying (and logging) the failure on every fill.
+const PRIMARY_COOLDOWN_MS = 10 * 60_000;
+let primaryUnavailableUntil = 0;
 const ACTIVITY_LIMIT = 16;
 const ROBINHOOD_EXPLORER = "https://robinhoodchain.blockscout.com";
 
@@ -109,29 +113,34 @@ export async function fetchRecentPoolActivity(options: {
   const env = loadEnv();
   const defaultRpcUrl = env.rpcByChain.robinhood || ROBINHOOD_RPC_DEFAULT;
   const rpcUrl = env.activityRpcUrl || env.rpcByChain.robinhood || ROBINHOOD_RPC_DEFAULT;
+  const builtFromUrls = !options.clients && !options.client;
+  const ladder: Array<{ client: PoolActivityClient; blockWindow?: bigint }> = [
+    { client: activityClientFor(rpcUrl), blockWindow: options.blockWindow },
+    ...(defaultRpcUrl !== rpcUrl
+      ? [{ client: activityClientFor(defaultRpcUrl), blockWindow: options.blockWindow }]
+      : []),
+    // The official public RPC rate limits shared serverless egress IPs and
+    // its nodes enforce inconsistent eth_getLogs range caps, so retry
+    // narrower, then fall through to an independent provider.
+    { client: activityClientFor(defaultRpcUrl), blockWindow: REDUCED_BLOCK_WINDOW },
+    { client: activityClientFor(PUBLICNODE_ROBINHOOD_RPC), blockWindow: NARROW_BLOCK_WINDOW },
+  ];
   const attempts: Array<{ client: PoolActivityClient; blockWindow?: bigint }> = options.clients
     ? options.clients.map((client) => ({ client, blockWindow: options.blockWindow }))
     : options.client
       ? [{ client: options.client, blockWindow: options.blockWindow }]
-      : [
-          { client: activityClientFor(rpcUrl), blockWindow: options.blockWindow },
-          ...(defaultRpcUrl !== rpcUrl
-            ? [{ client: activityClientFor(defaultRpcUrl), blockWindow: options.blockWindow }]
-            : []),
-          // The official public RPC rate limits shared serverless egress IPs
-          // and its nodes enforce inconsistent eth_getLogs range caps, so
-          // retry narrower, then fall through to an independent provider.
-          { client: activityClientFor(defaultRpcUrl), blockWindow: REDUCED_BLOCK_WINDOW },
-          { client: activityClientFor(PUBLICNODE_ROBINHOOD_RPC), blockWindow: NARROW_BLOCK_WINDOW },
-        ];
+      : Date.now() < primaryUnavailableUntil
+        ? ladder.slice(-1)
+        : ladder;
   let lastError: unknown;
   for (const [index, attempt] of attempts.entries()) {
     try {
       return await scanPoolActivity(attempt.client, markets, { ...options, blockWindow: attempt.blockWindow });
     } catch (error) {
       lastError = error;
-      if (index < attempts.length - 1) {
-        console.error("[pool-activity] scan failed; retrying on the default robinhood rpc");
+      if (index < attempts.length - 1 && builtFromUrls && Date.now() >= primaryUnavailableUntil) {
+        primaryUnavailableUntil = Date.now() + PRIMARY_COOLDOWN_MS;
+        console.error("[pool-activity] primary robinhood rpc unavailable; serving narrow scans for 10 minutes");
       }
     }
   }

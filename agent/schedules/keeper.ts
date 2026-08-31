@@ -12,15 +12,30 @@ export default defineSchedule({
       return;
     }
     const live = keeperLiveEnabled();
-    const result = await runKeeperScan({ owner, live });
-    console.log(
-      JSON.stringify({
-        schedule: "keeper",
-        live,
-        dryRun: !live,
-        owner: result.owner,
-        decisions: result.decisions,
-      }),
-    );
+    // Wizzy positions live on Robinhood Chain; Base stays covered for the
+    // legacy portfolio. One chain failing must not block the other's scan.
+    for (const chain of ["robinhood", "base"] as const) {
+      try {
+        const result = await runKeeperScan({ owner, live, chain });
+        console.log(
+          JSON.stringify({
+            schedule: "keeper",
+            chain,
+            live,
+            dryRun: !live,
+            owner: result.owner,
+            decisions: result.decisions,
+          }),
+        );
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            schedule: "keeper",
+            chain,
+            error: error instanceof Error ? error.message : "keeper scan failed",
+          }),
+        );
+      }
+    }
   },
 });

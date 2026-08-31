@@ -372,7 +372,8 @@ describe("meme index product UI", () => {
 
   it("ships wallet-scoped XP and quests tied to confirmed product actions", () => {
     expect(portfolio).toContain("<AchievementCenter");
-    expect(portfolio).toContain("achievementActionRef.current?.(actionPlan.kind)");
+    expect(portfolio).toContain("confirmedTransactionHashes(confirmedEvm)");
+    expect(portfolio).toContain("transactionHashes,");
     expect(achievementCenter).toContain('trackProductEvent("Quest Completed"');
     expect(achievementCenter).toContain('trackProductEvent("Quest Board Opened"');
     expect(achievementCenter).toContain('id="quest-board-title">Quests</h2>');
@@ -388,6 +389,8 @@ describe("meme index product UI", () => {
     expect(achievementCenter).toContain('fetch("/api/achievements"');
     expect(achievementsRoute).toContain("verifyAuthToken");
     expect(achievementsRoute).toContain("setCustomMetadata");
+    expect(achievementsRoute).toContain("verifyOnchainQuestAction");
+    expect(achievementsRoute).not.toContain('"record" in body');
     expect(achievementsRoute).not.toContain("userId: body");
     expect(telemetry).toContain('"achievements"');
   });

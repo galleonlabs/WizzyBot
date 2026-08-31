@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { callsTerminalState, privySendCallsBody, privyTransactionTerminalState, relaySucceeded, sendPrivyWalletCallsAndWait, sendWalletCalls, sendWalletCallsAndWait } from "../app/lib/wallet-calls.js";
+import { callsTerminalState, confirmedTransactionHashes, privySendCallsBody, privyTransactionTerminalState, relaySucceeded, sendPrivyWalletCallsAndWait, sendWalletCalls, sendWalletCallsAndWait } from "../app/lib/wallet-calls.js";
 
 describe("client wallet batches", () => {
   it("switches chain and asks the wallet for one atomic batch", async () => {
@@ -128,5 +128,11 @@ describe("client wallet batches", () => {
     expect(privyTransactionTerminalState({ status: "pending" })).toBe("pending");
     expect(privyTransactionTerminalState({ status: "confirmed" })).toBe("success");
     expect(privyTransactionTerminalState({ status: "execution_reverted" })).toBe("failure");
+  });
+
+  it("extracts canonical receipt hashes without mistaking bundle IDs for transactions", () => {
+    const hash = `0x${"ab".repeat(32)}`;
+    expect(confirmedTransactionHashes({ id: "bundle_123", status: { transaction_hash: hash, receipts: [{ transactionHash: hash }] } })).toEqual([hash]);
+    expect(confirmedTransactionHashes({ id: "0xbundle", status: "confirmed" })).toEqual([]);
   });
 });

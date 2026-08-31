@@ -27,11 +27,11 @@ import {
 } from "./lib/portfolio-types";
 import { type SolanaPositionActionPlan } from "./lib/solana-position-server";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
-import { sendPrivyWalletCallsAndWait, sendWalletCallsAndWait, type ConnectedEvmWallet, type WalletTransaction } from "./lib/wallet-calls";
+import { confirmedTransactionHashes, sendPrivyWalletCallsAndWait, sendWalletCallsAndWait, type ConnectedEvmWallet, type ConfirmedCallsSubmission, type WalletTransaction } from "./lib/wallet-calls";
 import { PRIVY_APP_ID } from "./lib/privy-config";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 import { AchievementCenter } from "./achievement-center";
-import type { AchievementAction } from "./lib/achievements";
+import type { AchievementActionEvidence } from "./lib/achievements";
 
 type ViewTab = "overview" | "markets";
 type ThemePreference = "system" | "light" | "dark";
@@ -134,7 +134,7 @@ export function PortfolioApp() {
   const positionsRequestRef = useRef(0);
   const balanceRequestRef = useRef(0);
   const authStateRef = useRef<"loading" | "signed-in" | "signed-out">("loading");
-  const achievementActionRef = useRef<((action: AchievementAction) => void) | null>(null);
+  const achievementActionRef = useRef<((evidence: AchievementActionEvidence) => Promise<void>) | null>(null);
 
   const wallet = useMemo(() => {
     const preferred = user?.wallet?.address?.toLowerCase();
@@ -543,6 +543,7 @@ export function PortfolioApp() {
       return;
     }
     try {
+      let confirmedEvm: ConfirmedCallsSubmission | null = null;
       setActionState({ kind: "signing", message: "Approve this position update in your wallet." });
       if (actionPlan.chain === "solana") {
         if (!solanaWallet) throw new Error("Your Solana wallet is not ready");
@@ -557,7 +558,7 @@ export function PortfolioApp() {
           }),
         });
       } else {
-        await sendEvmBatch({
+        confirmedEvm = await sendEvmBatch({
           owner: actionPlan.owner,
           chainId: actionPlan.chainId,
           transactions: actionPlan.transactions,
@@ -578,7 +579,15 @@ export function PortfolioApp() {
         kind: "submitted",
         message: actionPlan.kind === "withdraw" ? "Your ETH is back in your wallet." : actionPlan.kind === "rebalance" ? "Your position is earning in its new range." : "Your fees are back at work.",
       });
-      if (actionPlan.kind === "compound" || actionPlan.kind === "rebalance") achievementActionRef.current?.(actionPlan.kind);
+      if ((actionPlan.kind === "compound" || actionPlan.kind === "rebalance") && actionPlan.chain === "robinhood" && confirmedEvm) {
+        const transactionHashes = confirmedTransactionHashes(confirmedEvm);
+        if (transactionHashes.length) void achievementActionRef.current?.({
+          action: actionPlan.kind,
+          chainId: 4663,
+          tokenId: actionPlan.tokenId,
+          transactionHashes,
+        });
+      }
       trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : actionPlan.kind === "rebalance" ? "Rebalance Confirmed" : "Compound Confirmed", { chainId: actionPlan.chainId });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : "Wallet submission failed" });
@@ -688,7 +697,6 @@ export function PortfolioApp() {
             <AchievementCenter
               address={address}
               authenticated={authenticated}
-              positions={positions}
               positionsState={positionsState}
               getAccessToken={getAccessToken}
               onConnect={() => startLogin("header")}

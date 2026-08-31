@@ -25,6 +25,13 @@ export type ConfirmedCallsSubmission = CallsSubmission & {
   status: unknown;
 };
 
+/** Extract only canonical EVM transaction hashes from wallet/Privy status shapes. */
+export function confirmedTransactionHashes(value: unknown): `0x${string}`[] {
+  const hashes = new Set<`0x${string}`>();
+  collectTransactionHashes(value, hashes, 0);
+  return [...hashes];
+}
+
 export type PrivyAuthorizationPayload = {
   version: 1;
   url: string;
@@ -272,6 +279,24 @@ function apiErrorMessage(value: unknown, fallback: string): string {
   if (!value || typeof value !== "object") return fallback;
   const record = value as Record<string, unknown>;
   return typeof record.error === "string" && record.error.length <= 300 ? record.error : fallback;
+}
+
+function collectTransactionHashes(value: unknown, hashes: Set<`0x${string}`>, depth: number) {
+  if (depth > 5 || value === null || value === undefined) return;
+  if (typeof value === "string") {
+    if (/^0x[0-9a-fA-F]{64}$/.test(value)) hashes.add(value.toLowerCase() as `0x${string}`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectTransactionHashes(item, hashes, depth + 1);
+    return;
+  }
+  if (typeof value !== "object") return;
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (["transaction_hash", "transactionHash", "hash", "receipts", "receipt", "status"].includes(key)) {
+      collectTransactionHashes(item, hashes, depth + 1);
+    }
+  }
 }
 
 function delay(ms: number): Promise<void> {

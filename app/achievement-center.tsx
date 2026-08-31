@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
-import type { PositionView } from "./lib/cards";
-import { summarizePositions } from "./lib/portfolio-summary";
 import {
+  ACHIEVEMENT_AUTHORITY,
   ACHIEVEMENTS,
   ACHIEVEMENT_SECTIONS,
+  ACHIEVEMENT_STORAGE_VERSION,
   achievementLevel,
   achievementProgress,
   achievementXp,
   emptyAchievementRecord,
-  mergeAchievementRecords,
   normalizeAchievementRecord,
-  observeAchievementProgress,
-  recordAchievementAction,
-  type AchievementAction,
+  type AchievementActionEvidence,
   type AchievementId,
   type AchievementRecord,
 } from "./lib/achievements";
@@ -23,11 +20,23 @@ import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 type PositionState = "idle" | "loading" | "ready" | "error";
 
 const PREVIEW_RECORD = normalizeAchievementRecord({
+  version: ACHIEVEMENT_STORAGE_VERSION,
+  authority: ACHIEVEMENT_AUTHORITY,
   maxPositionCount: 6,
   maxMarketCount: 6,
-  maxFeesUsd: 124.72,
+  feesEarnedUsd: 124.72,
+  feeCheckpoints: { "941": 2.4 },
   compoundCount: 1,
   rebalanceCount: 0,
+  proofs: {
+    compound: {
+      action: "compound",
+      chainId: 4663,
+      tokenId: "941",
+      transactionHash: `0x${"ab".repeat(32)}`,
+      verifiedAt: "2026-08-28T12:00:00.000Z",
+    },
+  },
   unlockedAt: {
     "first-spell": "2026-08-25T12:00:00.000Z",
     "full-spellbook": "2026-08-25T12:00:00.000Z",
@@ -40,7 +49,6 @@ const PREVIEW_RECORD = normalizeAchievementRecord({
 export function AchievementCenter({
   address,
   authenticated,
-  positions,
   positionsState,
   getAccessToken,
   onConnect,
@@ -49,18 +57,15 @@ export function AchievementCenter({
 }: {
   address?: string;
   authenticated: boolean;
-  positions: PositionView[];
   positionsState: PositionState;
   getAccessToken: () => Promise<string | null>;
   onConnect: () => void;
   preview: boolean;
-  actionRef: MutableRefObject<((action: AchievementAction) => void) | null>;
+  actionRef: MutableRefObject<((evidence: AchievementActionEvidence) => Promise<void>) | null>;
 }) {
   const [record, setRecord] = useState<AchievementRecord>(() => emptyAchievementRecord());
-  const [loadedOwner, setLoadedOwner] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [toastId, setToastId] = useState<AchievementId | null>(null);
-  const recordRef = useRef(record);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const owner = preview ? "preview" : address?.toLowerCase() ?? null;
@@ -77,27 +82,9 @@ export function AchievementCenter({
     }
   }, [owner]);
 
-  const persistRemote = useCallback(async (next: AchievementRecord) => {
-    if (!authenticated || !owner || owner === "preview") return;
-    try {
-      const token = await getAccessToken();
-      if (!token) return;
-      const response = await fetch("/api/achievements", {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ record: next }),
-      });
-      if (!response.ok) throw new Error(`Achievement sync failed with ${response.status}`);
-    } catch (error) {
-      reportClientError("achievements", error);
-    }
-  }, [authenticated, getAccessToken, owner]);
-
-  const commitRecord = useCallback((next: AchievementRecord, newlyUnlocked: AchievementId[] = [], sync = true) => {
-    recordRef.current = next;
+  const commitRecord = useCallback((next: AchievementRecord, newlyUnlocked: AchievementId[] = []) => {
     setRecord(next);
     persistLocal(next);
-    if (sync) void persistRemote(next);
     if (!newlyUnlocked.length) return;
     const latest = newlyUnlocked[newlyUnlocked.length - 1]!;
     setToastId(latest);
@@ -105,22 +92,34 @@ export function AchievementCenter({
       const achievement = ACHIEVEMENTS.find((candidate) => candidate.id === id);
       trackProductEvent("Quest Completed", { questId: id, xp: achievement?.xp ?? 0 });
     }
-  }, [persistLocal, persistRemote]);
+  }, [persistLocal]);
+
+  const requestAuthoritativeRecord = useCallback(async (body: { type: "sync" } | ({ type: "action" } & AchievementActionEvidence)) => {
+    const token = await getAccessToken();
+    if (!token) throw new Error("Quest authentication is unavailable");
+    const response = await fetch("/api/achievements", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json() as { record?: unknown; newlyUnlocked?: unknown; error?: string };
+    if (!response.ok || !payload.record) throw new Error(payload.error ?? `Quest sync failed with ${response.status}`);
+    const newlyUnlocked = Array.isArray(payload.newlyUnlocked)
+      ? payload.newlyUnlocked.filter((id): id is AchievementId => ACHIEVEMENTS.some((quest) => quest.id === id))
+      : [];
+    commitRecord(normalizeAchievementRecord(payload.record), newlyUnlocked);
+  }, [commitRecord, getAccessToken]);
 
   useEffect(() => {
     let active = true;
     setToastId(null);
     if (!owner) {
       const empty = emptyAchievementRecord();
-      recordRef.current = empty;
       setRecord(empty);
-      setLoadedOwner(null);
       return;
     }
     if (owner === "preview") {
-      recordRef.current = PREVIEW_RECORD;
       setRecord(PREVIEW_RECORD);
-      setLoadedOwner(owner);
       if (isShotQuery() && new URLSearchParams(window.location.search).get("state") === "achievements") setOpen(true);
       return;
     }
@@ -131,43 +130,25 @@ export function AchievementCenter({
     } catch {
       // Continue with the remote copy.
     }
-    recordRef.current = local;
     setRecord(local);
-    setLoadedOwner(owner);
     void (async () => {
       try {
-        const token = await getAccessToken();
-        if (!token) return;
-        const response = await fetch("/api/achievements", { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
-        if (!response.ok) throw new Error(`Achievement load failed with ${response.status}`);
-        const payload = await response.json() as { record?: unknown };
-        if (!active || !payload.record) return;
-        const merged = mergeAchievementRecords(recordRef.current, normalizeAchievementRecord(payload.record));
-        commitRecord(merged, [], false);
+        if (!active) return;
+        await requestAuthoritativeRecord({ type: "sync" });
       } catch (error) {
         if (active) reportClientError("achievements", error);
       }
     })();
     return () => { active = false; };
-  }, [commitRecord, getAccessToken, owner]);
+  }, [owner, requestAuthoritativeRecord]);
 
-  useEffect(() => {
-    if (!owner || loadedOwner !== owner || positionsState !== "ready") return;
-    const activePositions = positions.filter((position) => !position.closed);
-    const marketKeys = new Set(activePositions.map((position) => position.marketId ?? `${position.chain ?? "unknown"}:${position.pair}`));
-    const feesUsd = summarizePositions(activePositions).feesUsd;
-    const result = observeAchievementProgress(recordRef.current, {
-      positionCount: activePositions.length,
-      marketCount: marketKeys.size,
-      feesUsd,
-    });
-    if (JSON.stringify(result.record) !== JSON.stringify(recordRef.current)) commitRecord(result.record, result.newlyUnlocked);
-  }, [commitRecord, loadedOwner, owner, positions, positionsState]);
-
-  const recordAction = useCallback((action: AchievementAction) => {
-    const result = recordAchievementAction(recordRef.current, action);
-    commitRecord(result.record, result.newlyUnlocked);
-  }, [commitRecord]);
+  const recordAction = useCallback(async (evidence: AchievementActionEvidence) => {
+    try {
+      await requestAuthoritativeRecord({ type: "action", ...evidence });
+    } catch (error) {
+      reportClientError("achievements", error);
+    }
+  }, [requestAuthoritativeRecord]);
 
   useEffect(() => {
     actionRef.current = recordAction;
@@ -216,6 +197,9 @@ export function AchievementCenter({
   const openQuests = () => {
     setOpen(true);
     trackProductEvent("Quest Board Opened", { xp, level: level.level, completed: unlockedCount, authenticated });
+    if (authenticated && owner && owner !== "preview") {
+      void requestAuthoritativeRecord({ type: "sync" }).catch((error) => reportClientError("achievements", error));
+    }
   };
 
   const toast = toastId ? ACHIEVEMENTS.find((achievement) => achievement.id === toastId) : null;

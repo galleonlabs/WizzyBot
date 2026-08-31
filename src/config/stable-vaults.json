@@ -23,7 +23,8 @@
       "weightBps": 3500,
       "status": "active",
       "risk": "established",
-      "color": "#5ef0b6"
+      "color": "#5ef0b6",
+      "imageUrl": "https://cdn.morpho.org/v2/assets/images/gauntlet.svg"
     },
     {
       "id": "base-spark-usdc",
@@ -35,7 +36,8 @@
       "weightBps": 3000,
       "status": "active",
       "risk": "established",
-      "color": "#f4c851"
+      "color": "#f4c851",
+      "imageUrl": "https://cdn.morpho.org/v2/assets/images/spark.svg"
     },
     {
       "id": "base-steakhouse-usdc",
@@ -47,7 +49,8 @@
       "weightBps": 2000,
       "status": "active",
       "risk": "established",
-      "color": "#8ba8ff"
+      "color": "#8ba8ff",
+      "imageUrl": "https://cdn.morpho.org/v2/assets/images/steakhouse.svg"
     },
     {
       "id": "base-grove-steakhouse-usdc",
@@ -59,7 +62,8 @@
       "weightBps": 1500,
       "status": "active",
       "risk": "emerging",
-      "color": "#ff8a62"
+      "color": "#ff8a62",
+      "imageUrl": "https://cdn.morpho.org/v2/assets/images/steakhouse.svg"
     }
   ]
 }

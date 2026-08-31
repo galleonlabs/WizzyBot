@@ -24,7 +24,7 @@ const display = Unbounded({
 const siteUrl = "https://wizzy.meme";
 const socialTitle = "Wizzy: Make Stable Yield";
 const socialDescription =
-  "One USDC deposit across Base's most trusted yield vaults. Curated by agents, self-custodial, withdraw any time.";
+  "One USDC deposit across Base's largest curated yield vaults. Agents pick and monitor the venues. Self-custodial, withdraw any time.";
 const socialImage = {
   url: "/brand/wizzy-social-stable-v1.png",
   width: 1200,

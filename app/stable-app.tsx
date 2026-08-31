@@ -24,6 +24,7 @@ type StableVaultRow = {
   status: "active" | "paused" | "watch";
   risk: string;
   color: string;
+  imageUrl?: string;
   netApy: number | null;
   totalAssetsUsd: number | null;
 };
@@ -330,7 +331,7 @@ export function StableApp() {
             <div className="hero-stage">
               <div className="hero-copy">
                 <h1>Make Stable Yield</h1>
-                <p>Deposit USDC into a curated index of Base yield vaults and earn.<br /><span>Curated and monitored by agents. Self-custodial.</span></p>
+                <p>Deposit USDC into a curated index of Base yield vaults and earn.<br /><span>Agents pick the venues and watch them around the clock. You keep custody.</span></p>
               </div>
               <div className="index-showcase" aria-label="Base yield index">
                 <div className="network-lockup" aria-label="Built on Base">
@@ -340,7 +341,7 @@ export function StableApp() {
                 <div className={`hero-token-field ${marketsState === "loading" ? "is-loading" : ""}`}>
                   {(marketsState === "loading" ? placeholderVaults() : activeVaults).map((vault, index) => (
                     <span className="hero-token" key={vault.id} style={{ "--token-index": index } as CSSProperties}>
-                      <span className="token-icon" style={{ backgroundColor: vault.color || "var(--surface-3)" }} aria-hidden="true"><b>{vault.symbol.slice(0, 1).toUpperCase()}</b></span>
+                      <VenueIcon vault={vault} />
                       {vault.curatorName ? <b>{vault.curatorName}</b> : null}
                     </span>
                   ))}
@@ -366,7 +367,7 @@ export function StableApp() {
                 <span className="market-breadth">
                   <span className="market-stack" role="img" aria-label={marketsState === "loading" ? "Reading venues" : activeVaults.map((vault) => vault.name).join(", ")}>
                     {(marketsState === "loading" ? placeholderVaults() : activeVaults).map((vault) => (
-                      <span className="token-icon" key={vault.id} style={{ backgroundColor: vault.color || "var(--surface-3)" }} aria-hidden="true"><b>{vault.symbol.slice(0, 1).toUpperCase()}</b></span>
+                      <VenueIcon vault={vault} key={vault.id} />
                     ))}
                   </span>
                   <span><b>{marketsState === "loading" ? "Reading venues" : `${activeVaults.length} venues`}</b><small>{marketsState === "loading" ? "Current index" : "Curated Base vaults"}</small></span>
@@ -423,11 +424,11 @@ export function StableApp() {
         ) : (
           <section className="index-main markets-view">
             <header className="index-title-row">
-              <div><h1>The venues</h1><p>Wizzy agents review vault health, curators, and timelocks every six hours.</p></div>
+              <div><h1>The venues</h1><p>Wizzy agents review vault health, curators, and timelocks every six hours. Rates are variable and set by each venue.</p></div>
             </header>
             <div className="stable-venues">
               {(markets?.vaults ?? []).map((vault) => <div className={`stable-venue ${vault.status !== "active" ? "is-paused" : ""}`} key={vault.id}>
-                <span className="stable-venue-badge" style={{ background: vault.color }} aria-hidden="true">{vault.symbol.slice(0, 1).toUpperCase()}</span>
+                <span className="stable-venue-badge" style={{ background: vault.imageUrl ? "var(--surface-2)" : vault.color }} aria-hidden="true">{vault.imageUrl ? <img src={vault.imageUrl} alt="" /> : vault.symbol.slice(0, 1).toUpperCase()}</span>
                 <span className="stable-venue-name"><b>{vault.name}</b><small>{vault.curatorName} · {vault.venue}{vault.status !== "active" ? " · paused" : ""}</small></span>
                 <span className="stable-venue-stat"><small>Weight</small><b>{(vault.weightBps / 100).toFixed(0)}%</b></span>
                 <span className="stable-venue-stat"><small>TVL</small><b>{formatUsd(vault.totalAssetsUsd)}</b></span>
@@ -478,6 +479,12 @@ function StableWalletMenu({ address, onDisconnect }: { address: string; onDiscon
       <button type="button" role="menuitem" onClick={() => { setOpen(false); onDisconnect(); }}>Disconnect</button>
     </div> : null}
   </div>;
+}
+
+function VenueIcon({ vault }: { vault: StableVaultRow }) {
+  return <span className={`token-icon ${vault.imageUrl ? "is-logo" : ""}`} style={{ backgroundColor: vault.imageUrl ? "var(--surface-2)" : vault.color || "var(--surface-3)" }} aria-hidden="true">
+    {vault.imageUrl ? <img src={vault.imageUrl} alt="" /> : <b>{vault.symbol.slice(0, 1).toUpperCase()}</b>}
+  </span>;
 }
 
 function placeholderVaults(): StableVaultRow[] {

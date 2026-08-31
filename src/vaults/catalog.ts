@@ -15,6 +15,7 @@ const VaultSchema = z.object({
   status: z.enum(["active", "paused", "watch"]),
   risk: z.enum(["established", "emerging", "experimental"]),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  imageUrl: z.string().url().optional(),
 });
 
 const StableCatalogSchema = z.object({

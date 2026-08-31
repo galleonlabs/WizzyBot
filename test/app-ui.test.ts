@@ -252,7 +252,7 @@ describe("meme index product UI", () => {
     expect(layout).toContain('url: "/"');
     expect(layout).toContain('locale: "en_GB"');
     expect(layout).toContain('"max-image-preview": "large"');
-    expect(layout).toContain("Base's most trusted yield vaults");
+    expect(layout).toContain("Base's largest curated yield vaults");
     expect(layout).toContain('url: "/brand/wizzy-social-stable-v1.png"');
     expect(layout.match(/images: \[socialImage\]/g)).toHaveLength(2);
     expect(socialCard.readUInt32BE(16)).toBe(1200);

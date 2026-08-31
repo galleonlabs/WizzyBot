@@ -1,13 +1,10 @@
-import { createRequire } from "node:module";
-
 /**
- * Eve evaluates agent/* as ESM and leaves package deps external.
- * Uniswap SDK ESM is extensionless, so tools must not import those packages.
- * Load the pre-bundled CJS via a relative path so eve does not need the
- * file: workspace package. Package-name require is a fallback after the
- * bundle script copies into node_modules.
+ * Eve evaluates agent/* as ESM. Uniswap SDK ESM is extensionless, so tools
+ * must not import those packages directly. Import the pre-bundled CJS
+ * statically so the hosted build inlines it into the function output; a
+ * dynamic require would leave the file untraced and crash on Vercel.
  */
-const require = createRequire(import.meta.url);
+import hostedCjs from "../../vendor/hosted-cjs/index.cjs";
 
 export type HostedSurface = {
   listPositions: (owner?: string, chain?: string) => Promise<unknown>;
@@ -66,15 +63,7 @@ export type HostedSurface = {
   assertWriteAllowed: (flags: { live?: boolean; confirm?: boolean }) => boolean;
 };
 
-function loadHosted(): HostedSurface {
-  try {
-    return require("../../vendor/hosted-cjs/index.cjs") as HostedSurface;
-  } catch {
-    return require("unabot-hosted-cjs") as HostedSurface;
-  }
-}
-
-const hosted = loadHosted();
+const hosted = hostedCjs as HostedSurface;
 
 export const listPositions = hosted.listPositions;
 export const statusPosition = hosted.statusPosition;

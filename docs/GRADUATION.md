@@ -11,19 +11,13 @@ The Wizzy token lives on its launchpad bonding curve. Graduation seeds the real 
 - **Activation script**: `scripts/activate-wizzy-sleeve.ts` verifies the pool onchain (pair, fee, non-zero liquidity), rescales the ordinary constituents, appends the sleeve, and revalidates the catalog. Config-only; no transaction or fee change.
 - **Watcher**: `scripts/watch-wizzy-graduation.ts` polls the v3 factory for the WIZZY/WETH pool and alerts through `UNABOT_ALERT_WEBHOOK` on `pool-created` and `graduated` transitions. Disarmed until it has the token address.
 
-## Arm the watcher (do this now)
+## Token
 
-Needs the confirmed WIZZY token contract address from the launchpad.
+`0x9626F5491773BD28e1a1Edb91BE962264adF4F63` on Robinhood Chain — verified onchain 2026-08-31 from the canonical RPC: contract code present, `name() = "Wizzy"`, `symbol() = "WIZZY"`, 18 decimals, fixed 1,000,000,000 supply. Launchpad page: pools.trade. The watcher runs on the dappnode timer `wizzy-graduation.timer` every five minutes and alerts on `pool-created` and `graduated`; state lands in `~/.local/state/unabot-curator/wizzy-graduation.json`.
 
-```bash
-WIZZY_TOKEN_ADDRESS=0x... bun scripts/watch-wizzy-graduation.ts
-```
+## Timing decision (recorded)
 
-On dappnode, add `WIZZY_TOKEN_ADDRESS=0x...` to `~/.config/unabot/curator.env` and run it from a 5-minute user timer with `WorkingDirectory=%h/projects/personal/UnaBot`, mirroring `unabot-curator.service` hardening. State lands next to the curator's in `~/.local/state/unabot-curator/wizzy-graduation.json`.
-
-## The recorded decision still open
-
-[TOKEN_FLYWHEEL.md](TOKEN_FLYWHEEL.md) Stage 3 gates activation on 30 days of market history, $250k usable liquidity, $100k genuine 7-day volume, and legal review. Activating at graduation instead is a deliberate revision of that recorded plan — the operator's call, made explicitly and recorded here, not a side effect. The machinery supports either timing; nothing activates until the release below ships.
+Operator decision, 2026-08-31: **activate the sleeve at graduation.** This deliberately supersedes the Stage 3 timing gates in [TOKEN_FLYWHEEL.md](TOKEN_FLYWHEEL.md) (30 days of market history, $250k liquidity, $100k seven-day volume, prior legal review). The activation script's own onchain safety checks still apply — correct pair, expected fee tier, non-zero seeded liquidity — and the curator's pause authority, the 10% hard cap, and the no-fee-routing boundary all remain in force.
 
 ## Activation release (day-of)
 

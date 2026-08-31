@@ -1,6 +1,6 @@
 # Wizzy token and index plan
 
-Decision recorded: 30 August 2026.
+Decision recorded: 30 August 2026. Revised 31 August 2026: the operator elected to activate the Stage 3 sleeve at pool graduation rather than after the 30-day market-evidence gates; the revision and its execution path are recorded in [GRADUATION.md](GRADUATION.md).
 
 ## Decision
 

@@ -4,6 +4,7 @@ import type { PositionView } from "./lib/cards";
 import { summarizePositions } from "./lib/portfolio-summary";
 import {
   ACHIEVEMENTS,
+  ACHIEVEMENT_SECTIONS,
   achievementLevel,
   achievementProgress,
   achievementXp,
@@ -102,7 +103,7 @@ export function AchievementCenter({
     setToastId(latest);
     for (const id of newlyUnlocked) {
       const achievement = ACHIEVEMENTS.find((candidate) => candidate.id === id);
-      trackProductEvent("Achievement Unlocked", { achievementId: id, xp: achievement?.xp ?? 0 });
+      trackProductEvent("Quest Completed", { questId: id, xp: achievement?.xp ?? 0 });
     }
   }, [persistLocal, persistRemote]);
 
@@ -208,60 +209,69 @@ export function AchievementCenter({
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
-      previouslyFocused?.focus();
+      (triggerRef.current ?? previouslyFocused)?.focus();
     };
   }, [open]);
 
-  const openCase = () => {
+  const openQuests = () => {
     setOpen(true);
-    trackProductEvent("Trophy Case Opened", { xp, level: level.level, unlocked: unlockedCount, authenticated });
+    trackProductEvent("Quest Board Opened", { xp, level: level.level, completed: unlockedCount, authenticated });
   };
 
   const toast = toastId ? ACHIEVEMENTS.find((achievement) => achievement.id === toastId) : null;
   const portal = typeof document === "undefined" ? null : createPortal(<>
     {open ? <div className="achievement-backdrop" onPointerDown={(event) => { if (event.currentTarget === event.target) setOpen(false); }}>
-      <section ref={dialogRef} className="trophy-case" role="dialog" aria-modal="true" aria-labelledby="trophy-case-title" aria-describedby="trophy-case-description">
+      <section ref={dialogRef} className="trophy-case" role="dialog" aria-modal="true" aria-labelledby="quest-board-title" aria-describedby="quest-board-description">
         <header className="trophy-case-header">
           <span className="trophy-case-identity"><img src="/brand/wizzy-mascot-32.png" alt="" /><span><small>Wizzy level {level.level}</small><b>{level.title}</b></span></span>
           <button type="button" onClick={() => setOpen(false)}>Close</button>
         </header>
         <div className="trophy-case-intro">
           <div>
-            <h2 id="trophy-case-title">Trophy case</h2>
-            <p id="trophy-case-description">Make markets, earn fees, and keep your positions working.</p>
+            <h2 id="quest-board-title">Quests</h2>
+            <p id="quest-board-description">Make markets, stack fees, and level up your spellbook.</p>
           </div>
           <strong><span>{xp}</span> XP</strong>
         </div>
         <LevelProgress xp={xp} level={level} unlockedCount={unlockedCount} />
-        <div className="achievement-list" role="list">
-          {ACHIEVEMENTS.map((achievement, index) => {
-            const unlockedAt = record.unlockedAt[achievement.id];
-            const progress = achievementProgress(record, achievement.id);
-            const progressPct = Math.max(0, Math.min(100, (progress.current / progress.target) * 100));
-            return <article className={unlockedAt ? "is-unlocked" : "is-locked"} role="listitem" key={achievement.id}>
-              <span className={`achievement-mark is-${index % 3}`} aria-hidden="true">{achievement.mark}</span>
-              <div className="achievement-copy">
-                <span className="achievement-title-row"><b>{achievement.title}</b><strong>+{achievement.xp} XP</strong></span>
-                <p>{achievement.description}</p>
-                <span className="achievement-progress" role="progressbar" aria-label={`${achievement.title}: ${progress.label}`} aria-valuemin={0} aria-valuemax={progress.target} aria-valuenow={progress.current} style={{ "--achievement-progress": `${progressPct}%` } as CSSProperties}><i /></span>
-                <small>{unlockedAt ? `Earned ${formatEarnedDate(unlockedAt)}` : authenticated ? positionsState === "loading" ? "Reading your wallet" : progress.label : "Connect to start"}</small>
+        <div className="quest-sections">
+          {ACHIEVEMENT_SECTIONS.map((section) => {
+            const quests = ACHIEVEMENTS.filter((achievement) => achievement.section === section.id);
+            const completed = quests.filter((quest) => record.unlockedAt[quest.id]).length;
+            return <section className="quest-section" aria-labelledby={`quest-section-${section.id}`} key={section.id}>
+              <header><h3 id={`quest-section-${section.id}`}>{section.title}</h3><span>{completed}/{quests.length} complete</span></header>
+              <div className="achievement-list" role="list">
+                {quests.map((achievement, index) => {
+                  const unlockedAt = record.unlockedAt[achievement.id];
+                  const progress = achievementProgress(record, achievement.id);
+                  const progressPct = Math.max(0, Math.min(100, (progress.current / progress.target) * 100));
+                  return <article className={unlockedAt ? "is-unlocked" : "is-locked"} role="listitem" key={achievement.id}>
+                    <span className={`achievement-mark is-${index % 3}`} aria-hidden="true">{achievement.mark}</span>
+                    <div className="achievement-copy">
+                      <span className="achievement-title-row"><b>{achievement.title}</b><strong>+{achievement.xp} XP</strong></span>
+                      <p>{achievement.description}</p>
+                      <span className="achievement-progress" role="progressbar" aria-label={`${achievement.title}: ${progress.label}`} aria-valuemin={0} aria-valuemax={progress.target} aria-valuenow={progress.current} style={{ "--achievement-progress": `${progressPct}%` } as CSSProperties}><i /></span>
+                      <small>{unlockedAt ? `Completed ${formatEarnedDate(unlockedAt)}` : authenticated ? positionsState === "loading" ? "Reading your wallet" : progress.label : "Connect to start"}</small>
+                    </div>
+                  </article>;
+                })}
               </div>
-            </article>;
+            </section>;
           })}
         </div>
-        {!authenticated ? <footer className="trophy-case-footer"><span><b>Ready to play?</b><small>Connect a wallet and your first market earns 100 XP.</small></span><button type="button" onClick={() => { setOpen(false); onConnect(); }}>Connect wallet</button></footer> : null}
+        {!authenticated ? <footer className="trophy-case-footer"><span><b>Begin your first quest.</b><small>Connect a wallet and your first market earns 100 XP.</small></span><button type="button" onClick={() => { setOpen(false); onConnect(); }}>Connect wallet</button></footer> : null}
       </section>
     </div> : null}
-    {toast ? <button className="achievement-toast" type="button" onClick={() => { setToastId(null); openCase(); }} aria-label={`${toast.title} unlocked. Open trophy case.`}>
+    {toast ? <button className="achievement-toast" type="button" onClick={() => { setToastId(null); openQuests(); }} aria-label={`${toast.title} complete. Open quests.`}>
       <span className="achievement-toast-mascot"><img src="/brand/wizzy-mascot-32.png" alt="" /><i /><i /><i /></span>
-      <span><small>Trophy unlocked</small><b>{toast.title}</b></span>
+      <span><small>Quest complete</small><b>{toast.title}</b></span>
       <strong>+{toast.xp} XP</strong>
     </button> : null}
   </>, document.body);
   return <>
-    <button ref={triggerRef} className="achievement-trigger" type="button" onClick={openCase} aria-label={`${xp} XP. Level ${level.level} ${level.title}. Open trophy case.`} aria-haspopup="dialog" aria-expanded={open}>
+    <button ref={triggerRef} className="achievement-trigger" type="button" onClick={openQuests} aria-label={`${xp} XP. Level ${level.level} ${level.title}. Open quests.`} aria-haspopup="dialog" aria-expanded={open}>
       <span><b>{xp}</b><small>XP</small></span>
-      <span className="achievement-trigger-level">Lv {level.level}</span>
+      <span className="achievement-trigger-level">Quests</span>
     </button>
     {portal}
   </>;
@@ -280,7 +290,7 @@ function LevelProgress({ xp, level, unlockedCount }: { xp: number; level: Return
 }
 
 function unlockedLabel(count: number): string {
-  return count === 0 ? "Your journey starts here." : `${count} of ${ACHIEVEMENTS.length} trophies earned.`;
+  return count === 0 ? "Your journey starts here." : `${count} of ${ACHIEVEMENTS.length} quests complete.`;
 }
 
 function storageKey(owner: string): string {

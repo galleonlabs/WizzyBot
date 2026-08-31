@@ -370,15 +370,21 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("one atomic approval.`");
   });
 
-  it("ships a wallet-scoped XP and trophy system tied to confirmed product actions", () => {
+  it("ships wallet-scoped XP and quests tied to confirmed product actions", () => {
     expect(portfolio).toContain("<AchievementCenter");
     expect(portfolio).toContain("achievementActionRef.current?.(actionPlan.kind)");
-    expect(achievementCenter).toContain('trackProductEvent("Achievement Unlocked"');
-    expect(achievementCenter).toContain('trackProductEvent("Trophy Case Opened"');
+    expect(achievementCenter).toContain('trackProductEvent("Quest Completed"');
+    expect(achievementCenter).toContain('trackProductEvent("Quest Board Opened"');
+    expect(achievementCenter).toContain('id="quest-board-title">Quests</h2>');
+    expect(achievementCenter).toContain("Quest complete");
+    expect(achievementCenter).toContain("quests complete.");
+    expect(achievementCenter).not.toContain("Trophy case");
+    expect(achievementCenter).not.toContain("Trophy unlocked");
     expect(achievementCenter).toContain('role="dialog"');
     expect(achievementCenter).toContain('aria-modal="true"');
     expect(achievementCenter).toContain('role="progressbar"');
     expect(achievementCenter).toContain("createPortal");
+    expect(achievementCenter).toContain("(triggerRef.current ?? previouslyFocused)?.focus()");
     expect(achievementCenter).toContain('fetch("/api/achievements"');
     expect(achievementsRoute).toContain("verifyAuthToken");
     expect(achievementsRoute).toContain("setCustomMetadata");
@@ -386,11 +392,13 @@ describe("meme index product UI", () => {
     expect(telemetry).toContain('"achievements"');
   });
 
-  it("keeps the trophy case usable across desktop, mobile, themes, and reduced motion", () => {
+  it("keeps the quest board usable across desktop, mobile, themes, and reduced motion", () => {
     expect(css).toContain(".achievement-backdrop {\n  position: fixed;");
     expect(css).toContain(".trophy-case {\n  width: min(760px, 100%);");
+    expect(css).toContain(".quest-sections { display: grid; gap: 28px;");
     expect(css).toContain(".achievement-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));");
     expect(css).toContain(".trophy-case { width: 100%; max-height: calc(100dvh - 16px);");
+    expect(css).toContain(".quest-sections { gap: 22px; padding: 0 18px 24px;");
     expect(css).toContain(".achievement-list { grid-template-columns: minmax(0, 1fr);");
     expect(css).toContain(".achievement-toast-mascot i,");
     expect(css).toContain(".achievement-progress i,");

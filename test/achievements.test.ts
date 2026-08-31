@@ -13,15 +13,15 @@ import {
 
 const NOW = "2026-08-31T09:00:00.000Z";
 
-describe("Wizzy achievements", () => {
-  it("unlocks wallet-state trophies from real position and fee observations", () => {
+describe("Wizzy quests", () => {
+  it("unlocks wallet-state quests from real position and fee observations", () => {
     const result = observeAchievementProgress(emptyAchievementRecord(NOW), {
       positionCount: 6,
       marketCount: 6,
       feesUsd: 124.72,
     }, NOW);
-    expect(result.newlyUnlocked).toEqual(["first-spell", "full-spellbook", "fee-collector", "triple-digits"]);
-    expect(achievementXp(result.record)).toBe(600);
+    expect(result.newlyUnlocked).toEqual(["first-spell", "full-spellbook", "first-fees", "fee-collector", "pocket-full", "half-century", "triple-digits"]);
+    expect(achievementXp(result.record)).toBe(800);
     expect(achievementLevel(achievementXp(result.record))).toMatchObject({ level: 3, title: "Liquidity wizard" });
   });
 
@@ -48,7 +48,7 @@ describe("Wizzy achievements", () => {
     const local = recordAchievementAction(emptyAchievementRecord(NOW), "compound", NOW).record;
     const remote = observeAchievementProgress(emptyAchievementRecord(NOW), { positionCount: 1, marketCount: 1, feesUsd: 12 }, "2026-08-30T09:00:00.000Z").record;
     const merged = mergeAchievementRecords(local, remote, "2026-09-01T09:00:00.000Z");
-    expect(Object.keys(merged.unlockedAt).sort()).toEqual(["compounder", "fee-collector", "first-spell"]);
+    expect(Object.keys(merged.unlockedAt).sort()).toEqual(["compounder", "fee-collector", "first-fees", "first-spell"]);
     expect(merged.unlockedAt["first-spell"]).toBe("2026-08-30T09:00:00.000Z");
     expect(merged.compoundCount).toBe(1);
     expect(merged.maxFeesUsd).toBe(12);
@@ -67,6 +67,20 @@ describe("Wizzy achievements", () => {
     expect(record.compoundCount).toBe(10_000);
     expect(record.unlockedAt.compounder).toBe(NOW);
     expect(achievementProgress(record, "fee-collector").label).toBe("$7.25 of $10 fees");
-    expect(ACHIEVEMENTS).toHaveLength(6);
+    expect(ACHIEVEMENTS).toHaveLength(12);
+  });
+
+  it("builds a complete fee ladder without leaving XP above the top level", () => {
+    const result = observeAchievementProgress(emptyAchievementRecord(NOW), {
+      positionCount: 6,
+      marketCount: 6,
+      feesUsd: 1_000,
+    }, NOW);
+    expect(result.newlyUnlocked).toHaveLength(10);
+    const feeTargets = ACHIEVEMENTS.filter((quest) => quest.metric === "fees").map((quest) => quest.target);
+    expect(feeTargets).toEqual([1, 10, 25, 50, 100, 250, 500, 1_000]);
+    const completed = recordAchievementAction(recordAchievementAction(result.record, "compound", NOW).record, "rebalance", NOW).record;
+    expect(achievementXp(completed)).toBe(2_275);
+    expect(achievementLevel(achievementXp(completed))).toMatchObject({ level: 6, title: "Market myth", nextMinimumXp: null });
   });
 });

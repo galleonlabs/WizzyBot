@@ -74,9 +74,11 @@ if (status !== previousStatus && status !== "waiting" && env.alertWebhook) {
   const line = status === "graduated"
     ? `WIZZY graduated: ${found!.pool} (fee ${found!.fee}, liquidity ${found!.liquidity}). Run docs/GRADUATION.md.`
     : `WIZZY/WETH pool created at ${found!.pool} (fee ${found!.fee}) but liquidity is still zero.`;
+  // Discord reads `content`, Slack-style receivers read `text`; each ignores
+  // the other key, so one payload serves both webhook dialects.
   await fetch(env.alertWebhook, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text: line }),
+    body: JSON.stringify({ content: line, text: line }),
   }).catch(() => undefined);
 }

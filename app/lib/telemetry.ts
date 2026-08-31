@@ -5,6 +5,7 @@ export const TELEMETRY_AREAS = [
   "index-plan",
   "index-submit",
   "cross-chain-funding",
+  "send-eth",
   "position-action",
   "index-migration",
   "achievements",

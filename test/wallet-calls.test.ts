@@ -112,6 +112,7 @@ describe("client wallet batches", () => {
       walletAddress: "0x1111111111111111111111111111111111111111",
       chainId: 4663,
       transactions: [{ to: "0x2222222222222222222222222222222222222222", data: "0x1234", value: "0", description: "test" }],
+      intent: "send-eth",
       generateAuthorizationSignature,
       fetcher,
       pollingIntervalMs: 0,
@@ -120,7 +121,10 @@ describe("client wallet batches", () => {
       url: "https://api.privy.io/v1/wallets/wallet_12345678/rpc",
       body: expect.objectContaining({ sponsor: true }),
     }));
-    expect(fetcher).toHaveBeenNthCalledWith(1, "/api/privy/calls", expect.objectContaining({ method: "POST" }));
+    expect(fetcher).toHaveBeenNthCalledWith(1, "/api/privy/calls", expect.objectContaining({
+      method: "POST",
+      body: expect.stringContaining('"intent":"send-eth"'),
+    }));
     expect(result.status).toEqual({ status: "confirmed", transaction_hash: "0xabc" });
   });
 

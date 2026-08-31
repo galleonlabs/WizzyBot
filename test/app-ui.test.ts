@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const page = readFileSync("app/page.tsx", "utf8");
 const portfolio = readFileSync("app/portfolio-app.tsx", "utf8");
+const sendEthDialog = readFileSync("app/send-eth-dialog.tsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
 const providers = readFileSync("app/providers.tsx", "utf8");
@@ -288,16 +289,27 @@ describe("meme index product UI", () => {
     expect(providers).not.toContain("createSolanaRpc");
   });
 
-  it("opens an accessible wallet menu for Privy management and disconnect", () => {
+  it("opens an accessible wallet menu with a native Robinhood ETH send flow", () => {
     expect(portfolio).toContain('aria-haspopup="menu"');
     expect(portfolio).toContain('role="menu"');
     expect(portfolio).toContain('role="menuitem"');
     expect(portfolio).toContain('href="https://home.privy.io/"');
-    expect(portfolio).toContain("Send funds or export keys");
+    expect(portfolio).toContain("Send ETH");
+    expect(portfolio).toContain("On Robinhood Chain");
+    expect(portfolio).toContain("Export keys and security");
+    expect(portfolio).toContain('intent: "send-eth"');
     expect(portfolio).toContain("Disconnect");
     expect(portfolio).toContain('event.key !== "Escape"');
     expect(portfolio).toContain("handleMenuNavigation");
     expect(css).toContain(".wallet-menu-popover");
+    expect(sendEthDialog).toContain('role="dialog"');
+    expect(sendEthDialog).toContain('aria-modal="true"');
+    expect(sendEthDialog).toContain("Review transfer");
+    expect(sendEthDialog).toContain("Network fee sponsored by Wizzy");
+    expect(sendEthDialog).toContain(">Max</button>");
+    expect(sendEthDialog).toContain("View transaction");
+    expect(css).toContain(".send-eth-dialog");
+    expect(css).toContain(".send-eth-backdrop { align-items: end");
   });
 
   it("keeps custom RPC credentials on the server and caches the public market snapshot", () => {

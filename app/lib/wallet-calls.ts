@@ -123,6 +123,7 @@ export async function sendPrivyWalletCallsAndWait(input: {
   walletAddress: string;
   chainId: 4663;
   transactions: readonly WalletTransaction[];
+  intent?: "send-eth";
   generateAuthorizationSignature(payload: PrivyAuthorizationPayload): Promise<{ signature: string }>;
   onSubmitted?: (submission: CallsSubmission) => void;
   timeoutMs?: number;
@@ -145,7 +146,7 @@ export async function sendPrivyWalletCallsAndWait(input: {
   const response = await fetcher("/api/privy/calls", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ walletId: input.walletId, body, signature }),
+    body: JSON.stringify({ walletId: input.walletId, body, signature, ...(input.intent ? { intent: input.intent } : {}) }),
   });
   const payload = await response.json() as unknown;
   if (!response.ok) throw new Error(apiErrorMessage(payload, "Privy could not submit this atomic batch"));

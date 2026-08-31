@@ -555,6 +555,100 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
 .wallet-menu-actions small { color: var(--muted); font-size: 10px; }
 .wallet-menu-actions > button:hover > svg { color: var(--coral); }
 
+.send-eth-backdrop {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(9, 9, 13, .68);
+  backdrop-filter: blur(10px);
+  animation: achievement-backdrop-in 180ms ease-out both;
+}
+
+.send-eth-dialog {
+  width: min(430px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--popover-shadow);
+  color: var(--ink);
+  animation: trophy-case-in 220ms var(--motion-out) both;
+}
+
+.send-eth-dialog > header {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.send-eth-dialog > header > span { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.send-eth-dialog > header img { display: block; width: 36px; height: 36px; flex: 0 0 36px; object-fit: contain; }
+.send-eth-dialog > header span span { display: grid; min-width: 0; gap: 2px; }
+.send-eth-dialog > header small { color: var(--muted); font-size: 9px; font-weight: 700; }
+.send-eth-dialog > header b { font-size: 12px; font-weight: 750; }
+.send-eth-dialog > header button { min-width: 48px; min-height: 40px; padding: 0 10px; border-radius: 9px; color: var(--muted); font-size: 10px; font-weight: 700; }
+.send-eth-dialog > header button:hover { background: var(--surface-2); color: var(--ink); }
+
+.send-eth-body { display: grid; gap: 16px; padding: 24px; }
+.send-eth-heading h2,
+.send-eth-status h2 { margin: 0; font-family: var(--font-display); font-size: 26px; font-weight: 650; letter-spacing: -.04em; }
+.send-eth-heading p,
+.send-eth-status p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+.send-eth-field { display: grid; gap: 8px; }
+.send-eth-field > span:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--ink-soft); font-size: 10px; font-weight: 750; }
+.send-eth-field > span:first-child small { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-size: 9px; font-weight: 650; text-align: right; }
+.send-eth-field > input,
+.send-eth-amount { min-height: 52px; border: 1px solid var(--line-strong); border-radius: 11px; background: var(--surface-2); }
+.send-eth-field > input { width: 100%; padding: 0 14px; font-size: 13px; }
+.send-eth-field > input::placeholder,
+.send-eth-amount input::placeholder { color: var(--muted-2); }
+.send-eth-amount { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 0 12px 0 14px; }
+.send-eth-amount input { min-width: 0; width: 100%; border: 0; background: transparent; font-size: 22px; font-weight: 750; letter-spacing: -.03em; }
+.send-eth-amount button { min-width: 48px; min-height: 34px; padding: 0 9px; border-radius: 8px; background: var(--surface-3); color: var(--ink-soft); font-size: 10px; font-weight: 800; }
+.send-eth-amount button:hover:not(:disabled) { color: var(--coral); }
+.send-eth-amount b { color: var(--muted); font-size: 11px; }
+.send-eth-error { margin: -4px 0 0; color: var(--orange); font-size: 11px; font-weight: 650; line-height: 1.45; }
+
+.send-eth-network { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.send-eth-network img { display: block; width: 30px; height: 30px; padding: 5px; border-radius: 8px; background: #fff; object-fit: contain; }
+.send-eth-network span { display: grid; gap: 2px; }
+.send-eth-network b { font-size: 11px; }
+.send-eth-network small { color: var(--muted); font-size: 9px; }
+
+.send-eth-primary { min-height: 50px; padding: 0 18px; border-radius: 11px; background: var(--coral); color: var(--coral-ink); font-size: 12px; font-weight: 850; }
+.send-eth-primary:hover:not(:disabled) { background: var(--coral-hover); }
+.send-eth-primary:active:not(:disabled) { transform: scale(.985); }
+.send-eth-buttons { display: grid; grid-template-columns: .7fr 1fr; gap: 10px; }
+.send-eth-buttons > button:not(.send-eth-primary) { min-height: 50px; border-radius: 11px; background: var(--surface-2); color: var(--ink-soft); font-size: 11px; font-weight: 750; }
+.send-eth-buttons > button:not(.send-eth-primary):hover { background: var(--surface-3); color: var(--ink); }
+
+.send-eth-review { display: grid; margin: 0; border-top: 1px solid var(--line); }
+.send-eth-review > div { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.send-eth-review dt { color: var(--muted); font-size: 10px; font-weight: 700; }
+.send-eth-review dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: var(--ink); font-size: 11px; font-weight: 750; text-align: right; }
+.send-eth-warning { margin: -2px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+
+.send-eth-status { display: grid; justify-items: center; gap: 10px; padding: 40px 28px 30px; text-align: center; }
+.send-eth-status .plan-loading { min-height: 54px; }
+.send-eth-status p { max-width: 34ch; }
+.send-eth-status > .send-eth-primary { width: 100%; margin-top: 8px; }
+.send-eth-status .send-eth-buttons { width: 100%; margin-top: 8px; }
+.send-eth-status-mark { display: grid; width: 70px; height: 70px; place-items: center; margin-bottom: 6px; border-radius: 50%; background: var(--surface-2); color: var(--orange); font-family: var(--font-display); font-size: 24px; font-weight: 650; }
+.send-eth-status-mark.is-success { position: relative; background: var(--mint-soft); }
+.send-eth-status-mark.is-success > img { width: 54px; height: 54px; object-fit: contain; }
+.send-eth-status-mark.is-success > svg { position: absolute; right: -2px; bottom: 2px; width: 24px; height: 24px; padding: 4px; border-radius: 50%; background: var(--mint); color: var(--canvas); fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.4; }
+.send-eth-explorer { display: inline-flex; min-height: 38px; align-items: center; gap: 6px; color: var(--ink-soft); font-size: 10px; font-weight: 750; text-decoration: none; }
+.send-eth-explorer:hover { color: var(--coral); }
+.send-eth-explorer svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+
 .preview-banner { padding: 7px 24px; background: var(--preview-bg); color: var(--preview-ink); text-align: center; font-size: 11px; font-weight: 700; }
 
 .index-shell { width: min(1280px, 100%); margin: 0 auto; padding: 0 24px 72px; }
@@ -965,7 +1059,9 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
   .action-preview,
   .index-update-panel,
   .achievement-backdrop,
+  .send-eth-backdrop,
   .trophy-case,
+  .send-eth-dialog,
   .achievement-toast,
   .achievement-toast-mascot img,
   .achievement-toast-mascot i,
@@ -1068,6 +1164,31 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
   .amount-input b { font-size: 14px; }
   .funding-choice { min-height: 66px; padding-inline: 8px; }
   .wallet-menu-popover { top: calc(100% + 8px); right: 0; bottom: auto; left: auto; width: calc(100vw - 24px); }
+  .send-eth-backdrop { align-items: end; padding: 16px 0 0; }
+  .send-eth-dialog { width: 100%; max-height: calc(100dvh - 16px); overflow: auto; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 20px 20px 0 0; transform-origin: bottom center; }
+  .send-eth-dialog > header { min-height: 68px; padding-inline: 16px 12px; }
+  .send-eth-dialog > header small { font-size: 10px; }
+  .send-eth-dialog > header b { font-size: 13px; }
+  .send-eth-dialog > header button { min-width: 52px; min-height: 48px; font-size: 12px; }
+  .send-eth-body { gap: 18px; padding: 22px 18px max(20px, env(safe-area-inset-bottom)); }
+  .send-eth-heading h2,
+  .send-eth-status h2 { font-size: 26px; }
+  .send-eth-heading p,
+  .send-eth-status p { font-size: 14px; }
+  .send-eth-field > span:first-child { font-size: 12px; }
+  .send-eth-field > span:first-child small { font-size: 11px; }
+  .send-eth-field > input,
+  .send-eth-amount { min-height: 56px; }
+  .send-eth-field > input { font-size: 14px; }
+  .send-eth-amount button { min-width: 52px; min-height: 40px; font-size: 12px; }
+  .send-eth-network b { font-size: 13px; }
+  .send-eth-network small,
+  .send-eth-warning { font-size: 11px; }
+  .send-eth-primary,
+  .send-eth-buttons > button:not(.send-eth-primary) { min-height: 52px; font-size: 13px; }
+  .send-eth-review dt,
+  .send-eth-review dd { font-size: 12px; }
+  .send-eth-status { padding: 42px 18px max(24px, env(safe-area-inset-bottom)); }
   .funding-choice b { font-size: 12px; }
   .funding-choice small { font-size: 10px; }
   .cross-chain-fund { min-height: 48px; font-size: 12px; }

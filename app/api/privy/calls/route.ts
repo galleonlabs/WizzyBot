@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRobinhoodIndexState } from "../../../lib/portfolio-server";
 import { ApiRequestError, apiErrorResponse, readApiJson } from "../../../lib/api-request-server";
+import { pureEthSendPolicyError } from "../../../lib/privy-call-policy";
 import { DEFAULT_PRIVY_APP_ID } from "../../../lib/privy-config";
 
 export const runtime = "nodejs";
@@ -26,6 +27,7 @@ const SubmitBody = z.object({
   walletId: Identifier,
   body: PrivyBody,
   signature: z.string().min(16).max(8_192),
+  intent: z.enum(["send-eth"]).optional(),
 }).strict();
 
 const ROBINHOOD_CONTRACTS = [
@@ -39,7 +41,7 @@ const MAX_TOTAL_VALUE_WEI = 1_000n * 10n ** 18n;
 export async function POST(request: Request) {
   try {
     const parsed = SubmitBody.parse(await readApiJson(request, 1_500_000));
-    await assertAllowedCalls(parsed.body.params.calls);
+    await assertAllowedCalls(parsed.body.params.calls, parsed.intent);
     const credentials = privyCredentials();
     const response = await fetch(`https://api.privy.io/v1/wallets/${encodeURIComponent(parsed.walletId)}/rpc`, {
       method: "POST",
@@ -83,7 +85,12 @@ export async function GET(request: Request) {
   }
 }
 
-async function assertAllowedCalls(calls: z.infer<typeof Call>[]) {
+async function assertAllowedCalls(calls: z.infer<typeof Call>[], intent?: "send-eth") {
+  if (intent === "send-eth") {
+    const error = pureEthSendPolicyError(calls);
+    if (error) throw new ApiRequestError(error.message, error.status);
+    return;
+  }
   const state = await getRobinhoodIndexState();
   const allowed = new Set(ROBINHOOD_CONTRACTS.map((address) => address.toLowerCase()));
   collectAddresses(state, allowed);

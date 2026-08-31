@@ -32,6 +32,7 @@ import { confirmedTransactionHashes, sendPrivyWalletCallsAndWait, sendWalletCall
 import { PRIVY_APP_ID } from "./lib/privy-config";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 import { AchievementCenter } from "./achievement-center";
+import { SendEthDialog } from "./send-eth-dialog";
 import type { AchievementActionEvidence } from "./lib/achievements";
 
 type ViewTab = "overview" | "markets";
@@ -132,6 +133,7 @@ export function PortfolioApp() {
   const [actionState, setActionState] = useState<PlanState>({ kind: "idle" });
   const [migrationPlan, setMigrationPlan] = useState<IndexMigrationPlan | null>(null);
   const [migrationState, setMigrationState] = useState<PlanState>({ kind: "idle" });
+  const [sendOpen, setSendOpen] = useState(false);
   const positionsRequestRef = useRef(0);
   const balanceRequestRef = useRef(0);
   const authStateRef = useRef<"loading" | "signed-in" | "signed-out">("loading");
@@ -160,6 +162,7 @@ export function PortfolioApp() {
     owner: string;
     chainId: number;
     transactions: readonly WalletTransaction[];
+    intent?: "send-eth";
     onSubmitted?: () => void;
   }) {
     if (!wallet) throw new Error("Your wallet is not ready");
@@ -172,6 +175,7 @@ export function PortfolioApp() {
         walletAddress: wallet.address,
         chainId: 4663,
         transactions: input.transactions,
+        intent: input.intent,
         generateAuthorizationSignature,
         onSubmitted: input.onSubmitted,
       });
@@ -204,6 +208,27 @@ export function PortfolioApp() {
       reportClientError("positions", error);
     }
   }, [address, authenticated]);
+
+  async function sendRobinhoodEth(recipient: `0x${string}`, amountWei: string, onSubmitted: () => void): Promise<`0x${string}` | null> {
+    if (!address) throw new Error("Your Wizzy wallet is not ready.");
+    trackProductEvent("ETH Send Started", { chainId: 4663 });
+    try {
+      const confirmed = await sendEvmBatch({
+        owner: address,
+        chainId: 4663,
+        intent: "send-eth",
+        transactions: [{ to: recipient, data: "0x", value: amountWei, description: "Send ETH on Robinhood Chain" }],
+        onSubmitted,
+      });
+      const transactionHash = confirmedTransactionHashes(confirmed.status)[0] ?? null;
+      await loadRobinhoodBalance();
+      trackProductEvent("ETH Send Confirmed", { chainId: 4663, transactionHash });
+      return transactionHash;
+    } catch (error) {
+      reportClientError("send-eth", error);
+      throw error;
+    }
+  }
 
   const loadPositions = useCallback(async () => {
     const requestId = ++positionsRequestRef.current;
@@ -720,7 +745,7 @@ export function PortfolioApp() {
               <ThemeIcon preference={theme} />
             </button>
             {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
-              <WalletMenu address={address ?? "Wallet"} onDisconnect={() => { trackProductEvent("Logout Started"); void logout(); }} />
+              <WalletMenu address={address ?? "Wallet"} onSend={() => { setSendOpen(true); void loadRobinhoodBalance(); trackProductEvent("ETH Send Opened", { chainId: 4663 }); }} onDisconnect={() => { trackProductEvent("Logout Started"); void logout(); }} />
             ) : (
               <button className="wallet-button wallet-connect" type="button" onClick={() => startLogin("header")} aria-label="Connect wallet"><WalletIcon /><span>Connect</span></button>
             )}
@@ -774,6 +799,7 @@ export function PortfolioApp() {
             </section>
           )}
       </div>
+      {address ? <SendEthDialog open={sendOpen} owner={address} balanceWei={balanceState.kind === "ready" ? balanceState.balanceWei : undefined} onClose={() => setSendOpen(false)} onSend={sendRobinhoodEth} /> : null}
     </main>
   );
 }
@@ -927,7 +953,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
   );
 }
 
-function WalletMenu({ address, onDisconnect }: { address: string; onDisconnect: () => void }) {
+function WalletMenu({ address, onSend, onDisconnect }: { address: string; onSend: () => void; onDisconnect: () => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -960,8 +986,11 @@ function WalletMenu({ address, onDisconnect }: { address: string; onDisconnect: 
         <span><small>Your Wizzy wallet</small><b>{short(address)}</b></span>
       </header>
       <div className="wallet-menu-actions">
+        <button type="button" role="menuitem" onClick={() => { setOpen(false); onSend(); }}>
+          <SendIcon /><span><b>Send ETH</b><small>On Robinhood Chain</small></span>
+        </button>
         <a href="https://home.privy.io/" target="_blank" rel="noreferrer" role="menuitem" onClick={() => setOpen(false)}>
-          <WalletIcon /><span><b>Manage</b><small>Send funds or export keys</small></span><ExternalLinkIcon />
+          <WalletIcon /><span><b>Manage</b><small>Export keys and security</small></span><ExternalLinkIcon />
         </a>
         <button type="button" role="menuitem" onClick={() => { setOpen(false); onDisconnect(); }}>
           <DisconnectIcon /><span><b>Disconnect</b><small>Sign out of Wizzy</small></span>
@@ -1422,6 +1451,7 @@ function VenueTrail({ chain }: { chain: IndexChain }) {
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }
 function ChevronIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" /></svg>; }
 function ExternalLinkIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M17 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" /></svg>; }
+function SendIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-5 14-2.5-5.5L5 12Z" /><path d="m11.5 13.5 3-3" /></svg>; }
 function DisconnectIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3M14 8l4 4-4 4M18 12H9" /></svg>; }
 function RefreshIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.2-2L20 12M4 12l2.7 5a7 7 0 0 0 11.2-2" /></svg>; }
 function CheckIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9" /></svg>; }

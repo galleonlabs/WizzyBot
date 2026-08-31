@@ -18,3 +18,4 @@ vendor/hosted-cjs/index.cjs
 .playwright-cli/
 output/playwright/
 .impeccable/
+.vercel

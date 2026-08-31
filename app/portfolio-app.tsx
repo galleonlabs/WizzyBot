@@ -9,6 +9,7 @@ import {
 } from "@privy-io/react-auth/solana";
 import { formatEther, parseEther } from "viem";
 import { lightRowToView, priceLabel, type PositionView } from "./lib/cards";
+import { readJsonPayload } from "./lib/api-payload";
 import { positionFeesEth, positionValueEth, positionValueUsd, summarizePositions } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
 import {
@@ -193,7 +194,7 @@ export function PortfolioApp() {
     setBalanceState({ kind: "loading" });
     try {
       const response = await fetch(`/api/balance?address=${encodeURIComponent(address)}`, { cache: "no-store" });
-      const payload = await response.json() as { balanceWei?: string; error?: string };
+      const payload = await readJsonPayload(response) as { balanceWei?: string; error?: string };
       if (!response.ok || payload.balanceWei === undefined) throw new Error(payload.error ?? "Could not read balance");
       if (requestId !== balanceRequestRef.current) return;
       setBalanceState({ kind: "ready", balanceWei: payload.balanceWei });
@@ -215,13 +216,13 @@ export function PortfolioApp() {
     try {
       const requests = (["base", "robinhood"] as const).map(async (chain) => {
         const response = await fetch(`/api/positions?owner=${encodeURIComponent(address)}&chain=${chain}`);
-        const payload = await response.json() as { positions?: unknown[]; error?: string };
+        const payload = await readJsonPayload(response) as { positions?: unknown[]; error?: string };
         if (!response.ok || payload.error) throw new Error(payload.error ?? `Could not load ${chain} positions`);
         return payload.positions ?? [];
       });
       if (solanaReady && solanaAddress) requests.push((async () => {
         const response = await fetch(`/api/portfolio/solana/positions?owner=${encodeURIComponent(solanaAddress)}`);
-        const payload = await response.json() as { positions?: unknown[]; error?: string };
+        const payload = await readJsonPayload(response) as { positions?: unknown[]; error?: string };
         if (!response.ok || payload.error) throw new Error(payload.error ?? "Could not load Solana positions");
         return payload.positions ?? [];
       })());
@@ -280,7 +281,7 @@ export function PortfolioApp() {
     }
     fetch("/api/markets")
       .then(async (response) => {
-        const payload = await response.json() as MarketsPayload;
+        const payload = await readJsonPayload(response) as MarketsPayload;
         if (!response.ok) throw new Error("Could not load markets");
         setMarkets(payload);
         setMarketsState("ready");
@@ -464,7 +465,7 @@ export function PortfolioApp() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ owner: address, amountWei: amountWei.toString(), originChainId: 4663 }),
       });
-      const payload = await response.json() as { plan?: RobinhoodIndexPlan; error?: string };
+      const payload = await readJsonPayload(response) as { plan?: RobinhoodIndexPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not prepare the index deposit");
       setPlan(payload.plan);
       setPlanState({ kind: "ready", message: "Review your deposit and fees before continuing." });
@@ -535,7 +536,7 @@ export function PortfolioApp() {
           positionManager: position.positionManager,
         }),
       });
-      const payload = await response.json() as { plan?: AnyPositionActionPlan; error?: string };
+      const payload = await readJsonPayload(response) as { plan?: AnyPositionActionPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? `Could not prepare ${action}`);
       setActionPlan(payload.plan);
       setActionState({ kind: "ready", message: action === "compound" ? "Review the fees ready to reinvest." : action === "rebalance" ? "Review the new range before continuing." : "Review the ETH return before continuing." });
@@ -614,7 +615,7 @@ export function PortfolioApp() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ owner: address, tokenId: update.position.tokenId, migrationId: update.migrationId }),
       });
-      const payload = await response.json() as { plan?: IndexMigrationPlan; error?: string };
+      const payload = await readJsonPayload(response) as { plan?: IndexMigrationPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not prepare the index update");
       setMigrationPlan(payload.plan);
       setMigrationState({ kind: "ready", message: "Review the replacement and fee before updating." });
@@ -799,7 +800,7 @@ function PoolActivityStrip({ preview }: { preview: boolean }) {
       const timeout = window.setTimeout(() => request?.abort(), 8_000);
       try {
         const response = await fetch("/api/pool-activity", { signal: request.signal });
-        const payload = await response.json() as PoolActivityPayload;
+        const payload = await readJsonPayload(response) as PoolActivityPayload;
         if (!response.ok) throw new Error("Could not load pool activity");
         if (active) setActivity((current) => payload.state === "ready" || !current.items.length ? payload : current);
       } catch {

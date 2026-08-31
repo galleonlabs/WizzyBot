@@ -2,6 +2,7 @@ import { Keypair, Transaction } from "@solana/web3.js";
 import { useSignTransaction, type ConnectedStandardSolanaWallet } from "@privy-io/react-auth/solana";
 import type { SolanaPositionActionPlan } from "./solana-position-server";
 import type { SolanaZapPlan } from "./solana-zap-server";
+import { readJsonPayload } from "./api-payload";
 
 export type SolanaExecutionProgress = {
   market: string;
@@ -107,7 +108,7 @@ async function broadcastSignedTransaction(owner: string, transaction: Uint8Array
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ owner, transactionBase64: encodeBase64(transaction) }),
   });
-  const payload = await response.json() as { signature?: string; error?: string };
+  const payload = await readJsonPayload(response) as { signature?: string; error?: string };
   if (!response.ok || !payload.signature) throw new Error(payload.error ?? "Could not submit Solana transaction");
   return payload.signature;
 }
@@ -116,7 +117,7 @@ async function waitForSolanaConfirmation(signature: string): Promise<void> {
   const deadline = Date.now() + 75_000;
   while (Date.now() < deadline) {
     const response = await fetch(`/api/portfolio/solana/status?signature=${encodeURIComponent(signature)}`, { cache: "no-store" });
-    const payload = await response.json() as { status?: "pending" | "confirmed" | "failed"; error?: string };
+    const payload = await readJsonPayload(response) as { status?: "pending" | "confirmed" | "failed"; error?: string };
     if (payload.status === "confirmed") return;
     if (payload.status === "failed") throw new Error(payload.error ?? "A Solana liquidity transaction failed");
     await new Promise((resolve) => window.setTimeout(resolve, 1_200));

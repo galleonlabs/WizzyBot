@@ -15,6 +15,7 @@ import {
   type AchievementRecord,
 } from "./lib/achievements";
 import { isShotQuery } from "./lib/shot-fixture";
+import { readJsonPayload } from "./lib/api-payload";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 
 type PositionState = "idle" | "loading" | "ready" | "error";
@@ -102,7 +103,7 @@ export function AchievementCenter({
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    const payload = await response.json() as { record?: unknown; newlyUnlocked?: unknown; error?: string };
+    const payload = await readJsonPayload(response) as { record?: unknown; newlyUnlocked?: unknown; error?: string };
     if (!response.ok || !payload.record) throw new Error(payload.error ?? `Quest sync failed with ${response.status}`);
     const newlyUnlocked = Array.isArray(payload.newlyUnlocked)
       ? payload.newlyUnlocked.filter((id): id is AchievementId => ACHIEVEMENTS.some((quest) => quest.id === id))

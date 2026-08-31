@@ -333,8 +333,17 @@ export function PortfolioApp() {
       .filter(({ market }) => ids.has(market.id))
       .sort((a, b) => marketTierIndex(markets.index, a.market.id) - marketTierIndex(markets.index, b.market.id) || b.indexWeightBps - a.indexWeightBps);
   }, [activeMarkets, markets.index, selectedTier]);
+  const displayedMarkets = useMemo(() => {
+    if (planState.kind !== "submitted" || !plan) return selectedMarkets;
+    const allocation = plan.stages.find((stage) => stage.id === "make-robinhood-markets")?.allocation;
+    if (!allocation) return selectedMarkets;
+    const order = new Map(allocation.markets.map((market, index) => [market.marketId, index]));
+    return activeMarkets
+      .filter(({ market }) => order.has(market.id))
+      .sort((a, b) => order.get(a.market.id)! - order.get(b.market.id)!);
+  }, [activeMarkets, plan, planState.kind, selectedMarkets]);
   const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
-  const feeApr = weightedFeeApr(selectedMarkets, stats);
+  const feeApr = weightedFeeApr(displayedMarkets, stats);
   const availableIndexUpdates = useMemo<AvailableIndexUpdate[]>(() => {
     const robinhood = markets.catalog.chains.find((chain) => chain.slug === "robinhood");
     if (!robinhood) return [];
@@ -734,7 +743,7 @@ export function PortfolioApp() {
                 <MarketAction
                   amount={amount}
                   onAmount={changeDepositAmount}
-                  markets={selectedMarkets}
+                  markets={displayedMarkets}
                   stats={stats}
                   loading={marketsState === "loading"}
                   feeApr={feeApr}
@@ -879,7 +888,7 @@ function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amoun
   onCancel: () => void;
   onViewMarkets: () => void;
 }) {
-  const constituentCount = markets.length;
+  const constituentCount = state.kind === "submitted" && plan ? plan.constituentCount : markets.length;
   const visibleAmountError = state.kind === "submitted" ? null : amountError;
   return (
     <aside className="market-action" aria-label="Make markets">
@@ -1113,7 +1122,7 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
       {showPositions ? <section className="portfolio-summary" aria-label="Portfolio summary">
         <div><span>Position value</span><strong>{summary.valueUsd > 0 ? money(summary.valueUsd) : summaryValueEth > 0 ? ethValue(summaryValueEth) : "—"}</strong><small>{summary.valueUsd > 0 ? `${summary.priced} of ${positions.length} priced` : "From live token balances"}</small></div>
         <div><span>Ready to collect</span><strong>{summary.feesUsd > 0 ? money(summary.feesUsd) : ethValue(summaryFeesEth)}</strong><small>Unclaimed fees</small></div>
-        <div><span>Earning now</span><strong>{summary.earning}</strong><small>of {positions.length} positions in range</small></div>
+        <div><span>Earning now</span><strong>{summary.earning}</strong><small>of {positions.length} {positions.length === 1 ? "position" : "positions"} in range</small></div>
         <div><span>Fee APR</span><strong>{formatFeeAprFraction(summary.feeApr)}</strong><small>Across priced positions</small></div>
       </section> : null}
       {showPositions ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>

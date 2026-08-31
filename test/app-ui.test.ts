@@ -199,7 +199,10 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("v{markets.catalog.version}");
     expect(portfolio).toContain('loading ? "Reading markets"');
     expect(portfolio).not.toContain("loading ? INDEX_MARKET_COUNT : constituentCount");
+    expect(portfolio).toContain('planState.kind !== "submitted" || !plan');
+    expect(portfolio).toContain('state.kind === "submitted" && plan ? plan.constituentCount : markets.length');
     expect(portfolio).toContain("Ready to collect");
+    expect(portfolio).toContain('positions.length === 1 ? "position" : "positions"');
     expect(portfolio).not.toContain("Your liquidity and the index, in one place.");
     expect(portfolio).not.toContain("Deposit ETH. Earn trading fees across Base, Robinhood, and Solana.");
     expect(css).toContain(".index-hero { grid-template-columns: 1fr; gap: 48px; padding: 68px 0 64px");

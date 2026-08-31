@@ -40,6 +40,7 @@ export type CentralizedCatalogUpdate = {
   changedFiles: Array<"src/config/curator.json" | "src/config/markets.json">;
   appliedReviews: string[];
   appliedReplacement: null | { fromMarketId: string; toMarketId: string };
+  appliedPauses: string[];
 };
 
 export function planCentralizedCatalogUpdate(input: {
@@ -133,10 +134,48 @@ export function planCentralizedCatalogUpdate(input: {
     appliedReplacement = { fromMarketId: outgoing.id, toMarketId: candidate.id };
   }
 
+  const appliedPauses: string[] = [];
+  for (const evaluation of input.report.evaluations) {
+    if (!evaluation.incumbent || evaluation.recommendation !== "pause") continue;
+    const chain = catalog.chains.find((row) => row.slug === evaluation.chain);
+    if (!chain) continue;
+    const market = chain.markets.find((row) => row.id === evaluation.marketId);
+    if (!market || market.status !== "active") continue;
+    const remaining = chain.markets.filter((row) => row.status === "active" && row.id !== market.id);
+    if (!remaining.length) throw new Error(`Refusing to pause ${market.id}: it is the last active ${chain.slug} market`);
+    market.status = "paused";
+    redistributeWeight(remaining, market.weightBps);
+    appliedPauses.push(`${market.id}:${evaluation.reasons.join("; ")}`);
+  }
+  if (appliedPauses.length && !appliedReplacement) {
+    catalog.version += 1;
+    catalog.updatedAt = input.today;
+  }
+
   const changedFiles: CentralizedCatalogUpdate["changedFiles"] = [];
   if (appliedReviews.length) changedFiles.push("src/config/curator.json");
-  if (appliedReplacement) changedFiles.push("src/config/markets.json");
-  return { curatorConfig, catalog, changedFiles, appliedReviews, appliedReplacement };
+  if (appliedReplacement || appliedPauses.length) changedFiles.push("src/config/markets.json");
+  return { curatorConfig, catalog, changedFiles, appliedReviews, appliedReplacement, appliedPauses };
+}
+
+/**
+ * Spreads a paused market's weight across the remaining active markets in
+ * proportion to their existing weights, keeping the active total at 10,000 bps
+ * (largest-remainder rounding, ties broken by market id for determinism).
+ */
+function redistributeWeight(markets: Array<{ id: string; weightBps: number }>, freedBps: number): void {
+  const remainingTotal = markets.reduce((sum, market) => sum + market.weightBps, 0);
+  const target = remainingTotal + freedBps;
+  const shares = markets.map((market) => {
+    const exact = (market.weightBps * target) / remainingTotal;
+    return { market, floor: Math.floor(exact), remainder: exact - Math.floor(exact) };
+  });
+  let leftover = target - shares.reduce((sum, share) => sum + share.floor, 0);
+  shares.sort((a, b) => b.remainder - a.remainder || a.market.id.localeCompare(b.market.id));
+  for (const share of shares) {
+    share.market.weightBps = share.floor + (leftover > 0 ? 1 : 0);
+    leftover -= leftover > 0 ? 1 : 0;
+  }
 }
 
 function assertResearchEvidence(sources: CuratorResearchDecision["candidateReviews"][number]["sources"]): void {

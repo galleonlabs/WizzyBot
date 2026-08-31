@@ -16,7 +16,7 @@ Pool capacity is capped at 1% of median TVL. Social data helps discover and veri
 
 Missing provider data is reported as unavailable, not as a failed liquidity or volume threshold. A clean security result remains valid for 24 hours so a transient provider outage cannot manufacture a risk call; any security flag still triggers review immediately.
 
-The curator is the decision-maker. A `review` incumbent remains until an eligible candidate earns a policy-valid replacement; it is not an operator approval queue. A `pause` recommendation requires the curator agent to mark the market unavailable in the catalog and ship the tested application deployment before new deposits stop using it. Eligible replacements inherit the outgoing market's weight and range width, preserving a 10,000-basis-point catalog without exposing arbitrary model-generated calldata.
+The curator is the decision-maker. A `review` incumbent remains until an eligible candidate earns a policy-valid replacement; it is not an operator approval queue. A `pause` call is applied deterministically from the rules report: the market is marked unavailable in the catalog, its weight is redistributed proportionally across the remaining active constituents, and the tested application deployment ships before new deposits stop using it. Eligible replacements inherit the outgoing market's weight and range width, preserving a 10,000-basis-point catalog without exposing arbitrary model-generated calldata.
 
 ## Related-party Wizzy sleeve
 

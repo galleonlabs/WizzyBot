@@ -67,6 +67,42 @@ describe("agentic centralized curator", () => {
     }));
   });
 
+  it("pauses an incumbent the deterministic report calls pause and redistributes its weight", () => {
+    const config = structuredClone(getCuratorConfig());
+    const pauseEvaluation = {
+      ...evaluation("robinhood-ponsguy", "pause", true),
+      reasons: ["pool liquidity fell 64% in 24h", "median pool liquidity is below $75,000"],
+    };
+    const result = planCentralizedCatalogUpdate({
+      report: report([pauseEvaluation]),
+      decision: decision(),
+      curatorConfig: config,
+      catalog: structuredClone(getMarketCatalog()),
+      today: "2026-08-31",
+    });
+    expect(result.appliedPauses).toEqual(["robinhood-ponsguy:pool liquidity fell 64% in 24h; median pool liquidity is below $75,000"]);
+    expect(result.changedFiles).toContain("src/config/markets.json");
+    const parsed = parseMarketCatalog(result.catalog);
+    const robinhood = parsed.chains.find((chain) => chain.slug === "robinhood")!;
+    expect(robinhood.markets.find((market) => market.id === "robinhood-ponsguy")!.status).toBe("paused");
+    const active = robinhood.markets.filter((market) => market.status === "active");
+    expect(active.reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
+    expect(result.catalog.version).toBe(getMarketCatalog().version + 1);
+  });
+
+  it("does not pause on a non-incumbent or non-pause call", () => {
+    const config = structuredClone(getCuratorConfig());
+    const result = planCentralizedCatalogUpdate({
+      report: report([evaluation("robinhood-ponsguy", "review", true), evaluation("robinhood-gg", "pause", false)]),
+      decision: decision(),
+      curatorConfig: config,
+      catalog: structuredClone(getMarketCatalog()),
+      today: "2026-08-31",
+    });
+    expect(result.appliedPauses).toEqual([]);
+    expect(result.changedFiles).toEqual([]);
+  });
+
   it("rejects an agent replacement that the deterministic report did not authorize", () => {
     const config = structuredClone(getCuratorConfig());
     config.candidates.find((row) => row.id === "robinhood-gg")!.identity = "reviewed";

@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "updatedAt": "2026-08-30",
+  "version": 4,
+  "updatedAt": "2026-08-31",
   "policy": {
     "snapshotMinutes": 360,
     "historyDays": 30,
@@ -16,63 +16,63 @@
   "candidates": [
     {
       "id": "robinhood-microduck",
-      "chain": "robinhood",
       "name": "Microduck",
       "symbol": "MICRODUCK",
-      "token": "0xd5f1afea47b1a9eab414d2ee740cf1d6d039e725",
-      "pool": "0xb87c3c63b53d19984f3b4a927e26b667e32087e8",
-      "protocol": "V3",
       "feePips": 10000,
       "risk": "experimental",
-      "identity": "watch"
+      "identity": "reviewed",
+      "chain": "robinhood",
+      "token": "0xD5f1afEA47b1A9eab414D2ee740cF1d6d039E725",
+      "pool": "0xb87C3c63b53d19984f3b4A927e26B667e32087E8",
+      "protocol": "V3"
     },
     {
       "id": "robinhood-gg",
-      "chain": "robinhood",
       "name": "Golden Goose",
       "symbol": "GG",
-      "token": "0xcacb0e9caccee63ec4d82952e561a291c68bcb68",
-      "pool": "0xd89f6933a8ef11c2939054c0e287ecb327817242",
-      "protocol": "V3",
       "feePips": 10000,
       "risk": "experimental",
-      "identity": "watch"
+      "identity": "reviewed",
+      "chain": "robinhood",
+      "token": "0xcaCB0e9caCcee63ec4d82952E561a291c68Bcb68",
+      "pool": "0xd89F6933a8eF11C2939054c0e287eCb327817242",
+      "protocol": "V3"
     },
     {
       "id": "robinhood-copperinu",
-      "chain": "robinhood",
       "name": "Copper Inu",
       "symbol": "COPPERINU",
-      "token": "0x5317c0d077d2eeb639448939b930d49c4984b63b",
-      "pool": "0xad5eb1fb22a06231a89f1b27c325f264572e2a54",
-      "protocol": "V3",
       "feePips": 10000,
       "risk": "experimental",
-      "identity": "watch"
+      "identity": "reviewed",
+      "chain": "robinhood",
+      "token": "0x5317C0d077D2eEB639448939b930D49c4984B63B",
+      "pool": "0xAd5eB1Fb22A06231a89f1b27c325F264572E2a54",
+      "protocol": "V3"
     },
     {
       "id": "solana-cate",
-      "chain": "solana",
       "name": "Cate",
       "symbol": "CATE",
-      "token": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
-      "pool": "qhJ7kLjrE68sbDF11CpwMt3P9rqiwZtretM5ZzeAX6o",
-      "protocol": "Meteora DLMM",
       "feePips": 5000,
       "risk": "emerging",
-      "identity": "reviewed"
+      "identity": "reviewed",
+      "chain": "solana",
+      "token": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+      "pool": "qhJ7kLjrE68sbDF11CpwMt3P9rqiwZtretM5ZzeAX6o",
+      "protocol": "Meteora DLMM"
     },
     {
       "id": "solana-ansem",
-      "chain": "solana",
       "name": "Ansem",
       "symbol": "ANSEM",
-      "token": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
-      "pool": "6e7V9eegCHw997T72MxgwwJipZ6GJyZF8NvjkzT1rvpN",
-      "protocol": "Meteora DLMM",
       "feePips": 2000,
       "risk": "emerging",
-      "identity": "watch"
+      "identity": "watch",
+      "chain": "solana",
+      "token": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
+      "pool": "6e7V9eegCHw997T72MxgwwJipZ6GJyZF8NvjkzT1rvpN",
+      "protocol": "Meteora DLMM"
     }
   ]
 }

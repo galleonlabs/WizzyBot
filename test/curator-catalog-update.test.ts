@@ -15,6 +15,7 @@ describe("agentic centralized curator", () => {
   it("promotes identity research without allowing the agent to bypass market policy", () => {
     const config = structuredClone(getCuratorConfig());
     const candidate = config.candidates.find((row) => row.id === "robinhood-gg")!;
+    candidate.identity = "watch";
     const result = planCentralizedCatalogUpdate({
       report: report([evaluation(candidate.id, "observe", false)]),
       decision: decision({ candidateReviews: [{ candidateId: candidate.id, identity: "reviewed", rationale: ["identity matched"], sources }] }),

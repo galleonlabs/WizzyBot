@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getCuratorConfig } from "../src/curator/config.js";
 import type { CuratorReport } from "../src/curator/run.js";
 import { planAutonomousRobinhoodRegistry } from "../src/index/autonomous.js";
 import { initialRobinhoodRegistryMarkets } from "../src/index/publish.js";
@@ -43,7 +44,7 @@ function report(overrides: Partial<CuratorReport> = {}): CuratorReport {
     version: 1,
     role: "curator",
     generatedAt,
-    configVersion: 3,
+    configVersion: getCuratorConfig().version,
     snapshotCadenceMinutes: 360,
     evaluations,
     replacements: [],

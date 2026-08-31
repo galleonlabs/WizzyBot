@@ -18,6 +18,7 @@ export const V3_BURN_EVENT = parseAbiItem(
 );
 
 const BLOCK_WINDOW = 1_000n;
+const REDUCED_BLOCK_WINDOW = 250n;
 const ACTIVITY_LIMIT = 16;
 const ROBINHOOD_EXPLORER = "https://robinhoodchain.blockscout.com";
 
@@ -105,18 +106,28 @@ export async function fetchRecentPoolActivity(options: {
   const env = loadEnv();
   const defaultRpcUrl = env.rpcByChain.robinhood || ROBINHOOD_RPC_DEFAULT;
   const rpcUrl = env.activityRpcUrl || env.rpcByChain.robinhood || ROBINHOOD_RPC_DEFAULT;
-  const clients = options.clients
-    ?? (options.client
-      ? [options.client]
-      : [rpcUrl, ...(defaultRpcUrl !== rpcUrl ? [defaultRpcUrl] : [])].map(activityClientFor));
+  const attempts: Array<{ client: PoolActivityClient; blockWindow?: bigint }> = options.clients
+    ? options.clients.map((client) => ({ client, blockWindow: options.blockWindow }))
+    : options.client
+      ? [{ client: options.client, blockWindow: options.blockWindow }]
+      : [
+          { client: activityClientFor(rpcUrl), blockWindow: options.blockWindow },
+          ...(defaultRpcUrl !== rpcUrl
+            ? [{ client: activityClientFor(defaultRpcUrl), blockWindow: options.blockWindow }]
+            : []),
+          // The public RPC is load balanced across nodes with inconsistent
+          // eth_getLogs range caps, so a final narrow scan recovers when the
+          // full window lands on a strict node.
+          { client: activityClientFor(defaultRpcUrl), blockWindow: REDUCED_BLOCK_WINDOW },
+        ];
   let lastError: unknown;
-  for (const [index, client] of clients.entries()) {
+  for (const [index, attempt] of attempts.entries()) {
     try {
-      return await scanPoolActivity(client, markets, options);
+      return await scanPoolActivity(attempt.client, markets, { ...options, blockWindow: attempt.blockWindow });
     } catch (error) {
       lastError = error;
-      if (index < clients.length - 1) {
-        console.error("[pool-activity] activity rpc scan failed; retrying on the default robinhood rpc");
+      if (index < attempts.length - 1) {
+        console.error("[pool-activity] scan failed; retrying on the default robinhood rpc");
       }
     }
   }

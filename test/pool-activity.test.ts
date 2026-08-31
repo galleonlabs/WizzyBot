@@ -76,6 +76,21 @@ describe("pool activity", () => {
     expect(working.getLogs).toHaveBeenCalledOnce();
   });
 
+  it("retries the remaining attempts when a log scan is rejected mid-flight", async () => {
+    const calls: bigint[] = [];
+    const strictThenPermissive: PoolActivityClient = {
+      getBlockNumber: vi.fn(async () => 10_000n),
+      getLogs: vi.fn(async (input) => {
+        calls.push(input.toBlock - input.fromBlock + 1n);
+        if (calls.length === 1) throw new Error("invalid params");
+        return [] as DecodedPoolActivityLog[];
+      }),
+    };
+    const result = await fetchRecentPoolActivity({ clients: [strictThenPermissive, strictThenPermissive] });
+    expect(result).toMatchObject({ asOfBlock: "10000", items: [] });
+    expect(calls).toEqual([1_000n, 1_000n]);
+  });
+
   it("rethrows when every client fails", async () => {
     const failing: PoolActivityClient = {
       getBlockNumber: vi.fn(async () => { throw new Error("invalid request"); }),

@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-31",
+  "chain": "base",
+  "asset": {
+    "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "symbol": "USDC",
+    "decimals": 6
+  },
+  "fees": {
+    "allocateBps": 15,
+    "withdrawBps": 15
+  },
+  "minimumDepositUnits": "20000000",
+  "vaults": [
+    {
+      "id": "base-gauntlet-usdc-prime",
+      "name": "Gauntlet USDC Prime",
+      "symbol": "gtUSDCp",
+      "venue": "Morpho",
+      "curatorName": "Gauntlet",
+      "vault": "0xeE8F4eC5672F09119b96Ab6fB59C27E1b7e44b61",
+      "weightBps": 3500,
+      "status": "active",
+      "risk": "established",
+      "color": "#5ef0b6"
+    },
+    {
+      "id": "base-spark-usdc",
+      "name": "Spark USDC Vault",
+      "symbol": "sparkUSDC",
+      "venue": "Morpho",
+      "curatorName": "Spark",
+      "vault": "0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A",
+      "weightBps": 3000,
+      "status": "active",
+      "risk": "established",
+      "color": "#f4c851"
+    },
+    {
+      "id": "base-steakhouse-usdc",
+      "name": "Steakhouse USDC",
+      "symbol": "steakUSDC",
+      "venue": "Morpho",
+      "curatorName": "Steakhouse Financial",
+      "vault": "0xbeeF010f9cb27031ad51e3333f9aF9C6B1228183",
+      "weightBps": 2000,
+      "status": "active",
+      "risk": "established",
+      "color": "#8ba8ff"
+    },
+    {
+      "id": "base-grove-steakhouse-usdc",
+      "name": "Grove x Steakhouse High Yield",
+      "symbol": "grove-bbqUSDC",
+      "venue": "Morpho",
+      "curatorName": "Steakhouse Financial",
+      "vault": "0xBeEf2d50B428675a1921bC6bBF4bfb9D8cF1461A",
+      "weightBps": 1500,
+      "status": "active",
+      "risk": "emerging",
+      "color": "#ff8a62"
+    }
+  ]
+}

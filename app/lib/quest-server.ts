@@ -8,7 +8,7 @@ import {
   type AchievementRecord,
 } from "./achievements";
 import { robinhoodChain, ROBINHOOD_RPC_DEFAULT } from "./chains";
-import { fetchPositionList } from "./hosted-server";
+import { fetchPositionList, fetchPositionStatus } from "./hosted-server";
 import { getMarketCatalog } from "./portfolio-server";
 import { deriveQuestObservation, verifyQuestActionReceipt } from "./quest-verification";
 
@@ -37,11 +37,11 @@ export async function verifyOnchainQuestAction(input: {
     chain: robinhoodChain,
     transport: http(process.env.ROBINHOOD_RPC_URL?.trim() || ROBINHOOD_RPC_DEFAULT),
   });
-  let verified: { transactionHash: Hex; blockNumber: bigint } | null = null;
+  let verified: { transactionHash: Hex; blockNumber: bigint; positionTokenId: string } | null = null;
   for (const transactionHash of input.transactionHashes) {
     try {
       const receipt = await client.getTransactionReceipt({ hash: transactionHash });
-      verifyQuestActionReceipt({
+      const action = verifyQuestActionReceipt({
         action: input.action,
         tokenId: input.tokenId,
         walletAddresses: input.walletAddresses,
@@ -52,7 +52,15 @@ export async function verifyOnchainQuestAction(input: {
           logs: receipt.logs.map((log) => ({ address: log.address, data: log.data, topics: log.topics })),
         },
       });
-      verified = { transactionHash: receipt.transactionHash, blockNumber: receipt.blockNumber };
+      const status = await fetchPositionStatus(action.positionTokenId, "robinhood") as Record<string, unknown>;
+      const view = status.view && typeof status.view === "object" ? status.view as Record<string, unknown> : {};
+      const pool = typeof view.pool === "string" ? view.pool.toLowerCase() : "";
+      const catalog = getMarketCatalog() as { chains?: Array<{ slug?: string; markets?: Array<{ pool?: string; status?: string }> }> };
+      const activePools = new Set(catalog.chains?.find((chain) => chain.slug === "robinhood")?.markets
+        ?.filter((market) => market.status === "active" && typeof market.pool === "string")
+        .map((market) => market.pool!.toLowerCase()) ?? []);
+      if (!activePools.has(pool)) throw new Error("quest position is not in the curated Robinhood index");
+      verified = { transactionHash: receipt.transactionHash, blockNumber: receipt.blockNumber, positionTokenId: action.positionTokenId };
       break;
     } catch {
       // A wallet batch can expose multiple receipt hashes. Only one must carry

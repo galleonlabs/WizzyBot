@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
 const source = join(here, "launch-card.svg");
+const robinhoodChainLogo = join(here, "robinhood-chain-logo-white.svg");
 const master = join(here, "launch-card-1600x900.png");
 const preview = join(here, "launch-card-1200x675.png");
 const workDir = await mkdtemp(join(tmpdir(), "wizzy-launch-"));
@@ -29,8 +30,17 @@ process.env.FONTCONFIG_PATH = workDir;
 try {
   const { default: sharp } = await import("sharp");
   const input = await readFile(source);
-  await sharp(input, { density: 144 })
+  const base = await sharp(input, { density: 144 })
     .resize(1600, 900, { fit: "fill" })
+    .png()
+    .toBuffer();
+  const officialRobinhoodChainLogo = await sharp(robinhoodChainLogo, { density: 144 })
+    .resize({ width: 390 })
+    .png()
+    .toBuffer();
+
+  await sharp(base)
+    .composite([{ input: officialRobinhoodChainLogo, left: 1120, top: 790 }])
     .png({ compressionLevel: 9 })
     .toFile(master);
 

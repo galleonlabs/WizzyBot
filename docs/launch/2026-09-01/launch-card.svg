@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
-  <title id="title">Wizzy is live: one amount, six meme markets</title>
-  <desc id="description">A bold Wizzy launch card with an oversized headline, the hooded Wizzy mascot, and a self-custody message.</desc>
+  <title id="title">Make Meme Markets</title>
+  <desc id="description">A bold Wizzy launch card with the Make Meme Markets tagline and the hooded Wizzy mascot.</desc>
   <defs>
     <g id="wizzy-shape">
       <path fill="#17171e" d="M33 98C47 76 68 64 86 48C97 38 99 24 94 10C124 14 154 28 180 52C210 80 228 116 226 154C224 195 192 226 147 235C99 244 54 229 31 196C9 164 12 129 33 98Z"/>
@@ -21,20 +21,9 @@
   <rect width="1600" height="900" fill="url(#wizzy-pattern)" opacity=".55"/>
   <rect x="0" y="0" width="18" height="900" fill="#ff6f83"/>
 
-  <g transform="translate(82 58) scale(.24)">
-    <path fill="#f7f3ed" d="M33 98C47 76 68 64 86 48C97 38 99 24 94 10C124 14 154 28 180 52C210 80 228 116 226 154C224 195 192 226 147 235C99 244 54 229 31 196C9 164 12 129 33 98Z"/>
-    <path fill="#202029" d="M48 104C61 80 91 68 127 68C165 68 195 83 208 108C221 134 207 164 178 181C148 198 101 200 70 183C39 166 32 133 48 104Z"/>
-    <ellipse cx="99" cy="124" rx="22" ry="32" fill="#77e8c9" transform="rotate(-5 99 124)"/>
-    <ellipse cx="158" cy="122" rx="22" ry="32" fill="#77e8c9" transform="rotate(-3 158 122)"/>
-    <ellipse cx="105" cy="113" rx="7" ry="10" fill="#f7f3ed" transform="rotate(-5 105 113)"/>
-    <ellipse cx="164" cy="111" rx="7" ry="10" fill="#f7f3ed" transform="rotate(-3 164 111)"/>
-  </g>
-  <text x="154" y="102" fill="#77e8c9" font-family="Unbounded, Arial, sans-serif" font-size="27" font-weight="750" letter-spacing="2">WIZZY IS LIVE</text>
-  <text x="1510" y="102" text-anchor="end" fill="#f7f3ed" font-family="Unbounded, Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="1.5">WIZZY.MEME</text>
-
-  <text x="82" y="305" fill="#f7f3ed" font-family="Unbounded, Arial, sans-serif" font-size="112" font-weight="760" letter-spacing="-5">ONE AMOUNT.</text>
-  <text x="82" y="475" fill="#f7f3ed" font-family="Unbounded, Arial, sans-serif" font-size="142" font-weight="780" letter-spacing="-7">SIX MEME</text>
-  <text x="82" y="642" fill="#f7f3ed" font-family="Unbounded, Arial, sans-serif" font-size="142" font-weight="780" letter-spacing="-7">MARKETS.</text>
+  <text x="82" y="330" fill="#f7f3ed" font-family="Unbounded, Arial, sans-serif" font-size="158" font-weight="780" letter-spacing="-8">MAKE</text>
+  <text x="82" y="520" fill="#f7f3ed" font-family="Unbounded, Arial, sans-serif" font-size="158" font-weight="780" letter-spacing="-8">MEME</text>
+  <text x="82" y="710" fill="#f7f3ed" font-family="Unbounded, Arial, sans-serif" font-size="158" font-weight="780" letter-spacing="-8">MARKETS</text>
 
   <circle cx="1290" cy="422" r="292" fill="#ff6f83"/>
   <g clip-path="url(#accent-clip)" opacity=".26">
@@ -53,7 +42,4 @@
     <ellipse cx="164" cy="111" rx="7" ry="10" fill="#f7f3ed" transform="rotate(-3 164 111)"/>
   </g>
 
-  <rect x="82" y="738" width="928" height="88" rx="6" fill="#77e8c9"/>
-  <text x="112" y="795" fill="#09090d" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="32" font-weight="800" letter-spacing="-.5">EVERY POSITION STAYS IN YOUR WALLET</text>
-  <text x="1510" y="795" text-anchor="end" fill="#f7f3ed" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="25" font-weight="750" letter-spacing=".5">ROBINHOOD CHAIN · UNISWAP V3</text>
 </svg>

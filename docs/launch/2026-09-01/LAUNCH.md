@@ -4,7 +4,7 @@
 
 Launch from [@wizzydotmeme](https://x.com/wizzydotmeme) with the seven-post thread below and `launch-card-1600x900.png` attached to post 1.
 
-The hook is the product outcome: one amount, six meme markets, positions in the user's wallet. The infrastructure and curator mechanics follow as proof. Do not lead with agents, APR, integrations, or a future token.
+The hook is the category: Make Meme Markets. The infrastructure and curator mechanics follow as proof. Do not lead with a fixed constituent count, custody mechanics, agents, APR, integrations, or a future token.
 
 ## Exact launch thread
 
@@ -12,9 +12,9 @@ The hook is the product outcome: one amount, six meme markets, positions in the 
 
 > Wizzy is live.
 >
-> One amount. Six meme markets. Every LP position stays in your wallet.
+> Make Meme Markets.
 >
-> Make Meme Markets → https://wizzy.meme
+> https://wizzy.meme
 
 ### 2/7
 
@@ -38,16 +38,9 @@ The hook is the product outcome: one amount, six meme markets, positions in the 
 
 ### 4/7
 
-> The launch index is six WETH markets on Robinhood Chain:
+> The index starts with selected WETH markets on Robinhood Chain.
 >
-> CASHCAT 35%
-> PONS 22%
-> AI 17%
-> CHUMP 12%
-> STONKBROKER 9%
-> PONSGUY 5%
->
-> The curator reviews liquidity, volume, security and capacity every six hours.
+> The curator reviews liquidity, volume, security and capacity every six hours—and can update membership and weights as meme markets change.
 
 ### 5/7
 
@@ -79,7 +72,7 @@ The plain-text paste version is in [`thread.txt`](thread.txt).
 
 Fomo's strongest current product posts are short, product-first statements: the product comes first, the crypto machinery comes later. Uniswap's strongest posts make one category claim and immediately support it with a product, market, or volume fact. Wizzy should combine those patterns without imitating their wording:
 
-- Post 1 states the product and the custody fact in 21 words before the link.
+- Post 1 makes one category claim in five words before the link.
 - Post 2 names the job Wizzy removes instead of calling the experience "simple" or "seamless."
 - Posts 3–5 prove how it works, what is in the index, and what remains manageable after deposit.
 - Post 6 contains every ecosystem tag. Tags do not interrupt the hook and do not imply an announced partnership.
@@ -91,7 +84,7 @@ Fomo's strongest current product posts are short, product-first statements: the 
 | Failure mode | Fomo/Uniswap pattern | Wizzy response |
 | --- | --- | --- |
 | Infrastructure before value | The strongest posts lead with a product outcome or category fact. | Robinhood Chain, Uniswap, Privy, Relay, and Fomo appear only in post 6. |
-| Empty launch language | Their best posts avoid "revolutionary," "game-changing," and "thrilled to announce." | The opening gives three testable facts: live, six markets, user-owned positions. |
+| Empty launch language | Their best posts avoid "revolutionary," "game-changing," and "thrilled to announce." | The opening names the product category directly: Make Meme Markets. |
 | Too much copy | The reference posts are highly compressed. | Each post has one job; no post tries to explain the whole system. |
 | Unsupported performance hook | Uniswap uses a dated historical metric when it makes a metric claim. | The thread makes no APR, return, volume, or TVL promise. |
 | Tag carpet | Partner/product tags are used when the subject is directly relevant. | All relevant handles appear once in the technical proof post. |
@@ -105,10 +98,11 @@ Fomo's strongest current product posts are short, product-first statements: the 
 - Editable artwork: `launch-card.svg`.
 - Editable render source: `render.mjs`.
 - Product evidence: `product-surface.png`, captured from the live, unauthenticated product at `https://wizzy.meme` on 31 August 2026 at approximately 00:18 BST. It supports the claims but is not used as a miniature interface in the launch card.
-- Alt text: **Bold dark Wizzy launch graphic reading “One amount. Six meme markets.” beside the hooded Wizzy mascot, with “Every position stays in your wallet” below.**
+- Official network asset: `robinhood-chain-logo-white.svg`, downloaded unchanged from Robinhood Chain's official brand asset pack.
+- Alt text: **Bold dark Wizzy launch graphic reading “Make Meme Markets” beside the hooded Wizzy mascot, with the Robinhood Chain logo below.**
 - Caption: no separate caption; post 1 supplies the context.
 
-The asset is a launch billboard, not a UI screenshot. Its only claims are the current six-market breadth and self-custody model already established by the live product and repository. It does not add partner logos, endorsement language, price targets, APR, volume, TVL, or illustrative figures.
+The asset is a launch billboard, not a UI screenshot. “Make Meme Markets” is its only authored text. The official white Robinhood Chain lockup is used unchanged on black, with clear space. The card does not make a fixed constituent-count, custody, performance, or forward-looking claim.
 
 ## Posting runbook — BST
 
@@ -118,7 +112,7 @@ The asset is a launch billboard, not a UI screenshot. Its only claims are the cu
 2. Confirm Pool activity shows real adds/removals and links to Robinhood Chain Blockscout.
 3. Sign in to the launch account and confirm the Privy wallet control opens without clipping.
 4. Check a small deposit quote through the review step. Do not broadcast solely for the smoke test.
-5. Confirm the current index still has the six markets and weights in post 4. If membership changed, update post 4 before posting.
+5. Confirm the active market set loads and post 4 still accurately describes the curator's dynamic membership and weights.
 6. Confirm `@RobinhoodCrypto`, `@Uniswap`, `@privy_io`, `@RelayProtocol`, and `@fomo` still resolve to the intended official accounts.
 
 ### 09:00: publish
@@ -148,7 +142,7 @@ The asset is a launch billboard, not a UI screenshot. Its only claims are the cu
 
 ### Why these markets?
 
-> The launch index uses six Robinhood Chain WETH pools selected under published liquidity, volume, age, security and capacity rules. The curator reviews them every six hours.
+> The active Robinhood Chain WETH pools are selected under published liquidity, volume, age, security and capacity rules. The curator reviews membership and weights every six hours.
 
 ### Is there a Wizzy token?
 
@@ -187,7 +181,7 @@ Primary external references, checked 31 August 2026:
 **PASS**
 
 - Blocking findings: none.
-- Non-blocking findings: none. The headline and custody proof remain readable in the 1200×675 preview and at thumbnail scale.
-- Evidence/rights: first-party Wizzy copy, mascot, palette, and type. Robinhood Chain and Uniswap v3 are named as infrastructure; no third-party logo or implied endorsement is used.
+- Non-blocking findings: none. The tagline and official network lockup remain readable in the 1200×675 preview and at thumbnail scale.
+- Evidence/rights: first-party Wizzy copy, mascot, palette, and type. The Robinhood Chain lockup comes unchanged from Robinhood's official asset pack and is used in the approved white-on-black pairing with clear space. No other third-party logo or implied endorsement is used.
 - Unverified publishing path: no post has been published or scheduled. The final upload remains a human action from the Wizzy X account.
 - Exact asset/copy awaiting approval: `launch-card-1600x900.png` plus posts 1–7 above.

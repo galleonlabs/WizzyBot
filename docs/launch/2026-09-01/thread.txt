@@ -1,9 +1,9 @@
 1/7
 Wizzy is live.
 
-One amount. Six meme markets. Every LP position stays in your wallet.
+Make Meme Markets.
 
-Make Meme Markets → https://wizzy.meme
+https://wizzy.meme
 
 2/7
 LP fees can be attractive. The setup is not.
@@ -24,16 +24,9 @@ How it works:
 No vault. The Uniswap v3 position NFTs go to your wallet.
 
 4/7
-The launch index is six WETH markets on Robinhood Chain:
+The index starts with selected WETH markets on Robinhood Chain.
 
-CASHCAT 35%
-PONS 22%
-AI 17%
-CHUMP 12%
-STONKBROKER 9%
-PONSGUY 5%
-
-The curator reviews liquidity, volume, security and capacity every six hours.
+The curator reviews liquidity, volume, security and capacity every six hours—and can update membership and weights as meme markets change.
 
 5/7
 Then Wizzy keeps the work visible: position value, unclaimed fees, range health and pool activity.

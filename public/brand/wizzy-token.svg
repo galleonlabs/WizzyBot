@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Wizzy token</title>
+  <desc id="desc">The hooded Wizzy mascot as a bold coral coin with mint accents.</desc>
+  <defs>
+    <radialGradient id="ground" cx="34%" cy="28%" r="95%">
+      <stop offset="0%" stop-color="#ff8296"/>
+      <stop offset="58%" stop-color="#ff6f83"/>
+      <stop offset="100%" stop-color="#f25a70"/>
+    </radialGradient>
+    <g id="wizzy">
+      <path fill="#f7f3ed" d="M33 98C47 76 68 64 86 48C97 38 99 24 94 10C124 14 154 28 180 52C210 80 228 116 226 154C224 195 192 226 147 235C99 244 54 229 31 196C9 164 12 129 33 98Z"/>
+      <path fill="#202029" d="M48 104C61 80 91 68 127 68C165 68 195 83 208 108C221 134 207 164 178 181C148 198 101 200 70 183C39 166 32 133 48 104Z"/>
+      <ellipse cx="99" cy="124" rx="22" ry="32" fill="#77e8c9" transform="rotate(-5 99 124)"/>
+      <ellipse cx="158" cy="122" rx="22" ry="32" fill="#77e8c9" transform="rotate(-3 158 122)"/>
+      <ellipse cx="105" cy="113" rx="7" ry="10" fill="#f7f3ed" transform="rotate(-5 105 113)"/>
+      <ellipse cx="164" cy="111" rx="7" ry="10" fill="#f7f3ed" transform="rotate(-3 164 111)"/>
+    </g>
+    <g id="wizzy-silhouette">
+      <path d="M33 98C47 76 68 64 86 48C97 38 99 24 94 10C124 14 154 28 180 52C210 80 228 116 226 154C224 195 192 226 147 235C99 244 54 229 31 196C9 164 12 129 33 98Z"/>
+    </g>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#ground)"/>
+
+  <g opacity=".18" transform="rotate(-10 512 512)">
+    <rect x="-120" y="118" width="1300" height="118" fill="#f7f3ed"/>
+    <rect x="-120" y="806" width="1300" height="72" fill="#77e8c9"/>
+  </g>
+
+  <use href="#wizzy-silhouette" fill="#f7f3ed" opacity=".22" transform="translate(846 84) scale(.62) rotate(14 120 127)"/>
+  <use href="#wizzy-silhouette" fill="#17171e" opacity=".16" transform="translate(6 762) scale(.5) rotate(-16 120 127)"/>
+  <circle cx="150" cy="176" r="46" fill="#77e8c9"/>
+  <circle cx="884" cy="852" r="30" fill="#f7f3ed"/>
+
+  <g transform="rotate(-6 512 512)">
+    <use href="#wizzy-silhouette" fill="#17171e" opacity=".9" transform="translate(160 152) scale(3.15)"/>
+    <use href="#wizzy" transform="translate(134 122) scale(3.15)"/>
+  </g>
+</svg>

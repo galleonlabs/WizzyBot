@@ -107,7 +107,8 @@ robinhood.markets.push({
   status: "active",
   risk: "experimental",
   sleeve: true,
-  color: "#f7a8b8",
+  imageUrl: "https://wizzy.meme/brand/wizzy-token-1024.png",
+  color: "#ff6f83",
 });
 catalog.version += 1;
 catalog.updatedAt = new Date().toISOString().slice(0, 10);

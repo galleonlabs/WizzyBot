@@ -19,3 +19,8 @@ vendor/hosted-cjs/index.cjs
 output/playwright/
 .impeccable/
 .vercel
+firebase-debug.log
+pglite-debug.log
+tsconfig.tsbuildinfo
+dogfood-output/
+.playwright-mcp/

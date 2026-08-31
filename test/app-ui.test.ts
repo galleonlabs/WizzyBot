@@ -253,7 +253,7 @@ describe("meme index product UI", () => {
     expect(layout).toContain('locale: "en_GB"');
     expect(layout).toContain('"max-image-preview": "large"');
     expect(layout).toContain("Base's most trusted yield vaults");
-    expect(layout).toContain('url: "/brand/wizzy-social-unbounded-v1.png"');
+    expect(layout).toContain('url: "/brand/wizzy-social-stable-v1.png"');
     expect(layout.match(/images: \[socialImage\]/g)).toHaveLength(2);
     expect(socialCard.readUInt32BE(16)).toBe(1200);
     expect(socialCard.readUInt32BE(20)).toBe(630);
@@ -284,7 +284,7 @@ describe("meme index product UI", () => {
     expect(providers).toContain('solana: { createOnLogin: "all-users" }');
     expect(providers).toContain("toSolanaWalletConnectors");
     expect(providers).toContain("solana: { connectors: solanaConnectors }");
-    expect(providers).toContain("defaultChain: robinhoodChain");
+    expect(providers).toContain("defaultChain: base");
     expect(providers).not.toContain("NEXT_PUBLIC_SOLANA_RPC_URL");
     expect(providers).not.toContain("NEXT_PUBLIC_SOLANA_WS_URL");
     expect(providers).not.toContain("createSolanaRpc");

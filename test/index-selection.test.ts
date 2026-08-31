@@ -53,14 +53,19 @@ describe("meme index breadth", () => {
 
   it("publishes the curator-selected Robinhood index without changing the hidden multi-chain policy", () => {
     const policy = getRobinhoodIndexBreadthPolicy();
-    const actives = byIndexWeight(activeMarkets("robinhood"));
+    const actives = activeMarkets("robinhood");
+    const sleeveIds = actives.filter((market) => market.sleeve).map((market) => market.id).sort();
+    const ordinaries = byIndexWeight(actives.filter((market) => !market.sleeve));
     expect(policy.chain).toBe("robinhood");
-    expect(policy.tiers.map((tier) => tier.constituentCount)).toEqual(actives.map((_, index) => index + 1));
-    expect(policy.tiers.at(-1)?.marketIds).toEqual(actives);
+    expect(policy.tiers.map((tier) => tier.constituentCount)).toEqual(ordinaries.map((_, index) => index + 1 + sleeveIds.length));
+    expect(policy.tiers.at(-1)?.marketIds).toEqual([...ordinaries, ...sleeveIds]);
+    for (const tier of policy.tiers) {
+      for (const sleeveId of sleeveIds) expect(tier.marketIds).toContain(sleeveId);
+    }
     expect(BigInt(policy.minimumAmountWei)).toBe(parseEther("0.02"));
-    expect(BigInt(policy.tiers.at(-1)!.minimumAmountWei)).toBe(parseEther("0.02") * BigInt(actives.length));
-    expect(selectRobinhoodIndexMarkets(parseEther("0.10")).constituentCount).toBe(Math.min(5, actives.length));
-    expect(selectRobinhoodIndexMarkets(parseEther("1")).constituentCount).toBe(actives.length);
+    expect(BigInt(policy.tiers.at(-1)!.minimumAmountWei)).toBe(parseEther("0.02") * BigInt(ordinaries.length));
+    expect(selectRobinhoodIndexMarkets(parseEther("0.10")).constituentCount).toBe(Math.min(5, ordinaries.length) + sleeveIds.length);
+    expect(selectRobinhoodIndexMarkets(parseEther("1")).constituentCount).toBe(ordinaries.length + sleeveIds.length);
     expect(() => selectRobinhoodIndexMarkets(parseEther("0.019"))).toThrow("Minimum Robinhood index deposit");
   });
 });

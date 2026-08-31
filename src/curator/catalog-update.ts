@@ -57,6 +57,17 @@ export function planCentralizedCatalogUpdate(input: {
 
   const curatorConfig = structuredClone(input.curatorConfig);
   const catalog = structuredClone(input.catalog);
+  const sleeveTokens = new Set(
+    catalog.chains.flatMap((chain) => chain.markets.filter((market) => market.sleeve).map((market) => market.token.toLowerCase())),
+  );
+  const sleeveIds = new Set(
+    catalog.chains.flatMap((chain) => chain.markets.filter((market) => market.sleeve).map((market) => market.id)),
+  );
+  for (const candidate of curatorConfig.candidates) {
+    if (sleeveTokens.has(candidate.token.toLowerCase())) {
+      throw new Error(`Candidate ${candidate.id} is the related-party sleeve token; the curator never ranks or selects it`);
+    }
+  }
   const candidates = new Map(curatorConfig.candidates.map((candidate) => [candidate.id, candidate]));
   const evaluations = new Map(input.report.evaluations.map((evaluation) => [evaluation.marketId, evaluation]));
   const appliedReviews: string[] = [];
@@ -88,6 +99,9 @@ export function planCentralizedCatalogUpdate(input: {
       && proposal.candidateMarketId === decision.replacement!.toMarketId
     );
     if (!replacement) throw new Error("Agent replacement is not authorized by the deterministic curator report");
+    if (sleeveIds.has(replacement.incumbentMarketId) || sleeveIds.has(replacement.candidateMarketId)) {
+      throw new Error("The related-party sleeve is outside curator replacement authority");
+    }
     const candidate = input.curatorConfig.candidates.find((row) => row.id === replacement.candidateMarketId);
     if (!candidate || candidate.chain !== "robinhood" || candidate.identity !== "reviewed") {
       throw new Error("Replacement candidate was not reviewed before this curator run");

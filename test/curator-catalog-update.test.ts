@@ -8,7 +8,7 @@ import { getMarketCatalog, parseMarketCatalog } from "../src/markets/catalog.js"
 function lowestWeightActiveRobinhoodMarket(catalog = getMarketCatalog()): { id: string; symbol: string } {
   const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood")!;
   const market = robinhood.markets
-    .filter((row) => row.status === "active")
+    .filter((row) => row.status === "active" && !row.sleeve)
     .sort((a, b) => a.weightBps - b.weightBps || a.id.localeCompare(b.id))[0]!;
   return { id: market.id, symbol: market.symbol };
 }

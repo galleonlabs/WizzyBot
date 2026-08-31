@@ -105,21 +105,25 @@ export function selectMemeIndexMarkets(totalAmountWei: bigint): IndexBreadthTier
  * The launch index is intentionally network-specific. Each viable 0.02 ETH
  * unit adds the next onchain Robinhood market by curator weight.
  */
-export function getRobinhoodIndexBreadthPolicy(indexMarkets: Array<{ id: string; weightBps: number }> = activeMarkets("robinhood")): RobinhoodIndexBreadthPolicy {
+export function getRobinhoodIndexBreadthPolicy(indexMarkets: Array<{ id: string; weightBps: number; sleeve?: boolean }> = activeMarkets("robinhood")): RobinhoodIndexBreadthPolicy {
+  // The related-party sleeve is part of every breadth tier so each deposit
+  // carries its fixed share; ordinary constituents ladder by curator weight.
+  const sleeveIds = indexMarkets.filter((market) => market.sleeve).map((market) => market.id).sort();
   const markets = indexMarkets
+    .filter((market) => !market.sleeve)
     .slice()
     .sort((a, b) => b.weightBps - a.weightBps || a.id.localeCompare(b.id));
   const tiers = markets.map((_, index) => ({
     minimumAmountWei: (ROBINHOOD_BREADTH_UNIT_WEI * BigInt(index + 1)).toString(),
-    constituentCount: index + 1,
-    marketIds: markets.slice(0, index + 1).map((market) => market.id),
+    constituentCount: index + 1 + sleeveIds.length,
+    marketIds: [...markets.slice(0, index + 1).map((market) => market.id), ...sleeveIds],
   }));
 
   return {
     chain: "robinhood",
     breadthUnitWei: ROBINHOOD_BREADTH_UNIT_WEI.toString(),
     minimumAmountWei: ROBINHOOD_BREADTH_UNIT_WEI.toString(),
-    maximumConstituents: markets.length,
+    maximumConstituents: markets.length + sleeveIds.length,
     tiers,
     selectionRules: {
       minimumPoolAgeDays: 30,
@@ -130,7 +134,7 @@ export function getRobinhoodIndexBreadthPolicy(indexMarkets: Array<{ id: string;
   };
 }
 
-export function selectRobinhoodIndexMarkets(totalAmountWei: bigint, indexMarkets?: Array<{ id: string; weightBps: number }>): RobinhoodIndexBreadthTier {
+export function selectRobinhoodIndexMarkets(totalAmountWei: bigint, indexMarkets?: Array<{ id: string; weightBps: number; sleeve?: boolean }>): RobinhoodIndexBreadthTier {
   const policy = getRobinhoodIndexBreadthPolicy(indexMarkets);
   if (totalAmountWei < BigInt(policy.minimumAmountWei)) {
     throw new Error(`Minimum Robinhood index deposit is ${trimEth(BigInt(policy.minimumAmountWei))} ETH`);

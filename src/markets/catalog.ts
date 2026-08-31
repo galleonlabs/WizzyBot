@@ -22,6 +22,7 @@ const MarketSchema = z.object({
   rangeWidthPct: z.number().positive().lt(100),
   weightBps: z.number().int().positive().max(10_000),
   status: z.enum(["active", "paused", "watch"]),
+  sleeve: z.boolean().optional(),
   risk: z.enum(["established", "emerging", "experimental"]),
   coingeckoId: z.string().min(1).optional(),
   imageUrl: z.string().url().optional(),
@@ -84,6 +85,15 @@ const CatalogSchema = z.object({
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} has an unused Aerodrome deployment` });
       }
     }
+    const sleeves = chain.markets.filter((market) => market.sleeve);
+    if (sleeves.length > 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: "at most one related-party sleeve per chain" });
+    }
+    for (const market of sleeves) {
+      if (market.weightBps > 1_000) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} sleeve weight exceeds the 10% hard maximum` });
+      }
+    }
   }
   const migrations = new Set<string>();
   const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood");
@@ -103,6 +113,9 @@ const CatalogSchema = z.object({
     }
     if (from.weightBps !== to.weightBps || from.rangeWidthPct !== to.rangeWidthPct) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index], message: "replacement must inherit the outgoing weight and range width" });
+    }
+    if (from.sleeve || to.sleeve) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index], message: "the related-party sleeve is never a replacement endpoint" });
     }
   }
 });

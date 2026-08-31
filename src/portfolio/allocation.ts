@@ -109,7 +109,7 @@ export async function planAllocation(input: {
 
   const env = loadEnv();
   const client = makePublicClient(env.rpcByChain[input.chain], chain.viem);
-  const budgets = weightedBudgets(net, markets.map((market) => market.weightBps));
+  const budgets = weightedBudgets(net, sleeveAwareWeights(markets));
   const quotes: MarketQuote[] = [];
   for (const [index, market] of markets.entries()) {
     const budget = budgets[index];
@@ -183,6 +183,31 @@ export async function planAllocation(input: {
       "Any unused WETH or meme tokens remain in your wallet.",
     ],
   };
+}
+
+/**
+ * Keeps a related-party sleeve at exactly its configured share of every
+ * deposit: the sleeve market keeps its bps and the selected ordinary markets
+ * are rescaled to the remainder of 10,000 with largest-remainder rounding, so
+ * partial breadth tiers cannot overweight the sleeve.
+ */
+export function sleeveAwareWeights(markets: readonly { weightBps: number; sleeve?: boolean }[]): number[] {
+  const sleeveBps = markets.reduce((sum, market) => sum + (market.sleeve ? market.weightBps : 0), 0);
+  const ordinaryTotal = markets.reduce((sum, market) => sum + (market.sleeve ? 0 : market.weightBps), 0);
+  if (!sleeveBps || !ordinaryTotal) return markets.map((market) => market.weightBps);
+  const target = 10_000 - sleeveBps;
+  const shares = markets.map((market, index) => {
+    if (market.sleeve) return { index, floor: market.weightBps, remainder: -1 };
+    const exact = (market.weightBps * target) / ordinaryTotal;
+    return { index, floor: Math.floor(exact), remainder: exact - Math.floor(exact) };
+  });
+  let leftover = target - shares.filter((share) => share.remainder >= 0).reduce((sum, share) => sum + share.floor, 0);
+  for (const share of [...shares].sort((a, b) => b.remainder - a.remainder || a.index - b.index)) {
+    if (share.remainder < 0 || leftover <= 0) continue;
+    share.floor += 1;
+    leftover -= 1;
+  }
+  return shares.map((share) => share.floor);
 }
 
 export function weightedBudgets(total: bigint, weights: readonly number[]): bigint[] {

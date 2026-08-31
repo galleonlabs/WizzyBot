@@ -7,17 +7,20 @@ export const revalidate = 300;
 
 type VaultLive = { address: string; netApy: number | null; totalAssetsUsd: number | null };
 
-const MORPHO_QUERY = `{
-  vaults(first: 24, where: { chainId_in: [8453], assetSymbol_in: ["USDC"] }) {
+function morphoQuery(addresses: string[]): string {
+  const list = addresses.map((address) => JSON.stringify(address)).join(",");
+  return `{
+  vaults(first: ${addresses.length}, where: { address_in: [${list}], chainId_in: [8453] }) {
     items { address state { netApy totalAssetsUsd } }
   }
 }`;
+}
 
-async function fetchLiveVaultStats(): Promise<Map<string, VaultLive>> {
+async function fetchLiveVaultStats(addresses: string[]): Promise<Map<string, VaultLive>> {
   const response = await fetch("https://blue-api.morpho.org/graphql", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: MORPHO_QUERY }),
+    body: JSON.stringify({ query: morphoQuery(addresses) }),
     cache: "no-store",
   });
   if (!response.ok) throw new Error(`Morpho API ${response.status}`);
@@ -41,7 +44,7 @@ const getStableMarketsPayload = unstable_cache(async () => {
     minimumDepositUnits: string;
     vaults: Array<Record<string, unknown> & { vault: string; weightBps: number; status: string }>;
   };
-  const live = await fetchLiveVaultStats().catch(() => new Map<string, VaultLive>());
+  const live = await fetchLiveVaultStats(catalog.vaults.map((vault) => vault.vault)).catch(() => new Map<string, VaultLive>());
   const vaults = catalog.vaults.map((vault) => {
     const stats = live.get(vault.vault.toLowerCase());
     return { ...vault, netApy: stats?.netApy ?? null, totalAssetsUsd: stats?.totalAssetsUsd ?? null };

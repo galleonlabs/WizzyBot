@@ -108,7 +108,7 @@ unabot run --interval 60000
 unabot --live run --once
 ```
 
-Hosted keeper is the eve schedule `*/15 * * * *` (`agent/schedules/keeper.ts`). It stays dry-run unless `KEEPER_LIVE=1` **and** `PRIVY_APP_SECRET` is set. `UNABOT_KEEPER_LIVE=1` is accepted as an alias.
+Hosted keeper is the eve schedule `*/15 * * * *` (`agent/schedules/keeper.ts`). It skips cleanly until `UNABOT_KEEPER_OWNER` names the wallet to scan, and stays dry-run unless `KEEPER_LIVE=1` **and** `PRIVY_APP_SECRET` is set. `UNABOT_KEEPER_LIVE=1` is accepted as an alias.
 
 ## Env
 
@@ -133,6 +133,7 @@ Set these in `.env` locally or in the Vercel project `wizzy`. Values here are pu
 | `PRIVY_AUTHORIZATION_KEY` | Optional Wallet API authorization key. Later. |
 | `PRIVY_WALLET_ID` | Optional hosted wallet id. |
 | `KEEPER_LIVE` | Set to `1` so the 15-minute keeper may broadcast (still needs the Privy secret). |
+| `UNABOT_KEEPER_OWNER` | Wallet address the hosted keeper scans. Unset, the schedule logs a skip and does nothing. |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. Or link the Vercel project and use `VERCEL_OIDC_TOKEN`. |
 | `EVE_ALLOW_ANON` | Set to `1` to admit anonymous eve HTTP in production. Default fail-closed. |
 

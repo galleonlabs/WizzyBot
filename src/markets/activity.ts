@@ -97,16 +97,44 @@ export function derivePoolActivity(
 
 export async function fetchRecentPoolActivity(options: {
   client?: PoolActivityClient;
+  clients?: readonly PoolActivityClient[];
   blockWindow?: bigint;
   limit?: number;
 } = {}): Promise<PoolActivityPayload> {
   const markets = activeMarkets("robinhood").filter((market) => market.protocol === "V3");
   const env = loadEnv();
+  const defaultRpcUrl = env.rpcByChain.robinhood || ROBINHOOD_RPC_DEFAULT;
   const rpcUrl = env.activityRpcUrl || env.rpcByChain.robinhood || ROBINHOOD_RPC_DEFAULT;
-  const client = options.client ?? createPublicClient({
+  const clients = options.clients
+    ?? (options.client
+      ? [options.client]
+      : [rpcUrl, ...(defaultRpcUrl !== rpcUrl ? [defaultRpcUrl] : [])].map(activityClientFor));
+  let lastError: unknown;
+  for (const [index, client] of clients.entries()) {
+    try {
+      return await scanPoolActivity(client, markets, options);
+    } catch (error) {
+      lastError = error;
+      if (index < clients.length - 1) {
+        console.error("[pool-activity] activity rpc scan failed; retrying on the default robinhood rpc");
+      }
+    }
+  }
+  throw lastError;
+}
+
+function activityClientFor(rpcUrl: string): PoolActivityClient {
+  return createPublicClient({
     chain: viemChainFor("robinhood"),
     transport: http(rpcUrl, { retryCount: 3, retryDelay: 500, timeout: 15_000 }),
   }) as unknown as PoolActivityClient;
+}
+
+async function scanPoolActivity(
+  client: PoolActivityClient,
+  markets: readonly CuratedMarket[],
+  options: { blockWindow?: bigint; limit?: number },
+): Promise<PoolActivityPayload> {
   const toBlock = await client.getBlockNumber();
   const blockWindow = options.blockWindow ?? BLOCK_WINDOW;
   const fromBlock = toBlock >= blockWindow ? toBlock - blockWindow + 1n : 0n;

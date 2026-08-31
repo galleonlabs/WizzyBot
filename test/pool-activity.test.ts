@@ -58,6 +58,31 @@ describe("pool activity", () => {
       strict: true,
     }));
   });
+
+  it("falls back to the next client when the activity rpc fails", async () => {
+    const failing: PoolActivityClient = {
+      getBlockNumber: vi.fn(async () => { throw new Error("the method eth_getLogs does not exist"); }),
+      getLogs: vi.fn(async () => [] as DecodedPoolActivityLog[]),
+    };
+    const working: PoolActivityClient = {
+      getBlockNumber: vi.fn(async () => 10_000n),
+      getLogs: vi.fn(async () => [] as DecodedPoolActivityLog[]),
+    };
+
+    const result = await fetchRecentPoolActivity({ clients: [failing, working], blockWindow: 500n });
+
+    expect(result).toMatchObject({ asOfBlock: "10000", scannedBlocks: 500, rpcRequests: 2, items: [] });
+    expect(failing.getBlockNumber).toHaveBeenCalledOnce();
+    expect(working.getLogs).toHaveBeenCalledOnce();
+  });
+
+  it("rethrows when every client fails", async () => {
+    const failing: PoolActivityClient = {
+      getBlockNumber: vi.fn(async () => { throw new Error("invalid request"); }),
+      getLogs: vi.fn(async () => [] as DecodedPoolActivityLog[]),
+    };
+    await expect(fetchRecentPoolActivity({ clients: [failing] })).rejects.toThrow("invalid request");
+  });
 });
 
 function log(

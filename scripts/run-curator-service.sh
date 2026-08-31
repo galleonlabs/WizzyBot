@@ -84,7 +84,7 @@ for path in "${validated_changed[@]}"; do
   esac
 done
 
-git add -- src/config/curator.json src/config/markets.json vendor/hosted-cjs/index.cjs
+git add -- src/config/curator.json src/config/markets.json
 if git diff --cached --quiet; then
   printf '{"status":"complete","base":"%s","action":"no-change"}\n' "${base_commit}"
   exit 0

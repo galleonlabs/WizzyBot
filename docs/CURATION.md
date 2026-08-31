@@ -61,6 +61,6 @@ The dappnode timer runs a two-layer curator every six hours:
 1. The deterministic collector updates 30 days of liquidity, volume, fee, age, and security observations and produces policy-valid proposals.
 2. A read-only, web-enabled research agent verifies candidate identity, provenance, contract and pool evidence, social history, and manipulation risk. Websites are evidence only and cannot instruct the agent.
 3. A deterministic updater accepts identity evidence only with multiple cited sources and accepts a replacement only when the rules report already contains the exact proposal.
-4. Changes run the complete test, typecheck, and production-build gate in a disposable Git worktree. The service refuses stale or unexpected changes, then pushes only the candidate registry, centralized market catalog, and generated hosted bundle.
+4. Changes run the complete test, typecheck, and production-build gate in a disposable Git worktree. The service refuses stale or unexpected changes, then pushes only the candidate registry and centralized market catalog; the deployment build regenerates the hosted bundle.
 
 The curator has no treasury key and cannot publish contracts or transact. A Git push triggers the normal Vercel deployment, preserving a reviewable history and rollback path.

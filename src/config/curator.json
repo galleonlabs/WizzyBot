@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "updatedAt": "2026-08-31",
   "policy": {
     "snapshotMinutes": 360,
@@ -32,7 +32,7 @@
       "symbol": "GG",
       "feePips": 10000,
       "risk": "experimental",
-      "identity": "reviewed",
+      "identity": "watch",
       "chain": "robinhood",
       "token": "0xcaCB0e9caCcee63ec4d82952E561a291c68Bcb68",
       "pool": "0xd89F6933a8eF11C2939054c0e287eCb327817242",

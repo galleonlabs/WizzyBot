@@ -37,8 +37,8 @@ describe("eve hosted CJS isolation", () => {
       }
     }
     const loader = readFileSync("agent/lib/hosted.ts", "utf8");
-    expect(loader).toContain("createRequire");
-    expect(loader).toContain("../../vendor/hosted-cjs/index.cjs");
+    expect(loader).toContain('import hostedCjs from "../../vendor/hosted-cjs/index.cjs"');
+    expect(loader).not.toContain("createRequire");
   });
 
   it("loads the CJS surface without Uniswap ESM", () => {

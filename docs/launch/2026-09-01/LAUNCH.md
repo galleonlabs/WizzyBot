@@ -102,12 +102,13 @@ Fomo's strongest current product posts are short, product-first statements: the 
 
 - Primary attachment: `launch-card-1600x900.png` (16:9 master).
 - Lightweight preview: `launch-card-1200x675.png`.
-- Proof source: `product-surface.png`, captured from the live, unauthenticated product at `https://wizzy.meme` on 31 August 2026 at approximately 00:18 BST.
+- Editable artwork: `launch-card.svg`.
 - Editable render source: `render.mjs`.
-- Alt text: **Dark Wizzy app screen showing “Make Meme Markets,” a one ETH deposit, six Robinhood Chain meme markets, and the self-custodial Make markets action.**
+- Product evidence: `product-surface.png`, captured from the live, unauthenticated product at `https://wizzy.meme` on 31 August 2026 at approximately 00:18 BST. It supports the claims but is not used as a miniature interface in the launch card.
+- Alt text: **Bold dark Wizzy launch graphic reading “One amount. Six meme markets.” beside the hooded Wizzy mascot, with “Every position stays in your wallet” below.**
 - Caption: no separate caption; post 1 supplies the context.
 
-The asset uses the product itself as proof. It does not add partner logos, endorsement language, price targets, or illustrative figures. The renderer masks the volatile point-in-time APR with “LIVE DATA” so a stale performance number cannot become launch copy.
+The asset is a launch billboard, not a UI screenshot. Its only claims are the current six-market breadth and self-custody model already established by the live product and repository. It does not add partner logos, endorsement language, price targets, APR, volume, TVL, or illustrative figures.
 
 ## Posting runbook — BST
 
@@ -186,7 +187,7 @@ Primary external references, checked 31 August 2026:
 **PASS**
 
 - Blocking findings: none.
-- Non-blocking findings: none. The volatile trailing 24-hour APR in the source capture is masked in both exports.
-- Evidence/rights: first-party Wizzy UI and Wizzy-owned brand assets. Constituent token artwork is displayed by the live product as identification, not as an endorsement badge. Robinhood Chain is named in text as the network; no Robinhood master logo is added by the launch asset.
+- Non-blocking findings: none. The headline and custody proof remain readable in the 1200×675 preview and at thumbnail scale.
+- Evidence/rights: first-party Wizzy copy, mascot, palette, and type. Robinhood Chain and Uniswap v3 are named as infrastructure; no third-party logo or implied endorsement is used.
 - Unverified publishing path: no post has been published or scheduled. The final upload remains a human action from the Wizzy X account.
 - Exact asset/copy awaiting approval: `launch-card-1600x900.png` plus posts 1–7 above.

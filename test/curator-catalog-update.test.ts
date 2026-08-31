@@ -5,6 +5,14 @@ import type { MarketEvaluation } from "../src/curator/policy.js";
 import type { CuratorReport } from "../src/curator/run.js";
 import { getMarketCatalog, parseMarketCatalog } from "../src/markets/catalog.js";
 
+function lowestWeightActiveRobinhoodMarket(catalog = getMarketCatalog()): { id: string; symbol: string } {
+  const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood")!;
+  const market = robinhood.markets
+    .filter((row) => row.status === "active")
+    .sort((a, b) => a.weightBps - b.weightBps || a.id.localeCompare(b.id))[0]!;
+  return { id: market.id, symbol: market.symbol };
+}
+
 const sources = [
   { url: "https://www.geckoterminal.com/robinhood/pools/example", title: "Pool", finding: "Pool identity and liquidity" },
   { url: "https://robinhoodchain.blockscout.com/token/example", title: "Contract", finding: "Verified token address" },
@@ -33,12 +41,13 @@ describe("agentic centralized curator", () => {
     const config = structuredClone(getCuratorConfig());
     const candidate = config.candidates.find((row) => row.id === "robinhood-gg")!;
     candidate.identity = "reviewed";
+    const incumbent = lowestWeightActiveRobinhoodMarket();
     const proposal = {
       chain: "robinhood" as const,
       candidateMarketId: candidate.id,
       candidateSymbol: candidate.symbol,
-      incumbentMarketId: "robinhood-ponsguy",
-      incumbentSymbol: "PONSGUY",
+      incumbentMarketId: incumbent.id,
+      incumbentSymbol: incumbent.symbol,
       candidateFeeAprPct: 900,
       incumbentFeeAprPct: 100,
       aprMultiple: 9,
@@ -69,8 +78,9 @@ describe("agentic centralized curator", () => {
 
   it("pauses an incumbent the deterministic report calls pause and redistributes its weight", () => {
     const config = structuredClone(getCuratorConfig());
+    const incumbent = lowestWeightActiveRobinhoodMarket();
     const pauseEvaluation = {
-      ...evaluation("robinhood-ponsguy", "pause", true),
+      ...evaluation(incumbent.id, "pause", true),
       reasons: ["pool liquidity fell 64% in 24h", "median pool liquidity is below $75,000"],
     };
     const result = planCentralizedCatalogUpdate({
@@ -80,11 +90,11 @@ describe("agentic centralized curator", () => {
       catalog: structuredClone(getMarketCatalog()),
       today: "2026-08-31",
     });
-    expect(result.appliedPauses).toEqual(["robinhood-ponsguy:pool liquidity fell 64% in 24h; median pool liquidity is below $75,000"]);
+    expect(result.appliedPauses).toEqual([`${incumbent.id}:pool liquidity fell 64% in 24h; median pool liquidity is below $75,000`]);
     expect(result.changedFiles).toContain("src/config/markets.json");
     const parsed = parseMarketCatalog(result.catalog);
     const robinhood = parsed.chains.find((chain) => chain.slug === "robinhood")!;
-    expect(robinhood.markets.find((market) => market.id === "robinhood-ponsguy")!.status).toBe("paused");
+    expect(robinhood.markets.find((market) => market.id === incumbent.id)!.status).toBe("paused");
     const active = robinhood.markets.filter((market) => market.status === "active");
     expect(active.reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
     expect(result.catalog.version).toBe(getMarketCatalog().version + 1);
@@ -92,8 +102,9 @@ describe("agentic centralized curator", () => {
 
   it("does not pause on a non-incumbent or non-pause call", () => {
     const config = structuredClone(getCuratorConfig());
+    const incumbent = lowestWeightActiveRobinhoodMarket();
     const result = planCentralizedCatalogUpdate({
-      report: report([evaluation("robinhood-ponsguy", "review", true), evaluation("robinhood-gg", "pause", false)]),
+      report: report([evaluation(incumbent.id, "review", true), evaluation("robinhood-gg", "pause", false)]),
       decision: decision(),
       curatorConfig: config,
       catalog: structuredClone(getMarketCatalog()),
@@ -110,7 +121,7 @@ describe("agentic centralized curator", () => {
       report: report([evaluation("robinhood-gg", "eligible", false)]),
       decision: decision({
         verdict: "replace",
-        replacement: { fromMarketId: "robinhood-ponsguy", toMarketId: "robinhood-gg", rationale: ["unsupported"] },
+        replacement: { fromMarketId: lowestWeightActiveRobinhoodMarket().id, toMarketId: "robinhood-gg", rationale: ["unsupported"] },
       }),
       curatorConfig: config,
       catalog: structuredClone(getMarketCatalog()),

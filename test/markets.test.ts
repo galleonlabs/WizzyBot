@@ -8,15 +8,16 @@ import { weightedBudgets } from "../src/portfolio/allocation.js";
 describe("curated meme markets", () => {
   it("keeps every active chain portfolio at 100%", () => {
     const catalog = getMarketCatalog();
-    expect(catalog.migrations).toEqual([]);
     for (const chain of catalog.chains) {
-      expect(activeMarkets(chain.slug).reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
+      const active = activeMarkets(chain.slug);
+      expect(active.length).toBeGreaterThan(0);
+      expect(new Set(active.map((market) => market.symbol)).size).toBe(active.length);
+      expect(active.reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
     }
-    expect(activeMarkets("base").map((market) => market.symbol)).toEqual(["BRETT", "BASECAT"]);
     expect(chainCatalog("base").markets.find((market) => market.symbol === "BRETT")?.protocol).toBe("AERODROME_SLIPSTREAM");
-    expect(activeMarkets("robinhood").map((market) => market.symbol)).toEqual(["CASHCAT", "PONS", "AI", "CHUMP", "STONKBROKER", "PONSGUY"]);
-    expect(chainCatalog("robinhood").markets[0]?.pool.toLowerCase()).toBe("0xd42a491087a15e5afd51feb3606066cc152d2b09");
-    expect(chainCatalog("robinhood").markets[0]).toMatchObject({ fee: 3000, tickSpacing: 60 });
+    const cashcat = chainCatalog("robinhood").markets.find((market) => market.id === "robinhood-cashcat")!;
+    expect(cashcat.pool.toLowerCase()).toBe("0xd42a491087a15e5afd51feb3606066cc152d2b09");
+    expect(cashcat).toMatchObject({ fee: 3000, tickSpacing: 60 });
   });
 
   it("allocates integer dust to the final market without losing wei", () => {

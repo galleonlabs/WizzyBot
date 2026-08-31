@@ -35,7 +35,7 @@ function snapshot(overrides: Partial<IndexRegistrySnapshot> = {}): IndexRegistry
 describe("onchain Una index registry", () => {
   it("resolves trust-critical registry fields against reviewed display metadata", () => {
     const resolved = resolveRegistryMarkets(snapshot());
-    expect(resolved).toHaveLength(6);
+    expect(resolved).toHaveLength(activeMarkets("robinhood").length);
     expect(resolved.reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
     expect(resolved.every((market) => market.status === "active" && market.protocol === "V3")).toBe(true);
   });
@@ -55,9 +55,9 @@ describe("onchain Una index registry", () => {
     expect(() => resolveRegistryMarkets(conflict)).toThrow("conflicts with reviewed metadata");
   });
 
-  it("encodes the reviewed six-market snapshot as one publish call", () => {
+  it("encodes the reviewed launch snapshot as one publish call", () => {
     const markets = initialRobinhoodRegistryMarkets();
-    expect(markets).toHaveLength(6);
+    expect(markets).toHaveLength(activeMarkets("robinhood").length);
     expect(markets.reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
     const data = encodeRegistryPublish({ expectedVersion: 0n, evidenceHash: `0x${"22".repeat(32)}` });
     expect(data).toMatch(/^0x1198b2ff/);
@@ -118,7 +118,7 @@ describe("onchain Una index registry", () => {
     } as unknown as PublicClient;
     const result = await readIndexRegistry(client, "0x0000000000000000000000000000000000000001");
     expect(result.version).toBe(4);
-    expect(result.markets).toHaveLength(6);
+    expect(result.markets).toHaveLength(activeMarkets("robinhood").length);
     expect(calls.length).toBeGreaterThan(8);
     expect(calls.every((call) => call.blockNumber === 123n)).toBe(true);
   });

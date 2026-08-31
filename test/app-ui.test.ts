@@ -31,7 +31,8 @@ const telemetry = readFileSync("app/lib/telemetry.ts", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
-    expect(page).toContain("PortfolioApp");
+    expect(page).toContain("StableApp");
+    expect(readFileSync("app/legacy/page.tsx", "utf8")).toContain("PortfolioApp");
     expect(portfolio).toContain("Make Meme Markets");
     expect(portfolio).toContain("Deposit ETH into a curated index of meme markets and earn.");
     expect(portfolio).toContain("Updated and managed by agents.");
@@ -228,7 +229,7 @@ describe("meme index product UI", () => {
 
   it("ships the Wizzy identity and canonical domain without stale public Una assets", () => {
     expect(layout).toContain('const siteUrl = "https://wizzy.meme"');
-    expect(layout).toContain('const socialTitle = "Wizzy: Make Meme Markets"');
+    expect(layout).toContain('const socialTitle = "Wizzy: Make Stable Yield"');
     expect(layout).toContain('siteName: "Wizzy"');
     expect(portfolio).toContain('aria-label="Wizzy overview"');
     expect(portfolio).toContain('/brand/wizzy-mascot-dark.svg');
@@ -251,13 +252,13 @@ describe("meme index product UI", () => {
     expect(layout).toContain('url: "/"');
     expect(layout).toContain('locale: "en_GB"');
     expect(layout).toContain('"max-image-preview": "large"');
-    expect(layout).toContain("earn trading fees, managed by agents on Robinhood Chain");
+    expect(layout).toContain("Base's most trusted yield vaults");
     expect(layout).toContain('url: "/brand/wizzy-social-unbounded-v1.png"');
     expect(layout.match(/images: \[socialImage\]/g)).toHaveLength(2);
     expect(socialCard.readUInt32BE(16)).toBe(1200);
     expect(socialCard.readUInt32BE(20)).toBe(630);
     expect(socialCard.byteLength).toBeLessThan(5 * 1024 * 1024);
-    expect(layout).toMatch(/alt: "Wizzy mascot.+Make Meme Markets.+earn trading fees/);
+    expect(layout).toMatch(/alt: "Wizzy mascot.+Make Stable Yield.+vault yield/);
     expect(socialSource).toContain('font-family="Unbounded, sans-serif"');
     expect(socialSource).toContain('font-family="Plus Jakarta Sans, Arial, sans-serif"');
     expect(socialRenderer).toContain('"assets", "fonts"');

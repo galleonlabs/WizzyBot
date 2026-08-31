@@ -22,14 +22,14 @@ const display = Unbounded({
 });
 
 const siteUrl = "https://wizzy.meme";
-const socialTitle = "Wizzy: Make Meme Markets";
+const socialTitle = "Wizzy: Make Stable Yield";
 const socialDescription =
-  "Deposit ETH into a curated index of meme markets and earn trading fees, managed by agents on Robinhood Chain.";
+  "One USDC deposit across Base's most trusted yield vaults. Curated by agents, self-custodial, withdraw any time.";
 const socialImage = {
   url: "/brand/wizzy-social-unbounded-v1.png",
   width: 1200,
   height: 630,
-  alt: "Wizzy mascot beside the words ‘Make Meme Markets’, with an invitation to deposit ETH and earn trading fees.",
+  alt: "Wizzy mascot beside the words ‘Make Stable Yield’, with an invitation to deposit USDC and earn vault yield.",
 };
 
 export const metadata: Metadata = {

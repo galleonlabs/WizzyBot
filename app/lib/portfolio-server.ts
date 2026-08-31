@@ -25,6 +25,10 @@ type HostedPortfolioSurface = {
     fresh: readonly T[],
     limit?: number,
   ) => T[];
+  getStableCatalog: () => unknown;
+  planStableIndex: (input: { owner: string; amountUnits: bigint }) => Promise<unknown>;
+  planStableWithdraw: (input: { owner: string; fractionBps?: number }) => Promise<unknown>;
+  readStablePositions: (input: { owner: string }) => Promise<unknown[]>;
   fetchSolanaMarketStats: () => Promise<unknown>;
   planAllocation: (input: {
     owner: string;
@@ -87,6 +91,10 @@ export const getSolanaMarketCatalog = hosted.getSolanaMarketCatalog;
 export const fetchMarketStats = hosted.fetchMarketStats;
 export const fetchRecentPoolActivity = hosted.fetchRecentPoolActivity;
 export const mergePoolActivityItems = hosted.mergePoolActivityItems;
+export const getStableCatalog = hosted.getStableCatalog;
+export const planStableIndex = hosted.planStableIndex;
+export const planStableWithdraw = hosted.planStableWithdraw;
+export const readStablePositions = hosted.readStablePositions;
 export const fetchSolanaMarketStats = hosted.fetchSolanaMarketStats;
 export const planAllocation = hosted.planAllocation;
 export const planDualChainAllocation = hosted.planDualChainAllocation;

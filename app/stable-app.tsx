@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useAddFunds, usePrivy, useWallets } from "@privy-io/react-auth";
+import { YieldQuestCenter } from "./stable-quests";
 import { readJsonPayload } from "./lib/api-payload";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 import { sendWalletCallsAndWait, type ConnectedEvmWallet, type WalletTransaction } from "./lib/wallet-calls";
@@ -73,7 +74,7 @@ type FlowState =
   | { kind: "error"; message: string };
 
 export function StableApp() {
-  const { ready, authenticated, user, login, logout } = usePrivy();
+  const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
   const { addFunds } = useAddFunds();
 
@@ -96,6 +97,7 @@ export function StableApp() {
   const [withdrawPlan, setWithdrawPlan] = useState<WithdrawPlan | null>(null);
   const [withdrawState, setWithdrawState] = useState<FlowState>({ kind: "idle" });
   const [fundingMessage, setFundingMessage] = useState<string | null>(null);
+  const [questSignal, setQuestSignal] = useState(0);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("wizzy-theme") ?? window.localStorage.getItem("una-theme");
@@ -209,6 +211,7 @@ export function StableApp() {
       setPlan(null);
       trackProductEvent("Stable Deposit Completed", { amountUnits: plan.totalAmountUnits });
       void loadPositions();
+      setQuestSignal((current) => current + 1);
     } catch (error) {
       setDepositState({ kind: "error", message: error instanceof Error ? error.message : "The deposit could not be completed" });
       reportClientError("index-submit", error);
@@ -250,6 +253,7 @@ export function StableApp() {
       setWithdrawPlan(null);
       trackProductEvent("Stable Withdraw Completed", {});
       void loadPositions();
+      setQuestSignal((current) => current + 1);
     } catch (error) {
       setWithdrawState({ kind: "error", message: error instanceof Error ? error.message : "The withdrawal could not be completed" });
       reportClientError("position-action", error);
@@ -303,6 +307,7 @@ export function StableApp() {
             ))}
           </nav>
           <div className="nav-actions">
+            <YieldQuestCenter authenticated={authenticated} getAccessToken={getAccessToken} onConnect={() => login()} refreshSignal={questSignal} />
             <a className="social-button" href="https://x.com/wizzydotmeme" target="_blank" rel="noreferrer" aria-label="Follow Wizzy on X" title="@wizzydotmeme on X" onClick={() => trackProductEvent("X Opened", { location: "header" })}>
               <XIcon />
             </a>

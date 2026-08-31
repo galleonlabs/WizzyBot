@@ -1103,7 +1103,7 @@ function IndexSnapshot({ markets, stats, state }: { markets: IndexMarket[]; stat
         {state === "loading" ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />) : markets.map(({ market, indexWeightBps }, index) => <i className="composition-segment" key={market.id} style={{ "--market-color": market.color, "--market-index": index, "--market-weight": indexWeightBps } as CSSProperties} />)}
       </span>
       {state === "ready" ? <span className="composition-key">
-        {markets.map(({ market, indexWeightBps }, index) => <span className="composition-item" key={market.id} style={{ "--market-index": index } as CSSProperties}><TokenIcon symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}</b><small>{(indexWeightBps / 100).toFixed(0)}%</small></span></span>)}
+        {markets.map(({ market, indexWeightBps }, index) => <span className="composition-item" key={market.id} style={{ "--market-index": index, "--market-weight": indexWeightBps } as CSSProperties}><TokenIcon symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}</b><small>{(indexWeightBps / 100).toFixed(0)}%</small></span></span>)}
       </span> : null}
     </div>
   </section>;

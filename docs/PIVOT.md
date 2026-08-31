@@ -56,10 +56,9 @@ Privy onboarding + embedded wallet, wallet_sendCalls batching, relay cross-chain
 - WIZZY token + sleeve machinery + graduation kit: intact in-repo, dormant.
 - Pool-activity rail: Robinhood-specific; retires with the meme surface.
 
-## Build phases
+## Status (2026-08-31, all shipped)
 
-1. **Vault core**: 4626 adapter (deposit/redeem/convert, share accounting), vault catalog schema + day-one config, tests.
-2. **Deposit flow**: USDC funding (Relay to Base USDC), batch planner, fee take, portfolio reader.
-3. **Curator**: vault policy gates + research prompt + config; wire into the existing dappnode loop.
-4. **UI**: yield surface, legacy meme route split.
-5. **Ship**: full gate, deploy, live verification with a real small deposit.
+1. **Vault core** — 4626 adapter, verified catalog, deposit/withdraw/position planners, tests.
+2. **Product** — wizzy.meme serves the yield surface (Earn + Venues); meme app at /legacy; Privy defaults to Base; social card updated.
+3. **Curator** — the dappnode loop now runs `curate:vaults`: Morpho observations, deterministic gates (TVL floor/collapse, rate floor, timelock), automatic pause with weight redistribution, same worktree test/typecheck/build gate and stale-push guard. Adding or replacing vaults is a reviewed release; the research-agent layer returns when candidate onboarding needs it.
+4. **Outstanding** — first real-money deposit verification (operator); brand/domain rename (operator).

@@ -35,7 +35,8 @@
     "curate:apply-research": "bun scripts/apply-curator-research.ts",
     "registry:deploy": "bun scripts/registry-deploy.ts",
     "registry:calldata": "bun scripts/registry-calldata.ts",
-    "registry:sync": "bun scripts/registry-sync.ts"
+    "registry:sync": "bun scripts/registry-sync.ts",
+    "curate:vaults": "bun src/curator/vault-cli.ts"
   },
   "engines": {
     "node": ">=20"

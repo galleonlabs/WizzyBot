@@ -168,7 +168,7 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain('className="index-snapshot');
     expect(portfolio).not.toContain("Index composition");
     expect(portfolio).not.toContain("Curator weights");
-    expect(portfolio).toContain("Across the index");
+    expect(portfolio).toContain("Across all pools");
     expect(portfolio).toContain('action: "Connect wallet"');
     expect(css).toContain(".composition-track");
     expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");

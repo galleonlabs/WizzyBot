@@ -7,6 +7,13 @@ export type PositionVenue = "uniswap-v3" | "aerodrome-slipstream" | "meteora-dlm
 
 export const MIN_TICK = -887272;
 export const MAX_TICK = 887272;
+export type RangePreset = "focused" | "balanced" | "wide";
+
+export const RANGE_PRESET_MULTIPLIER: Record<RangePreset, number> = {
+  focused: 0.6,
+  balanced: 1,
+  wide: 1.8,
+};
 
 export type PositionView = {
   kind: PositionKind;
@@ -28,6 +35,7 @@ export type PositionView = {
   tickLower: number;
   tickUpper: number;
   tickCurrent: number;
+  tickSpacing?: number;
   percentThroughRange: number;
   price: number;
   priceMin: number | null;
@@ -61,6 +69,15 @@ export type PositionRangeGeometry = {
   rangeEndPct: number;
   currentPct: number;
   currentState: "below" | "inside" | "above";
+};
+
+export type PositionRangePreview = {
+  tickLower: number;
+  tickUpper: number;
+  currentTick: number;
+  currentPrice: number;
+  priceMin: number;
+  priceMax: number;
 };
 
 export type ConfirmView = {
@@ -207,6 +224,7 @@ export function lightRowToView(row: Record<string, unknown>): PositionView | nul
     tickLower,
     tickUpper,
     tickCurrent: typeof row.tickCurrent === "number" ? row.tickCurrent : 0,
+    tickSpacing: typeof row.tickSpacing === "number" ? row.tickSpacing : undefined,
     percentThroughRange: typeof row.percentThroughRange === "number" ? row.percentThroughRange : 50,
     price: typeof row.price === "number" ? row.price : 0,
     priceMin: numOrNull(row.priceMin) ?? (fullRange ? 0 : null),
@@ -259,4 +277,47 @@ export function positionRangeGeometry(view: Pick<PositionView, "fullRange" | "ti
     currentPct: toPercent(view.tickCurrent),
     currentState: view.tickCurrent < lower ? "below" : view.tickCurrent > upper ? "above" : "inside",
   };
+}
+
+export function positionRangePreview(
+  view: Pick<PositionView, "fee" | "price" | "tickLower" | "tickUpper" | "tickCurrent" | "tickSpacing">,
+  preset: RangePreset,
+): PositionRangePreview {
+  const spacing = view.tickSpacing ?? ({ 100: 1, 500: 10, 3000: 60, 10000: 200 } as Record<number, number>)[view.fee];
+  if (!spacing) throw new Error("Range adjustment requires the pool tick spacing");
+  const width = view.tickUpper - view.tickLower;
+  const intervals = Math.max(1, Math.round((width / spacing) * RANGE_PRESET_MULTIPLIER[preset]));
+  const targetWidth = intervals * spacing;
+  const half = Math.floor(targetWidth / 2);
+  let tickLower = nearestClientTick(view.tickCurrent - half, spacing);
+  let tickUpper = nearestClientTick(view.tickCurrent - half + targetWidth, spacing);
+  if (tickLower >= tickUpper) tickUpper = tickLower + spacing;
+  if (tickUpper > MAX_TICK) {
+    tickUpper = nearestClientTick(MAX_TICK, spacing);
+    tickLower = tickUpper - spacing;
+  }
+  return positionRangePreviewForTicks(view, tickLower, tickUpper, view.tickCurrent);
+}
+
+export function positionRangePreviewForTicks(
+  view: Pick<PositionView, "price" | "tickCurrent">,
+  tickLower: number,
+  tickUpper: number,
+  currentTick: number,
+): PositionRangePreview {
+  const priceAt = (tick: number) => view.price * Math.pow(1.0001, tick - view.tickCurrent);
+  return {
+    tickLower,
+    tickUpper,
+    currentTick,
+    currentPrice: priceAt(currentTick),
+    priceMin: priceAt(tickLower),
+    priceMax: priceAt(tickUpper),
+  };
+}
+
+function nearestClientTick(tick: number, spacing: number): number {
+  const minimum = Math.ceil(MIN_TICK / spacing) * spacing;
+  const maximum = Math.floor(MAX_TICK / spacing) * spacing;
+  return Math.max(minimum, Math.min(maximum, Math.round(tick / spacing) * spacing));
 }

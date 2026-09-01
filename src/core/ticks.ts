@@ -1,6 +1,14 @@
 import { nearestUsableTick, TickMath } from "@uniswap/v3-sdk";
 import { FEE_AMOUNT_TICK_SPACING, MAX_TICK, MIN_TICK } from "../constants.js";
 
+export type RangePreset = "focused" | "balanced" | "wide";
+
+export const RANGE_PRESET_MULTIPLIER: Record<RangePreset, number> = {
+  focused: 0.6,
+  balanced: 1,
+  wide: 1.8,
+};
+
 export function tickSpacingForFee(fee: number): number {
   const spacing = FEE_AMOUNT_TICK_SPACING[fee];
   if (spacing === undefined) {
@@ -78,6 +86,23 @@ export function recenterSameWidth(
   }
   const half = Math.floor(width / 2);
   return snapRange(tickCurrent - half, tickCurrent - half + width, spacing);
+}
+
+/** Recenter a protocol-aligned range using a simple width preset. */
+export function recenterRangeForPreset(
+  tickLower: number,
+  tickUpper: number,
+  tickCurrent: number,
+  spacing: number,
+  preset: RangePreset,
+): { tickLower: number; tickUpper: number } {
+  const width = tickUpper - tickLower;
+  if (width <= 0) throw new Error("invalid existing range width");
+  if (!Number.isInteger(spacing) || spacing <= 0) throw new Error("spacing must be a positive integer");
+  const intervals = Math.max(1, Math.round((width / spacing) * RANGE_PRESET_MULTIPLIER[preset]));
+  const targetWidth = intervals * spacing;
+  const half = Math.floor(targetWidth / 2);
+  return snapRange(tickCurrent - half, tickCurrent - half + targetWidth, spacing);
 }
 
 export function priceToTick(price: number): number {

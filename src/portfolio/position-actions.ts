@@ -14,7 +14,7 @@ import {
 import { slipstreamQuoterV2Abi } from "../aerodrome/abi.js";
 import { loadEnv } from "../config/env.js";
 import { bpsOf } from "../core/fees.js";
-import { recenterSameWidth } from "../core/ticks.js";
+import { recenterRangeForPreset, type RangePreset } from "../core/ticks.js";
 import { chainCatalog, getMarketCatalog, type CuratedMarket } from "../markets/catalog.js";
 import { makePublicClient } from "../signer/broadcast.js";
 import type { PlannedTx, PositionSnapshot, Protocol } from "../types.js";
@@ -53,7 +53,14 @@ export type PositionActionPlan = {
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: Address; symbol: string; amount: string }>;
-  range?: { tickLower: number; tickUpper: number };
+  range?: {
+    tickLower: number;
+    tickUpper: number;
+    currentTick: number;
+    previousTickLower: number;
+    previousTickUpper: number;
+    preset: RangePreset;
+  };
   settlement?: { asset: "ETH"; minimumAmountWei: string; marketSymbol: string };
   transactions: SerializableTx[];
   allowedTargets: Address[];
@@ -70,6 +77,7 @@ export async function planPositionAction(input: {
   protocol?: Protocol;
   venue?: "uniswap-v3" | "aerodrome-slipstream";
   positionManager?: string;
+  rangePreset?: RangePreset;
 }): Promise<PositionActionPlan> {
   if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
   const owner = getAddress(input.owner);
@@ -98,7 +106,6 @@ export async function planPositionAction(input: {
   if (!configured) throw new Error("position pool is not in Wizzy's curated market catalog");
   if (input.action === "rebalance") {
     if (snapshot.ref.protocol === "V2") throw new Error("Uniswap V2 positions are already full range");
-    if (snapshot.inRange) throw new Error("position is already in range");
     const feeBps = getMarketCatalog().fees.rebalanceBps;
     const available0 = ((snapshot.amount0 + snapshot.uncollected0) * WITHDRAW_FEE_SAFETY_BPS) / BPS - bpsOf(snapshot.amount0, feeBps);
     const available1 = ((snapshot.amount1 + snapshot.uncollected1) * WITHDRAW_FEE_SAFETY_BPS) / BPS - bpsOf(snapshot.amount1, feeBps);
@@ -108,7 +115,7 @@ export async function planPositionAction(input: {
     } else if (snapshot.amount1 === 0n && available0 > 1n) {
       swap = await quoteRebalanceSwap(client, input.chain, configured, snapshot.token0.address, snapshot.token1.address, available0 / 2n);
     }
-    return buildRebalancePositionActionPlan(snapshot, owner, input.chain, env.treasury, swap);
+    return buildRebalancePositionActionPlan(snapshot, owner, input.chain, env.treasury, swap, input.rangePreset);
   }
   const plan = buildPositionActionPlan(snapshot, owner, input.chain, input.action, env.treasury);
   if (input.action !== "withdraw" || input.chain !== "robinhood" || configured.protocol !== "V3") return plan;
@@ -429,9 +436,9 @@ export function buildRebalancePositionActionPlan(
   chain: ChainSlug,
   treasury: Address,
   swap?: RebalanceSwap,
+  rangePreset: RangePreset = "balanced",
 ): PositionActionPlan {
   if (snapshot.ref.protocol === "V2") throw new Error("Uniswap V2 positions are already full range");
-  if (snapshot.inRange) throw new Error("position is already in range");
   const feeBps = getMarketCatalog().fees.rebalanceBps;
   const fee0 = bpsOf(snapshot.amount0, feeBps);
   const fee1 = bpsOf(snapshot.amount1, feeBps);
@@ -453,7 +460,20 @@ export function buildRebalancePositionActionPlan(
       throw new Error("rebalance swap tokens do not match the position");
     }
   }
-  const range = recenterSameWidth(snapshot.tickLower, snapshot.tickUpper, snapshot.tickCurrent, snapshot.tickSpacing);
+  const targetRange = recenterRangeForPreset(
+    snapshot.tickLower,
+    snapshot.tickUpper,
+    snapshot.tickCurrent,
+    snapshot.tickSpacing,
+    rangePreset,
+  );
+  const range = {
+    ...targetRange,
+    currentTick: snapshot.tickCurrent,
+    previousTickLower: snapshot.tickLower,
+    previousTickUpper: snapshot.tickUpper,
+    preset: rangePreset,
+  };
   const positionManager = managerFor(snapshot, chain);
   const addresses = addressesFor(chain);
   const aerodrome = snapshot.venue === "aerodrome-slipstream";
@@ -588,7 +608,7 @@ export function buildRebalancePositionActionPlan(
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString(),
     notices: [
-      `Your current ${aerodrome ? "Aerodrome Slipstream" : snapshot.ref.protocol} position closes and a new same-width range opens around the live price through wallet-confirmed steps.`,
+      `Your current ${aerodrome ? "Aerodrome Slipstream" : snapshot.ref.protocol} position closes and a new ${rangePreset} range opens around the live price through wallet-confirmed steps.`,
       "Every completed step settles to your wallet. If a later step fails, Wizzy never holds the recovered pool assets.",
       "Wizzy swaps only when an out-of-range position cannot fund the new range. Any amount that does not fit remains in your wallet.",
     ],

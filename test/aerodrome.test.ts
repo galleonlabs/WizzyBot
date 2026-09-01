@@ -98,7 +98,14 @@ describe("Aerodrome Slipstream", () => {
       tickSpacing: brett.tickSpacing,
     });
 
-    expect(plan.range).toEqual({ tickLower: 200, tickUpper: 1000 });
+    expect(plan.range).toEqual({
+      tickLower: 200,
+      tickUpper: 1000,
+      currentTick: 600,
+      previousTickLower: -400,
+      previousTickUpper: 400,
+      preset: "balanced",
+    });
     expect(plan.transactions.slice(0, 3).map((tx) => tx.description)).toEqual([
       "Aerodrome decreaseLiquidity 100%",
       "Aerodrome collect",

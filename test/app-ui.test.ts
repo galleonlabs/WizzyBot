@@ -426,13 +426,22 @@ describe("meme market maker UI", () => {
     expect(portfolio).not.toContain('</> : <div className="plan-loading"><i /><i /><i /></div>}');
   });
 
-  it("matches live position artwork by pool and offers an out-of-range rebalance", () => {
+  it("matches live position artwork by pool and offers compact range controls for every concentrated position", () => {
     expect(portfolio).toContain("positionTokenImage(position, markets, stats)");
     expect(portfolio).toContain("market.pool.toLowerCase() === position.pool.toLowerCase()");
-    expect(portfolio).toContain('const canRebalance = (position.protocol === "V3" || position.protocol === "V4") && !position.inRange && position.chain !== "solana" && !position.closed');
+    expect(portfolio).toContain('const canAdjustRange = (position.protocol === "V3" || position.protocol === "V4") && position.chain !== "solana" && !position.closed');
     expect(positionActionRoute).toContain('z.enum(["collect", "compound", "rebalance", "withdraw"])');
+    expect(positionActionRoute).toContain('rangePreset: z.enum(["focused", "balanced", "wide"]).optional()');
     expect(portfolio).toContain('role="dialog" aria-modal="true" aria-labelledby="position-manager-title"');
     expect(portfolio).toContain('onAction(position, "collect")');
+    expect(portfolio).toContain('onAction(position, "rebalance", rangePreset)');
+    expect(portfolio).toContain('role="group" aria-label="Range width"');
+    expect(portfolio).toContain("Full range by design.");
+    expect(portfolio).toContain('actionState.kind === "idle" ? <footer className="position-manager-actions">');
+    expect(portfolio).toContain("positionRangePreviewForTicks(position, plannedRange.tickLower, plannedRange.tickUpper, plannedRange.currentTick)");
+    expect(portfolio).toContain('!canAdjustRange && !position.closed ? <button className="position-primary-action position-withdraw-action"');
+    expect(portfolio).toContain("Ticks {previousTickLower}–{previousTickUpper} → {preview.tickLower}–{preview.tickUpper}");
+    expect(portfolio).not.toContain("same-width range centred");
     expect(shotFixture).toContain('fee: 2111');
     expect(shotFixture).toContain('feeLabel: "0.21%"');
   });

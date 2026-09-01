@@ -29,6 +29,7 @@ export type PositionView = {
   tickLower: number;
   tickUpper: number;
   tickCurrent: number;
+  tickSpacing?: number;
   percentThroughRange: number;
   price: number;
   /** null = 0 (full-range display). */
@@ -199,6 +200,7 @@ export function serializeLiveView(card: PositionCard): PositionView {
       tickLower: card.tickLower,
       tickUpper: card.tickUpper,
       tickCurrent: card.tickCurrent,
+      tickSpacing: card.tickSpacing,
       percentThroughRange: card.percentThroughRange,
       price: snapshotPrice(card.sqrtPriceX96, card.tickCurrent, card.token0.decimals, card.token1.decimals),
       symbol0: card.token0.symbol,

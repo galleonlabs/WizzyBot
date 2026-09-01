@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { useAccount, useConfig, useConnect, useDisconnect, type Connector } from "wagmi";
 import { createPortal } from "react-dom";
 import { formatEther, parseEther } from "viem";
-import { compositionShares, lightRowToView, positionRangeGeometry, priceLabel, type PositionView } from "./lib/cards";
+import { compositionShares, lightRowToView, positionRangeGeometry, positionRangePreview, positionRangePreviewForTicks, priceLabel, type PositionView, type RangePreset } from "./lib/cards";
 import { readJsonPayload } from "./lib/api-payload";
 import { positionFeesEth, positionValueEth, positionValueUsd } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
@@ -325,7 +325,7 @@ export function PortfolioApp() {
     window.open(`${BRIDGE_URLS[chain]}?toAddress=${address}`, "_blank", "noopener,noreferrer");
   }
 
-  async function preparePositionAction(position: PositionView, action: PositionActionKind) {
+  async function preparePositionAction(position: PositionView, action: PositionActionKind, rangePreset?: RangePreset) {
     if (!address || !position.tokenId || !position.chain) return;
     const withdrawsToEth = positionSettlesToEth(position);
     const planningVerb = action === "collect"
@@ -349,6 +349,7 @@ export function PortfolioApp() {
           protocol: position.protocol === "V2" || position.protocol === "V3" || position.protocol === "V4" ? position.protocol : undefined,
           venue: position.venue,
           positionManager: position.positionManager,
+          rangePreset: action === "rebalance" ? rangePreset : undefined,
         }),
       });
       const payload = await readJsonPayload(response) as { plan?: AnyPositionActionPlan; error?: string };
@@ -971,7 +972,7 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
   stats: Map<string, MarketStats>;
   onStart: () => void;
   onRetry: () => void;
-  onAction: (position: PositionView, action: PositionActionKind) => void;
+  onAction: (position: PositionView, action: PositionActionKind, rangePreset?: RangePreset) => void;
   actionPlan: AnyPositionActionPlan | null;
   actionState: PlanState;
   onExecute: () => void;
@@ -1072,14 +1073,30 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
   image?: string | null;
   actionPlan: AnyPositionActionPlan | null;
   actionState: PlanState;
-  onAction: (position: PositionView, action: PositionActionKind) => void;
+  onAction: (position: PositionView, action: PositionActionKind, rangePreset?: RangePreset) => void;
   onExecute: () => void;
   onCancel: () => void;
   onClose: () => void;
 }) {
+  const [rangePreset, setRangePreset] = useState<RangePreset>("balanced");
+  const [moreOpen, setMoreOpen] = useState(false);
   const canCollect = position.protocol !== "V2" && hasCollectibleFees(position) && !position.closed;
-  const canRebalance = (position.protocol === "V3" || position.protocol === "V4") && !position.inRange && position.chain !== "solana" && !position.closed;
+  const canAdjustRange = (position.protocol === "V3" || position.protocol === "V4") && position.chain !== "solana" && !position.closed;
+  const actionBusy = actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting";
   const { share0, share1 } = compositionShares(position);
+  const plannedRange = actionPlan?.kind === "rebalance" ? actionPlan.range : undefined;
+  const rangePreview = useMemo(() => {
+    if (!canAdjustRange) return null;
+    try {
+      if (plannedRange) {
+        return positionRangePreviewForTicks(position, plannedRange.tickLower, plannedRange.tickUpper, plannedRange.currentTick);
+      }
+      return positionRangePreview(position, rangePreset);
+    } catch {
+      return null;
+    }
+  }, [canAdjustRange, plannedRange, position, rangePreset]);
+  useEffect(() => setRangePreset("balanced"), [position.chain, position.positionManager, position.protocol, position.tokenId]);
   return <div className="position-manager-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="position-manager" role="dialog" aria-modal="true" aria-labelledby="position-manager-title">
       <header className="position-manager-header">
@@ -1092,7 +1109,7 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
           <strong>{positionValueLabel(position)}</strong>
           <span className={`range-status is-${position.status}`}>{position.status === "in-range" ? "In range" : position.status === "oor" ? "Out of range" : "Closed"}</span>
         </section>
-        <PositionRangeChart position={position} />
+        {rangePreview ? <PositionRangePlanner position={position} preset={rangePreset} preview={rangePreview} previousTickLower={plannedRange?.previousTickLower ?? position.tickLower} previousTickUpper={plannedRange?.previousTickUpper ?? position.tickUpper} disabled={actionBusy} onPreset={(next) => { if (next === rangePreset) return; onCancel(); setRangePreset(next); }} /> : <PositionRangeChart position={position} />}
         <dl className="position-manager-stats" aria-label="Position performance">
           <div><dt>Fees ready</dt><dd className={hasCollectibleFees(position) ? "positive" : ""}>{positionFeesLabel(position)}</dd></div>
           <div><dt>Position fee APR</dt><dd>{formatFeeAprFraction(position.feeApr ?? null)}</dd></div>
@@ -1104,15 +1121,63 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
         </section>
         {actionState.kind !== "idle" ? <PositionActionReview plan={actionPlan} state={actionState} settlement={actionPlan?.settlement} onExecute={onExecute} onCancel={onCancel} /> : null}
       </div>
-      <footer className="position-manager-actions">
-        {position.protocol === "V2" ? <p>V2 fees stay invested in the LP token automatically.</p> : null}
-        {canCollect ? <button className={canRebalance ? "" : "position-primary-action"} type="button" onClick={() => onAction(position, "collect")}>Collect fees</button> : null}
-        {position.protocol !== "V2" && !position.closed ? <button type="button" onClick={() => onAction(position, "compound")} disabled={!hasCollectibleFees(position)}>Compound</button> : null}
-        {canRebalance ? <button className="position-primary-action" type="button" onClick={() => onAction(position, "rebalance")}>Rebalance range</button> : null}
-        <button className="position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button>
-      </footer>
+      {actionState.kind === "idle" ? <footer className="position-manager-actions">
+        {position.protocol === "V2" ? <p><b>Full range by design.</b> V2 fees stay invested in the LP token automatically.</p> : null}
+        {canAdjustRange && rangePreview ? <button className="position-primary-action" type="button" onClick={() => onAction(position, "rebalance", rangePreset)} disabled={actionBusy}>{position.inRange ? "Adjust range" : "Rebalance range"}</button> : null}
+        {!canAdjustRange && !position.closed ? <button className="position-primary-action position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button> : null}
+        {canAdjustRange ? <div className={`position-secondary-actions ${moreOpen ? "is-open" : ""}`} id="position-more-actions">
+          {canCollect ? <button type="button" onClick={() => onAction(position, "collect")} disabled={actionBusy}>Collect fees</button> : null}
+          {position.protocol !== "V2" && !position.closed ? <button type="button" onClick={() => onAction(position, "compound")} disabled={!hasCollectibleFees(position) || actionBusy}>Compound</button> : null}
+          <button className="position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed || actionBusy}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button>
+        </div> : null}
+        {canAdjustRange ? <button className="position-more-action" type="button" aria-expanded={moreOpen} aria-controls="position-more-actions" onClick={() => setMoreOpen((open) => !open)} disabled={actionBusy}>{moreOpen ? "Less" : "More"}</button> : null}
+      </footer> : null}
     </section>
   </div>;
+}
+
+function PositionRangePlanner({ position, preset, preview, previousTickLower, previousTickUpper, disabled, onPreset }: {
+  position: PositionView;
+  preset: RangePreset;
+  preview: ReturnType<typeof positionRangePreview>;
+  previousTickLower: number;
+  previousTickUpper: number;
+  disabled: boolean;
+  onPreset: (preset: RangePreset) => void;
+}) {
+  const ticks = [previousTickLower, previousTickUpper, preview.currentTick, preview.tickLower, preview.tickUpper];
+  const rawSpan = Math.max(...ticks) - Math.min(...ticks);
+  const padding = Math.max(1, rawSpan * 0.16);
+  const domainMin = Math.min(...ticks) - padding;
+  const domainMax = Math.max(...ticks) + padding;
+  const at = (tick: number) => Math.max(0, Math.min(100, ((tick - domainMin) / (domainMax - domainMin)) * 100));
+  const styles = {
+    "--old-range-start": `${at(previousTickLower)}%`,
+    "--old-range-width": `${at(previousTickUpper) - at(previousTickLower)}%`,
+    "--new-range-start": `${at(preview.tickLower)}%`,
+    "--new-range-width": `${at(preview.tickUpper) - at(preview.tickLower)}%`,
+    "--range-position": `${at(preview.currentTick)}%`,
+  } as CSSProperties;
+  const choices: Array<{ id: RangePreset; label: string; detail: string }> = [
+    { id: "focused", label: "Focused", detail: "Tighter band" },
+    { id: "balanced", label: "Balanced", detail: "Current width" },
+    { id: "wide", label: "Wide", detail: "More price room" },
+  ];
+  return <section className="position-range-planner" aria-label="Adjust position price range">
+    <header><div><b>Price range</b><small>Choose how tightly liquidity follows the market.</small></div><div className="range-chart-price"><small>Current</small><strong>{priceLabel(preview.currentPrice)}</strong></div></header>
+    <div className="range-preset-options" role="group" aria-label="Range width">
+      {choices.map((choice) => <button key={choice.id} type="button" className={preset === choice.id ? "is-active" : ""} aria-pressed={preset === choice.id} disabled={disabled} onClick={() => onPreset(choice.id)}><b>{choice.label}</b><small>{choice.detail}</small></button>)}
+    </div>
+    <div className="range-compare" style={styles} aria-label={`Current ticks ${previousTickLower} to ${previousTickUpper}. New ticks ${preview.tickLower} to ${preview.tickUpper}.`}>
+      <span className="range-compare-axis" aria-hidden="true" />
+      <span className="range-compare-window is-current" aria-hidden="true" />
+      <span className="range-compare-window is-new" aria-hidden="true" />
+      <span className="range-compare-price" aria-hidden="true"><i /></span>
+    </div>
+    <div className="range-compare-legend"><span><i className="is-current" />Current</span><span><i className="is-new" />New</span></div>
+    <dl className="range-preview-values"><div><dt>Min · current → new</dt><dd>{priceLabel(position.price * Math.pow(1.0001, previousTickLower - position.tickCurrent))} <i>→</i> {priceLabel(preview.priceMin)}</dd></div><div><dt>Max · current → new</dt><dd>{priceLabel(position.price * Math.pow(1.0001, previousTickUpper - position.tickCurrent))} <i>→</i> {priceLabel(preview.priceMax)}</dd></div></dl>
+    <p className="range-preview-ticks">Ticks {previousTickLower}–{previousTickUpper} → {preview.tickLower}–{preview.tickUpper}</p>
+  </section>;
 }
 
 function PositionRangeChart({ position }: { position: PositionView }) {
@@ -1234,7 +1299,10 @@ function positionActionDescription(
     return `Close this position and return at least ${trimEth(BigInt(settlement.minimumAmountWei))} ETH to your wallet.`;
   }
   if (plan.kind === "withdraw") return "Close this position and return both pool tokens to your wallet.";
-  if (plan.kind === "rebalance") return "Move this liquidity into a same-width range centred on the current price.";
+  if (plan.kind === "rebalance" && plan.range) {
+    return `Move liquidity from ticks ${plan.range.previousTickLower}–${plan.range.previousTickUpper} to the ${plan.range.preset} range ${plan.range.tickLower}–${plan.range.tickUpper}.`;
+  }
+  if (plan.kind === "rebalance") return "Move this liquidity into a new range around the current price.";
   if (plan.kind === "collect") return "Return all claimable fees to your wallet without changing the position.";
   return "Collect and reinvest the fees ready to claim.";
 }

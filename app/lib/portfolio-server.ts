@@ -41,6 +41,7 @@ type HostedPortfolioSurface = {
     protocol?: "V2" | "V3" | "V4";
     venue?: "uniswap-v3" | "aerodrome-slipstream";
     positionManager?: string;
+    rangePreset?: "focused" | "balanced" | "wide";
   }) => Promise<unknown>;
   quoteBaseToRobinhoodEth: (input: { owner: string; amountInWei: bigint }) => Promise<unknown>;
   quoteEthToRobinhood: (input: { owner: string; amountInWei: bigint; originChainId: number }) => Promise<unknown>;

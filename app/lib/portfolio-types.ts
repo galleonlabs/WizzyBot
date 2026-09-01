@@ -177,7 +177,14 @@ export type PositionActionPlan = {
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: `0x${string}`; symbol: string; amount: string }>;
-  range?: { tickLower: number; tickUpper: number };
+  range?: {
+    tickLower: number;
+    tickUpper: number;
+    currentTick: number;
+    previousTickLower: number;
+    previousTickUpper: number;
+    preset: "focused" | "balanced" | "wide";
+  };
   settlement?: { asset: "ETH"; minimumAmountWei: string; marketSymbol: string };
   transactions: WalletTransaction[];
   allowedTargets: `0x${string}`[];

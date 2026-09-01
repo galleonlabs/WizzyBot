@@ -73,8 +73,14 @@ describe("self-custodial position actions", () => {
     expect(plan.atomic).toBe(false);
   });
 
-  it("does not rebalance a position that is already earning", () => {
-    expect(() => buildRebalancePositionActionPlan(snapshot(), owner, "base", TREASURY)).toThrow("already in range");
+  it("lets an earning position deliberately narrow or widen its range", () => {
+    const focused = buildRebalancePositionActionPlan(snapshot(), owner, "base", TREASURY, undefined, "focused");
+    const wide = buildRebalancePositionActionPlan(snapshot(), owner, "base", TREASURY, undefined, "wide");
+    expect(focused.range).toMatchObject({ preset: "focused", previousTickLower: -200, previousTickUpper: 200, currentTick: 0 });
+    expect(wide.range).toMatchObject({ preset: "wide", previousTickLower: -200, previousTickUpper: 200, currentTick: 0 });
+    expect(focused.range!.tickUpper - focused.range!.tickLower).toBeLessThan(400);
+    expect(wide.range!.tickUpper - wide.range!.tickLower).toBeGreaterThan(400);
+    expect(focused.notices[0]).toContain("focused range");
   });
 
   it("withdraws a Robinhood V2 LP through the Robinhood router", () => {
@@ -134,7 +140,14 @@ describe("self-custodial position actions", () => {
 
     expect(plan.kind).toBe("rebalance");
     expect(plan.atomic).toBe(false);
-    expect(plan.range).toEqual({ tickLower: 400, tickUpper: 800 });
+    expect(plan.range).toEqual({
+      tickLower: 400,
+      tickUpper: 800,
+      currentTick: 600,
+      previousTickLower: -200,
+      previousTickUpper: 200,
+      preset: "balanced",
+    });
     expect(plan.transactions[0]?.to).toBe(addresses.v4PositionManager);
     expect(plan.transactions[0]?.description).toContain("burn");
     expect(plan.transactions.some((transaction) => transaction.description.includes("exact-in"))).toBe(true);

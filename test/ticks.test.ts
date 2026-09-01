@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { nearestUsableTick } from "@uniswap/v3-sdk";
-import { rangeFromWidthPct, recenterSameWidth, snapRange, snapTick, tickSpacingForFee } from "../src/core/ticks.js";
+import { rangeFromWidthPct, recenterRangeForPreset, recenterSameWidth, snapRange, snapTick, tickSpacingForFee } from "../src/core/ticks.js";
 
 describe("tick snap", () => {
   it("snaps to fee-tier spacing via v3-sdk nearestUsableTick", () => {
@@ -34,6 +34,27 @@ describe("tick snap", () => {
     expect(next.tickUpper - next.tickLower).toBe(400);
     expect(next.tickLower).toBeLessThan(50);
     expect(next.tickUpper).toBeGreaterThan(50);
+  });
+
+  it("turns focused, balanced, and wide presets into aligned ranges", () => {
+    const focused = recenterRangeForPreset(-200, 200, 50, 10, "focused");
+    const balanced = recenterRangeForPreset(-200, 200, 50, 10, "balanced");
+    const wide = recenterRangeForPreset(-200, 200, 50, 10, "wide");
+    expect(focused.tickUpper - focused.tickLower).toBe(240);
+    expect(balanced.tickUpper - balanced.tickLower).toBe(400);
+    expect(wide.tickUpper - wide.tickLower).toBe(720);
+    for (const range of [focused, balanced, wide]) {
+      expect(Number.isInteger(range.tickLower / 10)).toBe(true);
+      expect(Number.isInteger(range.tickUpper / 10)).toBe(true);
+      expect(range.tickLower).toBeLessThanOrEqual(50);
+      expect(range.tickUpper).toBeGreaterThan(50);
+    }
+  });
+
+  it("keeps preset ranges usable at the protocol bounds", () => {
+    const range = recenterRangeForPreset(887_000, 887_200, 887_270, 10, "wide");
+    expect(range.tickUpper).toBeLessThanOrEqual(887_272);
+    expect(range.tickLower).toBeLessThan(range.tickUpper);
   });
 
   it("accepts negative ticks and rejects bad spacing", () => {

@@ -1,5 +1,6 @@
 export { CHAIN_ID, ADDRESSES, TREASURY, FEE_TIER, SIGNER_ALLOWLIST } from "./constants.js";
-export { snapTick, snapRange, rangeFromWidthPct, recenterSameWidth, tickSpacingForFee } from "./core/ticks.js";
+export { snapTick, snapRange, rangeFromWidthPct, recenterRangeForPreset, recenterSameWidth, tickSpacingForFee } from "./core/ticks.js";
+export type { RangePreset } from "./core/ticks.js";
 export { takeFromFees, takeFromNotional, bpsOf, resolveActionFee, COMPOUND_FEE_BPS } from "./core/fees.js";
 export { isInRange, shouldRerange, shouldExitAtPrice, percentThroughRange } from "./core/range.js";
 export { divergence, holdUsd, lpUsd, feeApr, totalApr } from "./core/pnl.js";

@@ -13,6 +13,7 @@ const Body = z.object({
   protocol: z.enum(["V2", "V3", "V4"]).optional(),
   venue: z.enum(["uniswap-v3", "aerodrome-slipstream"]).optional(),
   positionManager: z.string().optional(),
+  rangePreset: z.enum(["focused", "balanced", "wide"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
       protocol: body.protocol,
       venue: body.venue,
       positionManager: body.positionManager,
+      rangePreset: body.rangePreset,
     });
     return NextResponse.json({ plan });
   } catch (error) {

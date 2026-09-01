@@ -33,6 +33,7 @@ type ViewTab = "overview" | "markets";
 type ThemePreference = "system" | "light" | "dark";
 type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" | "submitted" | "error"; message?: string };
 type BalanceState = { kind: "idle" | "loading" | "ready" | "error"; balanceWei?: string };
+type ChainBalances = Record<ChainSlug, BalanceState>;
 type AnyPositionActionPlan = PositionActionPlan;
 type PositionActionKind = "compound" | "rebalance" | "withdraw";
 type IndexChain = ChainSlug | "solana";
@@ -49,7 +50,10 @@ type AvailableIndexUpdate = {
 };
 const INDEX_MARKET_COUNT = 6;
 const FOMO_URL = "https://fomo.family/r/makemememarkets";
-const ROBINHOOD_BRIDGE_URL = "https://relay.link/bridge/robinhood";
+const BRIDGE_URLS: Record<ChainSlug, string> = {
+  base: "https://relay.link/bridge/base",
+  robinhood: "https://relay.link/bridge/robinhood",
+};
 const POOL_ACTIVITY_REFRESH_MS = 60_000;
 const PREVIEW_POOL_ACTIVITY: PoolActivityItem[] = [
   { id: "preview-1", kind: "added", marketId: "robinhood-pons", symbol: "PONS", pair: "PONS/WETH", wethAmount: "9.34", transactionHash: "0xpreview", transactionUrl: "#", blockNumber: "3" },
@@ -103,6 +107,7 @@ const EMPTY_MARKETS: MarketsPayload = {
   stats: [],
   source: "",
 };
+const EMPTY_BALANCES: ChainBalances = { base: { kind: "idle" }, robinhood: { kind: "idle" } };
 
 export function PortfolioApp() {
   const wagmiConfig = useConfig();
@@ -113,7 +118,7 @@ export function PortfolioApp() {
   const authenticated = accountStatus === "connected";
   const [tab, setTab] = useState<ViewTab>("overview");
   const [theme, setTheme] = useState<ThemePreference>("dark");
-  const [balanceState, setBalanceState] = useState<BalanceState>({ kind: "idle" });
+  const [balances, setBalances] = useState<ChainBalances>(EMPTY_BALANCES);
   const [markets, setMarkets] = useState<MarketsPayload>(EMPTY_MARKETS);
   const [marketsState, setMarketsState] = useState<"loading" | "ready" | "error">("loading");
   const [positions, setPositions] = useState<PositionView[]>([]);
@@ -151,24 +156,26 @@ export function PortfolioApp() {
     });
   }
 
-  const loadRobinhoodBalance = useCallback(async () => {
+  const loadBalances = useCallback(async () => {
     const requestId = ++balanceRequestRef.current;
     if (!authenticated || !address) {
-      setBalanceState({ kind: "idle" });
+      setBalances(EMPTY_BALANCES);
       return;
     }
-    setBalanceState({ kind: "loading" });
-    try {
-      const response = await fetch(`/api/balance?address=${encodeURIComponent(address)}`, { cache: "no-store" });
-      const payload = await readJsonPayload(response) as { balanceWei?: string; error?: string };
-      if (!response.ok || payload.balanceWei === undefined) throw new Error(payload.error ?? "Could not read balance");
-      if (requestId !== balanceRequestRef.current) return;
-      setBalanceState({ kind: "ready", balanceWei: payload.balanceWei });
-    } catch (error) {
-      if (requestId !== balanceRequestRef.current) return;
-      setBalanceState({ kind: "error" });
-      reportClientError("positions", error);
-    }
+    setBalances({ base: { kind: "loading" }, robinhood: { kind: "loading" } });
+    const entries = await Promise.all((["base", "robinhood"] as const).map(async (chain) => {
+      try {
+        const response = await fetch(`/api/balance?address=${encodeURIComponent(address)}&chain=${chain}`, { cache: "no-store" });
+        const payload = await readJsonPayload(response) as { balanceWei?: string; error?: string };
+        if (!response.ok || payload.balanceWei === undefined) throw new Error(payload.error ?? `Could not read ${chain} balance`);
+        return [chain, { kind: "ready", balanceWei: payload.balanceWei } satisfies BalanceState] as const;
+      } catch (error) {
+        reportClientError("balance", error);
+        return [chain, { kind: "error" } satisfies BalanceState] as const;
+      }
+    }));
+    if (requestId !== balanceRequestRef.current) return;
+    setBalances(Object.fromEntries(entries) as ChainBalances);
   }, [address, authenticated]);
 
   async function sendRobinhoodEth(recipient: `0x${string}`, amountWei: string, onSubmitted: () => void): Promise<`0x${string}` | null> {
@@ -182,7 +189,7 @@ export function PortfolioApp() {
         onStep: () => onSubmitted(),
       });
       const transactionHash = confirmed.transactionHashes[0] ?? null;
-      await loadRobinhoodBalance();
+      await loadBalances();
       trackProductEvent("ETH Send Confirmed", { chainId: 4663, transactionHash });
       return transactionHash;
     } catch (error) {
@@ -235,8 +242,8 @@ export function PortfolioApp() {
   }, [authenticated, ready]);
 
   useEffect(() => {
-    void loadRobinhoodBalance();
-  }, [loadRobinhoodBalance]);
+    void loadBalances();
+  }, [loadBalances]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -286,10 +293,9 @@ export function PortfolioApp() {
   }, [address, authenticated, previewMode]);
 
   const activeMarkets = useMemo<IndexMarket[]>(() => {
-    const robinhood = markets.catalog.chains.find((chain) => chain.slug === "robinhood");
-    return robinhood?.markets
+    return markets.catalog.chains.flatMap((chain) => chain.markets
       .filter((market) => market.status === "active")
-      .map((market) => ({ market, chain: "robinhood" as const, indexWeightBps: market.weightBps })) ?? [];
+      .map((market) => ({ market, chain: chain.slug, indexWeightBps: market.weightBps })));
   }, [markets]);
   const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
   const availableIndexUpdates = useMemo<AvailableIndexUpdate[]>(() => {
@@ -344,13 +350,14 @@ export function PortfolioApp() {
     setConnectOpen(true);
   }
 
-  function fundRobinhood() {
+  function fundChain(chain: ChainSlug) {
     if (!authenticated || !address) {
       startLogin("make-markets");
       return;
     }
-    trackProductEvent("Cross-chain Funding Started", { destinationChainId: 4663 });
-    window.open(`${ROBINHOOD_BRIDGE_URL}?toAddress=${address}`, "_blank", "noopener,noreferrer");
+    const destinationChainId = chain === "robinhood" ? 4663 : 8453;
+    trackProductEvent("Cross-chain Funding Started", { destinationChainId });
+    window.open(`${BRIDGE_URLS[chain]}?toAddress=${address}`, "_blank", "noopener,noreferrer");
   }
 
   async function preparePositionAction(position: PositionView, action: PositionActionKind) {
@@ -394,7 +401,7 @@ export function PortfolioApp() {
         transactions: actionPlan.transactions,
         onStep: (message) => setActionState({ kind: "waiting", message }),
       });
-      await Promise.all([loadPositions(), loadRobinhoodBalance()]);
+      await Promise.all([loadPositions(), loadBalances()]);
       if (actionPlan.kind === "withdraw") {
         // The exit invalidates the earlier zap celebration. Returning to Make
         // must show a fresh form, never a stale "Market made" state.
@@ -476,6 +483,11 @@ export function PortfolioApp() {
       startLogin("markets");
       return;
     }
+    const selected = activeMarkets.find((entry) => entry.market.id === marketId);
+    if (!selected || selected.chain === "solana") {
+      setZapState({ kind: "error", message: "This market is no longer available." });
+      return;
+    }
     let amountWei: bigint;
     try {
       amountWei = parseEther(zapAmount || "0");
@@ -489,7 +501,7 @@ export function PortfolioApp() {
       const response = await fetch("/api/portfolio/allocate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ owner: address, chain: "robinhood", amountWei: amountWei.toString(), marketIds: [marketId] }),
+        body: JSON.stringify({ owner: address, chain: selected.chain, amountWei: amountWei.toString(), marketIds: [marketId] }),
       });
       const payload = await readJsonPayload(response) as { plan?: AllocationPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not quote this market");
@@ -572,8 +584,8 @@ export function PortfolioApp() {
         onPrepareZap={(id) => void prepareZap(id)}
         onExecuteZap={() => void executeZap()}
         onCloseZap={() => { setZapMarketId(null); setZapPlan(null); setZapState({ kind: "idle" }); }}
-        balance={authenticated ? balanceState : null}
-        onFund={fundRobinhood}
+        balances={authenticated ? balances : null}
+        onFund={fundChain}
       />
     </section>
   );
@@ -618,7 +630,7 @@ export function PortfolioApp() {
               <ThemeIcon preference={theme} />
             </button>
             {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
-              <WalletMenu address={address ?? "Wallet"} onSend={() => { setSendOpen(true); void loadRobinhoodBalance(); trackProductEvent("ETH Send Opened", { chainId: 4663 }); }} onDisconnect={() => { trackProductEvent("Logout Started"); disconnect(); }} />
+              <WalletMenu address={address ?? "Wallet"} onSend={() => { setSendOpen(true); void loadBalances(); trackProductEvent("ETH Send Opened", { chainId: 4663 }); }} onDisconnect={() => { trackProductEvent("Logout Started"); disconnect(); }} />
             ) : (
               <button className="wallet-button wallet-connect" type="button" onClick={() => startLogin("header")} aria-label="Connect wallet"><WalletIcon /><span>Connect</span></button>
             )}
@@ -654,7 +666,7 @@ export function PortfolioApp() {
             </section>
           )}
       </div>
-      {address ? <SendEthDialog open={sendOpen} owner={address} balanceWei={balanceState.kind === "ready" ? balanceState.balanceWei : undefined} onClose={() => setSendOpen(false)} onSend={sendRobinhoodEth} /> : null}
+      {address ? <SendEthDialog open={sendOpen} owner={address} balanceWei={balances.robinhood.kind === "ready" ? balances.robinhood.balanceWei : undefined} onClose={() => setSendOpen(false)} onSend={sendRobinhoodEth} /> : null}
       <ConnectWalletDialog
         open={connectOpen && !authenticated}
         connectors={connectors}
@@ -741,10 +753,10 @@ function PoolActivityGroup({ items, duplicate = false }: { items: PoolActivityIt
 }
 
 function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {
-  return <div className="index-showcase" aria-label="Robinhood meme markets">
-    <div className="network-lockup" aria-label="Built on Robinhood Chain">
-      <img src={BRAND_ASSETS.robinhood} alt="" />
-      <span className="network-name"><small>Built on</small><b>Robinhood Chain</b></span>
+  return <div className="index-showcase" aria-label="Base and Robinhood meme markets">
+    <div className="network-lockup" aria-label="Built on Base and Robinhood Chain">
+      <span className="network-icons" aria-hidden="true"><img src={BRAND_ASSETS.base} alt="" /><img src={BRAND_ASSETS.robinhood} alt="" /></span>
+      <span className="network-name"><small>Built on</small><b>Base + Robinhood Chain</b></span>
     </div>
     <div className={`hero-token-field ${loading ? "is-loading" : ""}`}>
       {(loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
@@ -781,7 +793,7 @@ function ConnectWalletDialog({ open, connectors, pending, error, onPick, onClose
   return createPortal(<div className="send-eth-backdrop" onPointerDown={(event) => { if (event.currentTarget === event.target && !pending) onClose(); }}>
     <section className="send-eth-dialog connect-dialog" role="dialog" aria-modal="true" aria-labelledby="connect-wallet-title" aria-describedby="connect-wallet-description">
       <header>
-        <span><img src="/brand/wizzy-mascot-32.png" alt="" /><span><small>Wizzy</small><b>Robinhood Chain</b></span></span>
+        <span><img src="/brand/wizzy-mascot-32.png" alt="" /><span><small>Wizzy</small><b>Base + Robinhood</b></span></span>
         <button type="button" onClick={onClose} disabled={pending}>Close</button>
       </header>
       <div className="send-eth-body">
@@ -872,7 +884,7 @@ function SuccessCelebration({ label }: { label: string }) {
   </div>;
 }
 
-function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balance, onFund }: {
+function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balances, onFund }: {
   markets: IndexMarket[];
   stats: Map<string, MarketStats>;
   state: "loading" | "ready" | "error";
@@ -886,15 +898,20 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
   onPrepareZap: (marketId: string) => void;
   onExecuteZap: () => void;
   onCloseZap: () => void;
-  balance: BalanceState | null;
-  onFund: () => void;
+  balances: ChainBalances | null;
+  onFund: (chain: ChainSlug) => void;
 }) {
-  const orderedMarkets = [...markets].sort(
+  const [chainFilter, setChainFilter] = useState<"all" | ChainSlug>("all");
+  const visibleMarkets = chainFilter === "all" ? markets : markets.filter((entry) => entry.chain === chainFilter);
+  const orderedMarkets = [...visibleMarkets].sort(
     (a, b) => marketTierIndex(policy, a.market.id) - marketTierIndex(policy, b.market.id) || b.indexWeightBps - a.indexWeightBps,
   );
   return (
     <section className="market-ledger">
       <div className="market-table-wrap">
+        <div className="market-toolbar" aria-label="Filter markets by chain">
+          {(["all", "base", "robinhood"] as const).map((chain) => <button key={chain} type="button" className={chainFilter === chain ? "is-active" : ""} aria-pressed={chainFilter === chain} onClick={() => setChainFilter(chain)}>{chain === "all" ? "All markets" : chainLabel(chain)}</button>)}
+        </div>
         <IndexSnapshot markets={orderedMarkets} stats={stats} state={state} />
         <table className="market-table">
           <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>Liquidity</th><th>Explore</th></tr></thead>
@@ -903,22 +920,23 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
             {state === "error" ? <tr><td colSpan={5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
             {state === "ready" ? orderedMarkets.flatMap(({ market, chain }) => {
               const row = stats.get(market.id);
-              const zappable = chain === "robinhood";
+              const zappable = chain === "base" || chain === "robinhood";
               const isOpen = zappable && zapMarketId === market.id;
               const rows = [<tr key={market.id} className={isOpen ? "is-zapping" : ""}>
-                <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/WETH</b><VenueTrail chain={chain} /></span></span></td>
+                <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/WETH</b><VenueTrail chain={chain} protocol={market.protocol} /></span></span></td>
                 <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b><small className="cell-note">Based on 24h fees</small></td>
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
                   {zappable ? <button className="market-link zap-link" type="button" aria-expanded={isOpen} onClick={() => onOpenZap(market.id)} aria-label={`Make the ${market.symbol}/WETH market`}><span className="market-link-label">{isOpen ? "Close" : "Make market"}</span></button> : null}
-                  <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
-                  <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a>
+                  <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(chain, market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
+                  {chain === "robinhood" ? <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a> : null}
                 </span></td>
               </tr>];
               if (isOpen) rows.push(<tr className="zap-row" key={`${market.id}-zap`}><td colSpan={5}>
                 <ZapPanel
                   market={market as CuratedMarket}
+                  chain={chain as ChainSlug}
                   feeAprPct={row?.trailingFeeAprPct ?? null}
                   amount={zapAmount}
                   plan={zapPlan}
@@ -927,8 +945,8 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
                   onPrepare={() => onPrepareZap(market.id)}
                   onExecute={onExecuteZap}
                   onClose={onCloseZap}
-                  balance={balance}
-                  onFund={onFund}
+                  balance={balances?.[chain as ChainSlug] ?? null}
+                  onFund={() => onFund(chain as ChainSlug)}
                 />
               </td></tr>);
               return rows;
@@ -940,8 +958,9 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
   );
 }
 
-function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare, onExecute, onClose, balance, onFund }: {
+function ZapPanel({ market, chain, feeAprPct, amount, plan, state, onAmount, onPrepare, onExecute, onClose, balance, onFund }: {
   market: CuratedMarket;
+  chain: ChainSlug;
   feeAprPct: number | null;
   amount: string;
   plan: AllocationPlan | null;
@@ -966,7 +985,7 @@ function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare,
         <input inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
         <b>ETH</b>
       </label>
-      {balance ? <span className="wallet-balance" role="status" title="Robinhood Chain ETH balance">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></span> : null}
+      {balance ? <span className="wallet-balance" role="status" title={`${chainLabel(chain)} ETH balance`}>Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></span> : null}
       {plan && (state.kind === "ready" || busy) ? (
         <button className="fund-button zap-cta" type="button" disabled={busy} onClick={onExecute}>
           {busy ? state.message : `Mint ${market.symbol} position`}
@@ -984,13 +1003,13 @@ function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare,
       <span><small>Ticks</small><b>{planMarket.tickLower} → {planMarket.tickUpper}</b></span>
     </div> : null}
     <div className="funding-choice">
-      <span><b>ETH on another chain?</b><small>Bridge to your wallet on Robinhood Chain.</small></span>
+      <span><b>Need ETH on {chainLabel(chain)}?</b><small>Bridge directly to this same wallet.</small></span>
       <button className="cross-chain-fund" type="button" onClick={onFund}>
         <EthereumIcon />Add ETH<ExternalLinkIcon />
       </button>
     </div>
     {state.kind === "submitted" || state.kind === "error" ? <p className={`funding-status is-${state.kind === "submitted" ? "submitted" : "error"}`} aria-live="polite">{state.message}</p> : null}
-    <p className="action-assurance">Robinhood Chain · Self-custodial · The position NFT goes to your wallet</p>
+    <p className="action-assurance">{chainLabel(chain)} · Self-custodial · The position goes to your wallet</p>
   </div>;
 }
 
@@ -1000,7 +1019,7 @@ function IndexSnapshot({ markets, stats, state }: { markets: IndexMarket[]; stat
   const feeApr = weightedFeeApr(markets, stats);
   return <section className={`index-snapshot is-${state}`} aria-label="Meme market stats">
     <div className="index-snapshot-top">
-      <span className="snapshot-origin"><img src={BRAND_ASSETS.robinhood} alt="" /><span><small>Live on</small><b>Robinhood Chain</b></span></span>
+      <span className="snapshot-origin"><span className="network-icons" aria-hidden="true">{markets.some((entry) => entry.chain === "base") ? <img src={BRAND_ASSETS.base} alt="" /> : null}{markets.some((entry) => entry.chain === "robinhood") ? <img src={BRAND_ASSETS.robinhood} alt="" /> : null}</span><span><small>Live on</small><b>{snapshotChainLabel(markets)}</b></span></span>
       <dl className="index-vitals">
         <div><dt>Fee APR</dt><dd>{formatFeeApr(feeApr)}</dd><small>Volume-weighted, 24h fees</small></div>
         <div><dt>24h volume</dt><dd>{state === "ready" ? compactMoney(volume) : "—"}</dd><small>Across all pools</small></div>
@@ -1306,15 +1325,22 @@ function BrandLogo({ brand, label, compact = false }: { brand: keyof typeof BRAN
   </span>;
 }
 
-function geckoPoolUrl(pool: string): string {
-  return `https://www.geckoterminal.com/robinhood/pools/${pool.toLowerCase()}`;
+function geckoPoolUrl(chain: IndexChain, pool: string): string {
+  return `https://www.geckoterminal.com/${chain === "base" ? "base" : "robinhood"}/pools/${pool.toLowerCase()}`;
 }
 
-function VenueTrail({ chain }: { chain: IndexChain }) {
+function VenueTrail({ chain, protocol }: { chain: IndexChain; protocol: CuratedMarket["protocol"] }) {
   return <span className="venue-trail">
     <BrandLogo brand={chain} label={chainLabel(chain)} compact />
-    <span>{chainLabel(chain)}</span>
+    <span>{chainLabel(chain)}</span><i>{protocol === "AERODROME_SLIPSTREAM" ? "Aerodrome Slipstream" : "Uniswap v3"}</i>
   </span>;
+}
+
+function snapshotChainLabel(markets: IndexMarket[]): string {
+  const chains = new Set(markets.map((market) => market.chain));
+  if (chains.size > 1) return "Base + Robinhood";
+  const [chain] = [...chains];
+  return chain ? chainLabel(chain) : "Base + Robinhood";
 }
 
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }

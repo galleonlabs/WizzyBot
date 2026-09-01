@@ -45,8 +45,9 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain('id="positions"');
     expect(portfolio).toContain("Make market");
     expect(portfolio).toContain('aria-label="ETH amount"');
-    expect(portfolio).toContain("ETH on another chain?");
-    expect(portfolio).toContain("Bridge to your wallet on Robinhood Chain.");
+    expect(portfolio).toContain("Need ETH on {chainLabel(chain)}?");
+    expect(portfolio).toContain("Bridge directly to this same wallet.");
+    expect(portfolio).toContain("https://relay.link/bridge/base");
     expect(portfolio).toContain("https://relay.link/bridge/robinhood");
     expect(portfolio).not.toContain('name="sourceChain"');
     expect(portfolio).toContain('className="pair-cell"');
@@ -58,7 +59,7 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("empty-route");
     expect(portfolio).not.toContain('label: "Positions"');
     expect(portfolio).not.toContain("scrollIntoView");
-    expect(portfolio).toContain("https://www.geckoterminal.com/robinhood/pools");
+    expect(portfolio).toContain('chain === "base" ? "base" : "robinhood"');
     expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
     expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
     expect(portfolio).toContain("Trade on Fomo");
@@ -91,6 +92,7 @@ describe("meme index product UI", () => {
     expect(css).toContain(".action-preview.is-submitted { grid-template-columns: auto minmax(0, 1fr)");
     expect(css).toContain(".action-preview.is-submitted > .action-buttons { grid-column: 1 / -1; }");
     expect(css).toContain(".market-link { width: 48px; min-height: 48px");
+    expect(css).toContain(".market-table .market-links:has(.fomo-link)");
     expect(css).toContain(".position-actions button,\n  .action-buttons button { min-height: 48px; }");
     expect(css).toContain(".empty-action { width: 100%; min-height: 48px");
   });
@@ -185,9 +187,14 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain('className="review-amount"');
   });
 
-  it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {
+  it("supports Base and Robinhood market making while preserving self-custody", () => {
     expect(portfolio).toContain("The meme markets");
-    expect(portfolio).toContain("Built on Robinhood Chain");
+    expect(portfolio).toContain("Built on Base and Robinhood Chain");
+    expect(portfolio).toContain("Base + Robinhood Chain");
+    expect(portfolio).toContain('chain === "base" || chain === "robinhood"');
+    expect(portfolio).toContain("market-toolbar");
+    expect(portfolio).toContain("market.protocol");
+    expect(portfolio).toContain('"Aerodrome Slipstream" : "Uniswap v3"');
     expect(portfolio).not.toContain("curated markets");
     expect(portfolio).toContain("Wizzy agents regularly review which markets qualify.");
     expect(portfolio).toContain("Every pool reviewed by Wizzy agents, every six hours.");
@@ -208,11 +215,13 @@ describe("meme index product UI", () => {
     expect(css).toMatch(/\.index-hero \{[\s\S]*?align-items: start;/);
     expect(css).toContain("min-height: 44px");
     expect(css).toContain(".cross-chain-fund");
-    expect(portfolio).toContain("Robinhood Chain ETH balance");
+    expect(portfolio).toContain('title={`${chainLabel(chain)} ETH balance`}');
     expect(portfolio).toContain("<EthereumIcon />");
     expect(css).toContain(".wallet-balance");
     expect(css).toContain("font-variant-numeric: tabular-nums");
     expect(balanceRoute).toContain("client.getBalance");
+    expect(balanceRoute).toContain('parseChainSlug(params.get("chain"))');
+    expect(balanceRoute).toContain("base-rpc.publicnode.com");
     expect(balanceRoute).toContain("process.env.ROBINHOOD_RPC_URL");
     expect(css).toContain(".index-update-panel");
     expect(portfolio).toContain("Index updated");

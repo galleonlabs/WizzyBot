@@ -1,6 +1,7 @@
 export const TELEMETRY_AREAS = [
   "auth",
   "markets",
+  "balance",
   "positions",
   "index-plan",
   "index-submit",

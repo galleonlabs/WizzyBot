@@ -1,5 +1,5 @@
 import { getAddress, type Address } from "viem";
-import { ADDRESSES } from "../constants.js";
+import { addressesFor, slugForChainId } from "../chains.js";
 import { writeTarget } from "./protocol.js";
 import { v2ApprovePairTx } from "../uniswap/v2-calldata.js";
 import type {
@@ -29,8 +29,13 @@ export interface PlanContext {
   takeBaseUsd?: number;
 }
 
-function recipients(fee: TreasuryFee | null, owner: Address, protocol: PositionSnapshot["ref"]["protocol"] = "V3"): Address[] {
-  const out = new Set<Address>([writeTarget(protocol), owner]);
+function recipients(
+  fee: TreasuryFee | null,
+  owner: Address,
+  protocol: PositionSnapshot["ref"]["protocol"] = "V3",
+  chainId = 8453,
+): Address[] {
+  const out = new Set<Address>([writeTarget(protocol, chainId), owner]);
   if (fee && !fee.skipped && (fee.amount0 > 0n || fee.amount1 > 0n)) {
     out.add(fee.recipient);
   }
@@ -81,7 +86,7 @@ function collectAction(position: PositionSnapshot, recipient: Address): PlannedA
     amountOut: position.uncollected1,
     recipient,
     tx: {
-      to: writeTarget(position.ref.protocol),
+      to: writeTarget(position.ref.protocol, position.ref.chainId),
       data: "0x",
       value: 0n,
       description: position.ref.protocol === "V4" ? "PositionManager.modifyLiquidities claim (0-liq decrease)" : "NFPM.collect",
@@ -163,7 +168,7 @@ export function planCompound(
       kind: "swap",
       description: "optional swap leftover fees toward in-range ratio (DEX pool fee only)",
       tx: {
-        to: ADDRESSES.universalRouter,
+        to: addressesFor(slugForChainId(position.ref.chainId)).universalRouter,
         data: "0x",
         value: 0n,
         description: "Universal Router v3 exact-in (no Wizzy swap fee)",
@@ -177,7 +182,7 @@ export function planCompound(
     amountIn: leftover.amount0,
     amountOut: leftover.amount1,
     tx: {
-      to: ADDRESSES.nfpm,
+      to: addressesFor(slugForChainId(position.ref.chainId)).nfpm,
       data: "0x",
       value: 0n,
       description: "NFPM.increaseLiquidity",
@@ -278,7 +283,7 @@ export function planRerange(
       kind: "decrease",
       description: `decrease 100% tokenId=${position.ref.tokenId}`,
       tx: {
-        to: writeTarget(position.ref.protocol),
+        to: writeTarget(position.ref.protocol, position.ref.chainId),
         data: "0x",
         value: 0n,
         description: position.ref.protocol === "V4" ? "PositionManager.modifyLiquidities decrease" : "NFPM.decreaseLiquidity 100%",
@@ -290,7 +295,7 @@ export function planRerange(
       kind: "mint",
       description: `mint same-width recenter ticks [${nextRange.tickLower}, ${nextRange.tickUpper}]`,
       tx: {
-        to: writeTarget(position.ref.protocol),
+        to: writeTarget(position.ref.protocol, position.ref.chainId),
         data: "0x",
         value: 0n,
         description: position.ref.protocol === "V4" ? "PositionManager.modifyLiquidities mint" : "NFPM.mint",
@@ -357,13 +362,13 @@ export function planExit(
         description: `approve Router02 for v2 LP token ${position.pool}`,
         tokenIn: position.pool,
         amountIn: position.liquidity,
-        tx: v2ApprovePairTx(position.pool, position.liquidity),
+        tx: v2ApprovePairTx(position.pool, position.liquidity, position.ref.chainId),
       },
       {
         kind: "decrease",
         description: `remove 100% v2 liquidity pair=${position.pool}`,
         tx: {
-          to: ADDRESSES.v2Router,
+          to: addressesFor(slugForChainId(position.ref.chainId)).v2Router,
           data: "0x",
           value: 0n,
           description: "Router02.removeLiquidity",
@@ -391,7 +396,7 @@ export function planExit(
       kind: "decrease",
       description: `decrease 100% tokenId=${position.ref.tokenId}`,
       tx: {
-        to: writeTarget(position.ref.protocol),
+        to: writeTarget(position.ref.protocol, position.ref.chainId),
         data: "0x",
         value: 0n,
         description: position.ref.protocol === "V4" ? "PositionManager.modifyLiquidities decrease" : "NFPM.decreaseLiquidity 100%",
@@ -409,7 +414,7 @@ export function planExit(
       tokenOut: dest,
       recipient: ctx.owner,
       tx: {
-        to: ADDRESSES.universalRouter,
+        to: addressesFor(slugForChainId(position.ref.chainId)).universalRouter,
         data: "0x",
         value: 0n,
         description: "Universal Router v3 exact-in",
@@ -421,7 +426,7 @@ export function planExit(
     kind: "burn",
     description: `burn empty NFT tokenId=${position.ref.tokenId}`,
     tx: {
-      to: ADDRESSES.nfpm,
+      to: addressesFor(slugForChainId(position.ref.chainId)).nfpm,
       data: "0x",
       value: 0n,
       description: "NFPM.burn",
@@ -447,7 +452,7 @@ function receipt(
     skipped: false,
     tokenId: position.ref.tokenId,
     from: ctx.owner,
-    to: recipients(fee, ctx.owner, position.ref.protocol),
+    to: recipients(fee, ctx.owner, position.ref.protocol, position.ref.chainId),
     actions,
     treasuryFee: fee,
     txs,

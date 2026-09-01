@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getAddress, type Address, type PublicClient } from "viem";
 import { ADDRESSES } from "../src/constants.js";
+import { addressesFor } from "../src/chains.js";
 import { parseProtocol, parseTokenId, pairFromTokenId, writeTarget } from "../src/core/protocol.js";
 import { V2Protocol, V4Protocol, adapterFor } from "../src/core/protocols.js";
 import { planCompound, planExit, planRerange, type PlanContext } from "../src/core/actions.js";
@@ -81,6 +82,9 @@ describe("parseProtocol / tokenId", () => {
     expect(writeTarget("V2")).toBe(ADDRESSES.v2Router);
     expect(writeTarget("V4")).toBe(ADDRESSES.v4PositionManager);
     expect(writeTarget("V3")).toBe(ADDRESSES.nfpm);
+    expect(writeTarget("V2", 4663)).toBe(addressesFor("robinhood").v2Router);
+    expect(writeTarget("V4", 4663)).toBe(addressesFor("robinhood").v4PositionManager);
+    expect(writeTarget("V3", 4663)).toBe(addressesFor("robinhood").nfpm);
   });
 });
 
@@ -120,6 +124,17 @@ describe("v2 calldata", () => {
     });
     expect(tx.value).toBe(10n ** 18n);
     expect(tx.description).toMatch(/ETH/);
+  });
+
+  it("uses Robinhood Router02 for Robinhood v2 approvals and exits", () => {
+    const position = snap({
+      ref: { protocol: "V2", chainId: 4663, tokenId: BigInt(pair) },
+      pool: pair,
+      liquidity: 100n,
+    });
+    const exit = hydrateCalldata(planExit(position, ctx(), {}), position, owner);
+    expect(exit.txs[0]?.to).toBe(pair);
+    expect(exit.txs[1]?.to).toBe(addressesFor("robinhood").v2Router);
   });
 });
 

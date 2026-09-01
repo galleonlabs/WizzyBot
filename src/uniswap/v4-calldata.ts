@@ -51,17 +51,18 @@ export function slipMin(amount: bigint, slippageBps = DEFAULT_SLIPPAGE_BPS): big
 }
 
 /** v4 native pairs use address(0), not WETH. Snapshot may store WETH + symbol ETH. */
-export function v4Currency(token: TokenRef): Address {
-  if (token.address.toLowerCase() === ADDRESSES.nativeEth.toLowerCase()) return ADDRESSES.nativeEth;
-  if (token.symbol === "ETH" && token.address.toLowerCase() === ADDRESSES.weth.toLowerCase()) {
-    return ADDRESSES.nativeEth;
+export function v4Currency(token: TokenRef, chainId = 8453): Address {
+  const addresses = addressesFor(slugForChainId(chainId));
+  if (token.address.toLowerCase() === addresses.nativeEth.toLowerCase()) return addresses.nativeEth;
+  if (token.symbol === "ETH" && token.address.toLowerCase() === addresses.weth.toLowerCase()) {
+    return addresses.nativeEth;
   }
   return getAddress(token.address);
 }
 
 export function poolKeyFromPosition(position: PositionSnapshot, hooks: Address = ADDRESSES.nativeEth): V4PoolKey {
-  const currency0 = v4Currency(position.token0);
-  const currency1 = v4Currency(position.token1);
+  const currency0 = v4Currency(position.token0, position.ref.chainId);
+  const currency1 = v4Currency(position.token1, position.ref.chainId);
   const [c0, c1] = currency0.toLowerCase() < currency1.toLowerCase() ? [currency0, currency1] : [currency1, currency0];
   return {
     currency0: c0,
@@ -275,10 +276,16 @@ export function v4BurnTx(position: PositionSnapshot, recipient: Address, slippag
   return pmTx(encodeModifyLiquidities(actions, params), 0n, "PositionManager.modifyLiquidities burn", position.ref.chainId);
 }
 
-export function permit2ApproveTx(token: Address, spender: Address, amount: bigint, expirationSec = DEFAULT_DEADLINE_SEC): PlannedTx {
+export function permit2ApproveTx(
+  token: Address,
+  spender: Address,
+  amount: bigint,
+  expirationSec = DEFAULT_DEADLINE_SEC,
+  chainId = 8453,
+): PlannedTx {
   const expiration = Math.floor(Date.now() / 1000) + expirationSec;
   return {
-    to: ADDRESSES.permit2,
+    to: addressesFor(slugForChainId(chainId)).permit2,
     data: encodeFunctionData({
       abi: permit2Abi,
       functionName: "approve",

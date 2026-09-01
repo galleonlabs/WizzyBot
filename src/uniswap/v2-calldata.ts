@@ -1,5 +1,5 @@
 import { encodeFunctionData, getAddress, type Address } from "viem";
-import { ADDRESSES, DEFAULT_DEADLINE_SEC, DEFAULT_SLIPPAGE_BPS } from "../constants.js";
+import { DEFAULT_DEADLINE_SEC, DEFAULT_SLIPPAGE_BPS } from "../constants.js";
 import { addressesFor, slugForChainId } from "../chains.js";
 import { v2RouterAbi } from "../chain/abi.js";
 import { erc20ApproveTx } from "./calldata.js";
@@ -129,8 +129,8 @@ export function removeLiquidityTx(args: {
   };
 }
 
-export function v2ApprovePairTx(pair: Address, liquidity: bigint): PlannedTx {
-  return erc20ApproveTx(pair, ADDRESSES.v2Router, liquidity);
+export function v2ApprovePairTx(pair: Address, liquidity: bigint, chainId = 8453): PlannedTx {
+  return erc20ApproveTx(pair, addressesFor(slugForChainId(chainId)).v2Router, liquidity);
 }
 
 export function v2RemoveFromPosition(

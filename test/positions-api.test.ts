@@ -28,4 +28,10 @@ describe("positions API route", () => {
     expect(empty.error).toMatch(/wallet/i);
     expect(readFileSync(loader, "utf8")).toContain("Connect a wallet to load positions.");
   });
+
+  it("preserves Uniswap protocol identity in action requests", () => {
+    const src = readFileSync("app/api/portfolio/action/route.ts", "utf8");
+    expect(src).toContain('protocol: z.enum(["V2", "V3", "V4"]).optional()');
+    expect(src).toContain("protocol: body.protocol");
+  });
 });

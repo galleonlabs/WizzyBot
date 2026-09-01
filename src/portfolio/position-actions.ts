@@ -1,6 +1,6 @@
 import { getAddress, isAddress, type Address, type PublicClient } from "viem";
 import { addressesFor, chainOf, type ChainSlug } from "../chains.js";
-import { V3Adapter } from "../chain/positions.js";
+import { adapterFor } from "../core/protocols.js";
 import { AerodromeSlipstreamAdapter } from "../aerodrome/positions.js";
 import { aerodromeDeployment } from "../aerodrome/deployments.js";
 import {
@@ -15,7 +15,7 @@ import { recenterSameWidth } from "../core/ticks.js";
 import { getRobinhoodIndexState } from "../index/registry.js";
 import { chainCatalog, getMarketCatalog, type CuratedMarket } from "../markets/catalog.js";
 import { makePublicClient } from "../signer/broadcast.js";
-import type { PlannedTx, PositionSnapshot } from "../types.js";
+import type { PlannedTx, PositionSnapshot, Protocol } from "../types.js";
 import {
   collectCalldata,
   decreaseCalldata,
@@ -23,10 +23,14 @@ import {
   erc20TransferTx,
   increaseCalldata,
   mintCalldata,
+  nativeTransferTx,
   unwrapEthTx,
 } from "../uniswap/calldata.js";
 import { exactInV3Tx } from "../uniswap/router.js";
+import { v2ApprovePairTx, v2RemoveFromPosition } from "../uniswap/v2-calldata.js";
+import { permit2ApproveTx, v4BurnTx, v4ClaimFeesTx, v4IncreaseTx } from "../uniswap/v4-calldata.js";
 import { quoterV2Abi } from "../chain/abi.js";
+import { liquidityForAmounts } from "../core/hydrate.js";
 import type { SerializableTx } from "./allocation.js";
 
 const PLAN_TTL_MS = 8 * 60_000;
@@ -60,6 +64,7 @@ export async function planPositionAction(input: {
   chain: ChainSlug;
   tokenId: bigint;
   action: "compound" | "rebalance" | "withdraw";
+  protocol?: Protocol;
   venue?: "uniswap-v3" | "aerodrome-slipstream";
   positionManager?: string;
 }): Promise<PositionActionPlan> {
@@ -80,7 +85,9 @@ export async function planPositionAction(input: {
     if (!deploymentId) throw new Error("position manager is not in Wizzy's curated Aerodrome catalog");
     snapshot = await new AerodromeSlipstreamAdapter(client, deploymentId).readPosition(input.tokenId);
   } else {
-    snapshot = await new V3Adapter(client).readPosition(input.tokenId);
+    const adapter = adapterFor(input.protocol ?? "V3", client);
+    adapter.bindOwner?.(owner);
+    snapshot = await adapter.readPosition(input.tokenId);
   }
   if (snapshot.owner.toLowerCase() !== owner.toLowerCase()) throw new Error("wallet does not own this position");
   const configuredMarkets = input.chain === "robinhood"
@@ -89,6 +96,8 @@ export async function planPositionAction(input: {
   const configured = configuredMarkets.find((market) => positionPoolIsConfigured(snapshot, [market]));
   if (!configured) throw new Error("position pool is not in Wizzy's curated market catalog");
   if (input.action === "rebalance") {
+    if (snapshot.ref.protocol === "V2") throw new Error("Uniswap V2 positions are already full range");
+    if (snapshot.ref.protocol === "V4") throw new Error("Uniswap V4 rebalancing is not available yet");
     if (snapshot.inRange) throw new Error("position is already in range");
     if (snapshot.venue === "aerodrome-slipstream") throw new Error("Aerodrome rebalancing is not available yet");
     const feeBps = getMarketCatalog().fees.rebalanceBps;
@@ -179,10 +188,13 @@ export function positionPoolIsConfigured(
   snapshot: PositionSnapshot,
   markets: readonly CuratedMarket[],
 ): boolean {
-  return markets.some((market) =>
-    market.pool.toLowerCase() === snapshot.pool.toLowerCase()
-    && (snapshot.venue === "aerodrome-slipstream") === (market.protocol === "AERODROME_SLIPSTREAM"),
-  );
+  return markets.some((market) => {
+    const tokens = new Set([snapshot.token0.address.toLowerCase(), snapshot.token1.address.toLowerCase()]);
+    const pairMatches = tokens.has(market.token.toLowerCase()) && tokens.has(market.quoteToken.toLowerCase());
+    if (snapshot.ref.protocol === "V2" || snapshot.ref.protocol === "V4") return pairMatches;
+    return market.pool.toLowerCase() === snapshot.pool.toLowerCase()
+      && (snapshot.venue === "aerodrome-slipstream") === (market.protocol === "AERODROME_SLIPSTREAM");
+  });
 }
 
 export function buildPositionActionPlan(
@@ -192,7 +204,6 @@ export function buildPositionActionPlan(
   action: "compound" | "rebalance" | "withdraw",
   treasury: Address,
 ): PositionActionPlan {
-  if (snapshot.ref.protocol !== "V3") throw new Error("launch portfolio actions support concentrated-liquidity positions");
   if (snapshot.ref.chainId !== chainOf(chain).id) throw new Error("position chain mismatch");
   if (snapshot.owner.toLowerCase() !== owner.toLowerCase()) throw new Error("wallet does not own this position");
 
@@ -208,11 +219,8 @@ export function buildPositionActionPlan(
     : ((snapshot.amount1 + snapshot.uncollected1) * WITHDRAW_FEE_SAFETY_BPS) / BPS;
   const fee0 = bpsOf(base0, feeBps);
   const fee1 = bpsOf(base1, feeBps);
-  const transactions = action === "compound"
-    ? compoundTransactions(snapshot, owner, treasury, fee0, fee1)
-    : withdrawTransactions(snapshot, owner, treasury, fee0, fee1);
-  const positionManager = managerFor(snapshot, chain);
-  const allowedTargets = uniqueAddresses([positionManager, snapshot.token0.address, snapshot.token1.address, treasury]);
+  const { transactions, targets } = protocolTransactions(snapshot, owner, chain, action, treasury, fee0, fee1);
+  const allowedTargets = uniqueAddresses([...targets, snapshot.token0.address, snapshot.token1.address, treasury]);
   assertAllowed(transactions, allowedTargets);
 
   const now = new Date();
@@ -240,12 +248,93 @@ export function buildPositionActionPlan(
           "Fees are collected to your wallet, Wizzy's disclosed fee is transferred, and the remainder is added to the same self-custodied NFT.",
           "No swap is forced: any token amount that does not fit the current range ratio remains in your wallet.",
         ]
+      : snapshot.ref.protocol === "V2"
+        ? [
+            "Your LP tokens are redeemed and both underlying pool tokens return to your wallet.",
+            "The fee is calculated below the slippage-adjusted expected withdrawal amounts; re-plan if this quote expires.",
+          ]
       : [
           "The full position is removed and the empty NFT is burned in the same wallet batch.",
           "You receive both underlying pool tokens. Consolidating them to ETH is a separate quoted action so no hidden swap is taken.",
           "The fee is calculated below the slippage-adjusted expected withdrawal amounts; re-plan if this quote expires.",
         ],
   };
+}
+
+function protocolTransactions(
+  snapshot: PositionSnapshot,
+  owner: Address,
+  chain: ChainSlug,
+  action: "compound" | "withdraw",
+  treasury: Address,
+  fee0: bigint,
+  fee1: bigint,
+): { transactions: PlannedTx[]; targets: Address[] } {
+  if (snapshot.ref.protocol === "V2") {
+    if (action === "compound") throw new Error("Uniswap V2 fees are already reinvested in the LP token");
+    const router = addressesFor(chain).v2Router;
+    const transactions = [
+      v2ApprovePairTx(snapshot.pool, snapshot.liquidity, snapshot.ref.chainId),
+      v2RemoveFromPosition(snapshot, owner, 100, 150),
+    ];
+    appendFeeTransfers(transactions, snapshot, treasury, fee0, fee1);
+    return { transactions, targets: [router, snapshot.pool] };
+  }
+
+  if (snapshot.ref.protocol === "V4") {
+    const addresses = addressesFor(chain);
+    if (action === "withdraw") {
+      const transactions = [v4BurnTx(snapshot, owner, 150)];
+      appendFeeTransfers(transactions, snapshot, treasury, fee0, fee1);
+      return { transactions, targets: [addresses.v4PositionManager] };
+    }
+    const add0 = snapshot.uncollected0 - fee0;
+    const add1 = snapshot.uncollected1 - fee1;
+    const liquidity = liquidityForAmounts(snapshot, add0, add1);
+    if (liquidity <= 0n) throw new Error("No usable fees are ready to compound");
+    const transactions: PlannedTx[] = [v4ClaimFeesTx(snapshot, owner)];
+    appendFeeTransfers(transactions, snapshot, treasury, fee0, fee1);
+    for (const [token, amount] of [[snapshot.token0, add0], [snapshot.token1, add1]] as const) {
+      if (amount <= 0n || (token.symbol === "ETH" && token.address.toLowerCase() === addresses.weth.toLowerCase())) continue;
+      transactions.push(
+        erc20ApproveTx(token.address, addresses.permit2, amount),
+        permit2ApproveTx(token.address, addresses.v4PositionManager, amount, undefined, snapshot.ref.chainId),
+      );
+    }
+    transactions.push(v4IncreaseTx(snapshot, liquidity, add0, add1, 150));
+    return { transactions, targets: [addresses.v4PositionManager, addresses.permit2] };
+  }
+
+  return {
+    transactions: action === "compound"
+      ? compoundTransactions(snapshot, owner, treasury, fee0, fee1)
+      : withdrawTransactions(snapshot, owner, treasury, fee0, fee1),
+    targets: [managerFor(snapshot, chain)],
+  };
+}
+
+function appendFeeTransfers(
+  transactions: PlannedTx[],
+  snapshot: PositionSnapshot,
+  treasury: Address,
+  fee0: bigint,
+  fee1: bigint,
+): void {
+  if (fee0 > 0n) transactions.push(feeTransferTx(snapshot, snapshot.token0, treasury, fee0));
+  if (fee1 > 0n) transactions.push(feeTransferTx(snapshot, snapshot.token1, treasury, fee1));
+}
+
+function feeTransferTx(
+  snapshot: PositionSnapshot,
+  token: PositionSnapshot["token0"],
+  treasury: Address,
+  amount: bigint,
+): PlannedTx {
+  const addresses = addressesFor(snapshot.ref.chainId === 4663 ? "robinhood" : "base");
+  if (snapshot.ref.protocol === "V4" && token.symbol === "ETH" && token.address.toLowerCase() === addresses.weth.toLowerCase()) {
+    return nativeTransferTx(treasury, amount);
+  }
+  return erc20TransferTx(token.address, treasury, amount);
 }
 
 type RebalanceSwap = {
@@ -451,6 +540,6 @@ function assertAllowed(transactions: readonly PlannedTx[], allowedTargets: reado
   const allowed = new Set(allowedTargets.map((address) => address.toLowerCase()));
   for (const transaction of transactions) {
     if (!allowed.has(transaction.to.toLowerCase())) throw new Error(`Refuse unapproved transaction target ${transaction.to}`);
-    if (transaction.data === "0x") throw new Error(`Refuse empty transaction to ${transaction.to}`);
+    if (transaction.data === "0x" && transaction.value === 0n) throw new Error(`Refuse empty transaction to ${transaction.to}`);
   }
 }

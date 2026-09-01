@@ -403,6 +403,12 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("one atomic approval.`");
   });
 
+  it("does not promise ETH for V2 or V4 withdrawals", () => {
+    expect(portfolio).toContain("positionSettlesToEth(position)");
+    expect(portfolio).toContain('position.protocol !== "V2"');
+    expect(portfolio).toContain('actionPlan.settlement?.asset === "ETH"');
+  });
+
   it("ships wallet-scoped XP and quests tied to confirmed product actions", () => {
     expect(portfolio).toContain("<AchievementCenter");
     expect(portfolio).toContain("confirmedEvm.transactionHashes");

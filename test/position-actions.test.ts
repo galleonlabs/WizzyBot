@@ -61,6 +61,68 @@ describe("self-custodial position actions", () => {
   it("does not rebalance a position that is already earning", () => {
     expect(() => buildRebalancePositionActionPlan(snapshot(), owner, "base", TREASURY)).toThrow("already in range");
   });
+
+  it("withdraws a Robinhood V2 LP through the Robinhood router", () => {
+    const addresses = addressesFor("robinhood");
+    const market = activeMarkets("robinhood")[0]!;
+    const pair = "0x0579fA41416101b66e202F66bF3B0de5101F5b9F" as const;
+    const position = snapshot({
+      ref: { protocol: "V2", chainId: 4663, tokenId: BigInt(pair) },
+      token0: { address: market.token, symbol: market.symbol, decimals: market.tokenDecimals },
+      token1: { address: addresses.weth, symbol: "WETH", decimals: 18 },
+      pool: pair,
+      liquidity: 500_000n,
+      uncollected0: 0n,
+      uncollected1: 0n,
+    });
+    const plan = buildPositionActionPlan(position, owner, "robinhood", "withdraw", TREASURY);
+    expect(plan.transactions[0]?.to).toBe(pair);
+    expect(plan.transactions[1]?.to).toBe(addresses.v2Router);
+    expect(plan.transactions.slice(2).every((tx) => tx.description.startsWith("ERC20.transfer"))).toBe(true);
+    expect(plan.allowedTargets).toContain(addresses.v2Router);
+    expect(() => buildPositionActionPlan(position, owner, "robinhood", "compound", TREASURY)).toThrow("already reinvested");
+  });
+
+  it("claims and compounds a Base V4 position through Permit2", () => {
+    const addresses = addressesFor("base");
+    const position = snapshot({ ref: { protocol: "V4", chainId: 8453, tokenId: 88n } });
+    const plan = buildPositionActionPlan(position, owner, "base", "compound", TREASURY);
+    expect(plan.transactions[0]?.description).toContain("claim");
+    expect(plan.transactions.some((tx) => tx.to === addresses.permit2)).toBe(true);
+    expect(plan.transactions.at(-1)?.to).toBe(addresses.v4PositionManager);
+    expect(plan.transactions.at(-1)?.description).toContain("increase");
+    expect(plan.transactions.every((tx) => tx.data !== "0x")).toBe(true);
+  });
+
+  it("burns a Base V4 position before transferring the disclosed fee", () => {
+    const addresses = addressesFor("base");
+    const position = snapshot({ ref: { protocol: "V4", chainId: 8453, tokenId: 89n } });
+    const plan = buildPositionActionPlan(position, owner, "base", "withdraw", TREASURY);
+    expect(plan.transactions[0]?.to).toBe(addresses.v4PositionManager);
+    expect(plan.transactions[0]?.description).toContain("burn");
+    expect(plan.transactions.slice(1).every((tx) => tx.description.startsWith("ERC20.transfer"))).toBe(true);
+  });
+
+  it("pays V4 native ETH fees as value instead of pretending ETH is WETH", () => {
+    const addresses = addressesFor("base");
+    const position = snapshot({
+      ref: { protocol: "V4", chainId: 8453, tokenId: 91n },
+      token0: { address: addresses.weth, symbol: "ETH", decimals: 18 },
+    });
+    const plan = buildPositionActionPlan(position, owner, "base", "withdraw", TREASURY);
+    const feeTransfer = plan.transactions.find((tx) => tx.to === TREASURY);
+    expect(feeTransfer?.data).toBe("0x");
+    expect(BigInt(feeTransfer?.value ?? "0")).toBeGreaterThan(0n);
+  });
+
+  it("accepts curated meme pairs across Uniswap protocol versions", () => {
+    const market = activeMarkets("base").find((candidate) => candidate.protocol === "V3")!;
+    const position = snapshot({
+      ref: { protocol: "V4", chainId: 8453, tokenId: 90n },
+      pool: addressesFor("base").v4PoolManager,
+    });
+    expect(positionPoolIsConfigured(position, [market])).toBe(true);
+  });
 });
 
 function snapshot(overrides: Partial<PositionSnapshot> = {}): PositionSnapshot {

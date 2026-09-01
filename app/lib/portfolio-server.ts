@@ -57,6 +57,7 @@ type HostedPortfolioSurface = {
     chain: "base" | "robinhood";
     tokenId: bigint;
     action: "compound" | "rebalance" | "withdraw";
+    protocol?: "V2" | "V3" | "V4";
     venue?: "uniswap-v3" | "aerodrome-slipstream";
     positionManager?: string;
   }) => Promise<unknown>;

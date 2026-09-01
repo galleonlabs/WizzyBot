@@ -1,6 +1,7 @@
 import { getAddress, type Address } from "viem";
 import type { Protocol } from "../types.js";
 import { ADDRESSES } from "../constants.js";
+import { addressesFor, slugForChainId } from "../chains.js";
 
 export function parseProtocol(raw?: string): Protocol {
   const v = (raw ?? "v3").trim().toLowerCase();
@@ -24,10 +25,11 @@ export function pairFromTokenId(tokenId: bigint): Address {
   return getAddress(`0x${tokenId.toString(16).padStart(40, "0")}`);
 }
 
-export function writeTarget(protocol: Protocol): Address {
-  if (protocol === "V2") return ADDRESSES.v2Router;
-  if (protocol === "V4") return ADDRESSES.v4PositionManager;
-  return ADDRESSES.nfpm;
+export function writeTarget(protocol: Protocol, chainId = 8453): Address {
+  const addresses = addressesFor(slugForChainId(chainId));
+  if (protocol === "V2") return addresses.v2Router;
+  if (protocol === "V4") return addresses.v4PositionManager;
+  return addresses.nfpm;
 }
 
 export function isNativeCurrency(address: Address): boolean {

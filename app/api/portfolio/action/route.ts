@@ -10,6 +10,7 @@ const Body = z.object({
   chain: z.enum(["base", "robinhood"]),
   tokenId: z.string().regex(/^\d+$/),
   action: z.enum(["compound", "rebalance", "withdraw"]),
+  protocol: z.enum(["V2", "V3", "V4"]).optional(),
   venue: z.enum(["uniswap-v3", "aerodrome-slipstream"]).optional(),
   positionManager: z.string().optional(),
 });
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
       chain: body.chain,
       tokenId: BigInt(body.tokenId),
       action: body.action,
+      protocol: body.protocol,
       venue: body.venue,
       positionManager: body.positionManager,
     });

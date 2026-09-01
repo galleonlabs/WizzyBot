@@ -3,7 +3,7 @@ import { slugForChainId } from "../chains.js";
 import { Token } from "@uniswap/sdk-core";
 import { Pool, Position } from "@uniswap/v3-sdk";
 import { TREASURY } from "../constants.js";
-import { collectCalldata, decreaseCalldata, erc20TransferTx, increaseCalldata, mintCalldata } from "../uniswap/calldata.js";
+import { collectCalldata, decreaseCalldata, erc20TransferTx, increaseCalldata, mintCalldata, nativeTransferTx } from "../uniswap/calldata.js";
 import { v2AddFromPosition, v2RemoveFromPosition } from "../uniswap/v2-calldata.js";
 import { poolKeyFromPosition, v4BurnTx, v4ClaimFeesTx, v4DecreaseTx, v4IncreaseTx, v4MintTx } from "../uniswap/v4-calldata.js";
 import { netAfterTake } from "./fees.js";
@@ -28,7 +28,7 @@ export function availableAfterUnwind(
   return { amount0: position.uncollected0, amount1: position.uncollected1 };
 }
 
-function liquidityForAmounts(position: PositionSnapshot, add0: bigint, add1: bigint, tickLower = position.tickLower, tickUpper = position.tickUpper): bigint {
+export function liquidityForAmounts(position: PositionSnapshot, add0: bigint, add1: bigint, tickLower = position.tickLower, tickUpper = position.tickUpper): bigint {
   if (add0 === 0n && add1 === 0n) return 0n;
   const t0 = new Token(position.ref.chainId, position.token0.address, position.token0.decimals, position.token0.symbol);
   const t1 = new Token(position.ref.chainId, position.token1.address, position.token1.decimals, position.token1.symbol);
@@ -114,6 +114,10 @@ export function hydrateCalldata(receipt: ActionReceipt, position: PositionSnapsh
       return action;
     }
     if (action.kind === "transfer" && action.recipient === (receipt.treasuryFee?.recipient ?? TREASURY) && action.tokenIn && action.amountIn) {
+      const nativeToken = [position.token0, position.token1].find((token) => token.address.toLowerCase() === action.tokenIn!.toLowerCase());
+      if (protocol === "V4" && nativeToken?.symbol === "ETH") {
+        return { ...action, tx: nativeTransferTx(action.recipient, action.amountIn) };
+      }
       return { ...action, tx: erc20TransferTx(action.tokenIn, action.recipient, action.amountIn) };
     }
     if (action.kind === "swap") {

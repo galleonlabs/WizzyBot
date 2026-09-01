@@ -336,8 +336,14 @@ export function PortfolioApp() {
 
   async function preparePositionAction(position: PositionView, action: PositionActionKind) {
     if (!address || !position.tokenId || !position.chain) return;
+    const withdrawsToEth = positionSettlesToEth(position);
+    const planningVerb = action === "compound"
+      ? "Preparing to reinvest"
+      : action === "rebalance"
+        ? "Preparing a new range for"
+        : withdrawsToEth ? "Preparing an ETH withdrawal for" : "Preparing to withdraw";
     setActionPlan(null);
-    setActionState({ kind: "planning", message: `${action === "compound" ? "Preparing to reinvest" : action === "rebalance" ? "Preparing a new range for" : "Preparing to withdraw"} ${position.pair}…` });
+    setActionState({ kind: "planning", message: `${planningVerb} ${position.pair}…` });
     try {
       const response = await fetch("/api/portfolio/action", {
         method: "POST",
@@ -347,6 +353,7 @@ export function PortfolioApp() {
           chain: position.chain,
           tokenId: position.tokenId,
           action,
+          protocol: position.protocol === "V2" || position.protocol === "V3" || position.protocol === "V4" ? position.protocol : undefined,
           venue: position.venue,
           positionManager: position.positionManager,
         }),
@@ -354,7 +361,12 @@ export function PortfolioApp() {
       const payload = await readJsonPayload(response) as { plan?: AnyPositionActionPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? `Could not prepare ${action}`);
       setActionPlan(payload.plan);
-      setActionState({ kind: "ready", message: action === "compound" ? "Review the fees ready to reinvest." : action === "rebalance" ? "Review the new range before continuing." : "Review the ETH return before continuing." });
+      const message = action === "compound"
+        ? "Review the fees ready to reinvest."
+        : action === "rebalance"
+          ? "Review the new range before continuing."
+          : withdrawsToEth ? "Review the ETH return before continuing." : "Review the withdrawal before continuing.";
+      setActionState({ kind: "ready", message });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : `Could not prepare ${action}` });
       reportClientError("position-action", error);
@@ -368,6 +380,7 @@ export function PortfolioApp() {
       return;
     }
     try {
+      const settlesToEth = actionPlan.kind === "withdraw" && actionPlan.settlement?.asset === "ETH";
       setActionState({ kind: "signing", message: "Approve this position update in your wallet." });
       const confirmedEvm = await sendEvmBatch({
         owner: actionPlan.owner,
@@ -384,7 +397,7 @@ export function PortfolioApp() {
       }
       setActionState({
         kind: "submitted",
-        message: actionPlan.kind === "withdraw" ? "Your ETH is back in your wallet." : actionPlan.kind === "rebalance" ? "Your position is earning in its new range." : "Your fees are back at work.",
+        message: positionActionSuccessMessage(actionPlan, settlesToEth),
       });
       if ((actionPlan.kind === "compound" || actionPlan.kind === "rebalance") && actionPlan.chain === "robinhood" && confirmedEvm) {
         const transactionHashes = confirmedEvm.transactionHashes;
@@ -971,15 +984,15 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
   const summaryValueEth = positions.reduce((total, position) => total + (positionValueEth(position) ?? 0), 0);
   const summaryFeesEth = positions.reduce((total, position) => total + (positionFeesEth(position) ?? 0), 0);
   const showPositions = authenticated && positions.length > 0;
-  const settlement = actionPlan && "settlement" in actionPlan ? actionPlan.settlement : undefined;
+  const settlement = actionPlan?.settlement;
   return (
     <section className={`position-ledger ${authenticated ? "" : "is-disconnected"}`} id="positions">
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
-          {actionState.kind === "submitted" ? <SuccessCelebration label={actionPlan?.kind === "withdraw" ? "ETH returned" : actionPlan?.kind === "rebalance" ? "Position rebalanced" : "Fees compounded"} /> : null}
+          {actionState.kind === "submitted" ? <SuccessCelebration label={positionActionSuccessLabel(actionPlan)} /> : null}
           <div className="action-copy"><b>{positionActionTitle(actionPlan, actionState)}</b><p>{positionActionDescription(actionPlan, actionState, settlement)}</p></div>
           {actionPlan && actionState.kind === "ready" ? <span>{formatServiceFee(actionPlan.serviceFeeBps)}</span> : null}
-          <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>{actionPlan?.kind === "withdraw" ? "Withdraw to ETH" : actionPlan?.kind === "rebalance" ? "Rebalance" : "Compound"}</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting"}>Close</button></div>
+          <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>{positionActionButtonLabel(actionPlan)}</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting"}>Close</button></div>
         </section>
       ) : null}
       {!authenticated ? <PortfolioEmpty variant="disconnected" onPrimary={onStart} /> : null}
@@ -1013,9 +1026,13 @@ function PositionActions({ position, onAction }: {
   const primaryAction: PositionActionKind = needsRebalance ? "rebalance" : "compound";
   const primaryDisabled = position.closed || (needsRebalance && !canRebalance);
   return <span className="position-actions">
-    <button type="button" onClick={() => onAction(position, primaryAction)} disabled={primaryDisabled} title={needsRebalance && !canRebalance ? "Rebalancing is not available for this pool yet" : undefined}>{needsRebalance ? "Rebalance" : "Compound"}</button>
-    <button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{position.chain === "robinhood" ? "Withdraw to ETH" : "Withdraw"}</button>
+    {position.protocol !== "V2" ? <button type="button" onClick={() => onAction(position, primaryAction)} disabled={primaryDisabled} title={needsRebalance && !canRebalance ? "Rebalancing is not available for this pool yet" : undefined}>{needsRebalance ? "Rebalance" : "Compound"}</button> : null}
+    <button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button>
   </span>;
+}
+
+function positionSettlesToEth(position: PositionView): boolean {
+  return position.chain === "robinhood" && position.protocol === "V3" && position.venue !== "aerodrome-slipstream";
 }
 
 function positionTokenImage(position: PositionView, markets: MarketEntry[], stats: Map<string, MarketStats>): string | null | undefined {
@@ -1042,13 +1059,31 @@ function positionVenueLabel(position: PositionView): string {
 function positionActionTitle(plan: AnyPositionActionPlan | null, state: PlanState): string {
   if (!plan) return "Preparing your position";
   if (state.kind === "submitted") {
-    if (plan.kind === "withdraw") return `${plan.pair} withdrawn to ETH`;
+    if (plan.kind === "withdraw") return plan.settlement?.asset === "ETH" ? `${plan.pair} withdrawn to ETH` : `${plan.pair} withdrawn`;
     if (plan.kind === "rebalance") return `${plan.pair} rebalanced`;
     return `${plan.pair} fees compounded`;
   }
-  if (plan.kind === "withdraw") return `Withdraw ${plan.pair} to ETH`;
+  if (plan.kind === "withdraw") return plan.settlement?.asset === "ETH" ? `Withdraw ${plan.pair} to ETH` : `Withdraw ${plan.pair}`;
   if (plan.kind === "rebalance") return `Rebalance ${plan.pair}`;
   return `Compound ${plan.pair} fees`;
+}
+
+function positionActionButtonLabel(plan: AnyPositionActionPlan | null): string {
+  if (plan?.kind === "withdraw") return plan.settlement?.asset === "ETH" ? "Withdraw to ETH" : "Withdraw";
+  if (plan?.kind === "rebalance") return "Rebalance";
+  return "Compound";
+}
+
+function positionActionSuccessLabel(plan: AnyPositionActionPlan | null): string {
+  if (plan?.kind === "withdraw") return plan.settlement?.asset === "ETH" ? "ETH returned" : "Position withdrawn";
+  if (plan?.kind === "rebalance") return "Position rebalanced";
+  return "Fees compounded";
+}
+
+function positionActionSuccessMessage(plan: AnyPositionActionPlan, settlesToEth: boolean): string {
+  if (plan.kind === "withdraw") return settlesToEth ? "Your ETH is back in your wallet." : "Your pool tokens are back in your wallet.";
+  if (plan.kind === "rebalance") return "Your position is earning in its new range.";
+  return "Your fees are back at work.";
 }
 
 function positionActionDescription(

@@ -309,7 +309,7 @@ function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `Permit2.approve PositionManager for ${quote.symbol0}`,
       tokenIn: quote.token0,
       amountIn: quote.amount0,
-      tx: permit2ApproveTx(quote.token0, addresses.v4PositionManager, quote.amount0),
+      tx: permit2ApproveTx(quote.token0, addresses.v4PositionManager, quote.amount0, undefined, quote.chainId),
     });
   }
   if (needApprove1) {
@@ -325,7 +325,7 @@ function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
       description: `Permit2.approve PositionManager for ${quote.symbol1}`,
       tokenIn: quote.token1,
       amountIn: quote.amount1,
-      tx: permit2ApproveTx(quote.token1, addresses.v4PositionManager, quote.amount1),
+      tx: permit2ApproveTx(quote.token1, addresses.v4PositionManager, quote.amount1, undefined, quote.chainId),
     });
   }
   const currency0 = quote.useNative && quote.nativeIsToken0 ? addresses.nativeEth : quote.token0;

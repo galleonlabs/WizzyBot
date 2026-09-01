@@ -6,6 +6,7 @@ import { V3Adapter, amountsForPosition, readTokenMeta } from "../chain/positions
 import { v2FactoryAbi, v2PairAbi, v4PositionManagerAbi, v4StateViewAbi } from "../chain/abi.js";
 import { assertUnhooked, decodePositionInfo, loadV4Pool, tokenIdSalt, v4PoolId } from "../chain/v4.js";
 import { uncollectedFees } from "../chain/fees-onchain.js";
+import { chainCatalog } from "../markets/catalog.js";
 import { isInRange, percentThroughRange } from "./range.js";
 import { pairFromTokenId } from "./protocol.js";
 import type { PositionRef, PositionSnapshot, Protocol, ProtocolAdapter, TokenRef } from "../types.js";
@@ -20,8 +21,16 @@ export const V2_WATCH_PAIRS: readonly [Address, Address][] = [[ADDRESSES.weth, A
 
 export function v2WatchPairsFor(slug: ChainSlug = "base"): readonly [Address, Address][] {
   const a = addressesFor(slug);
-  if (slug === "robinhood" && a.usdg) return [[a.weth, a.usdg]];
-  return [[a.weth, a.usdc ?? ADDRESSES.usdc]];
+  const candidates: [Address, Address][] = [
+    slug === "robinhood" && a.usdg ? [a.weth, a.usdg] : [a.weth, a.usdc ?? ADDRESSES.usdc],
+    ...chainCatalog(slug).markets.map((market): [Address, Address] => [market.token, market.quoteToken]),
+  ];
+  const unique = new Map<string, [Address, Address]>();
+  for (const pair of candidates) {
+    const key = pair.map((address) => address.toLowerCase()).sort().join(":");
+    unique.set(key, pair);
+  }
+  return [...unique.values()];
 }
 
 function emptySnap(over: Partial<PositionSnapshot> & Pick<PositionSnapshot, "ref" | "owner" | "pool">): PositionSnapshot {
@@ -71,6 +80,7 @@ export class V2Protocol implements ProtocolAdapter {
     const slug = slugOfClient(this.client);
     const addrs = addressesFor(slug);
     const refs: PositionRef[] = [];
+    const seenPairs = new Set<string>();
     for (const [a, b] of v2WatchPairsFor(slug)) {
       const pair = await this.client.readContract({
         address: addrs.v2Factory,
@@ -79,6 +89,8 @@ export class V2Protocol implements ProtocolAdapter {
         args: [a, b],
       });
       if (pair === addrs.nativeEth) continue;
+      if (seenPairs.has(pair.toLowerCase())) continue;
+      seenPairs.add(pair.toLowerCase());
       const bal = await this.client.readContract({
         address: pair,
         abi: v2PairAbi,

@@ -27,7 +27,7 @@ Wizzy makes meme-market liquidity feel as simple as a swap. Connect an external 
 
 The finished product must support Uniswap-style V2, V3, and V4 positions on both chains wherever the required canonical deployments exist. That means creation, discovery, fee collection, liquidity changes, range management where applicable, and full withdrawal. Protocol differences belong in the planner and position detail, not in three separate products.
 
-Current support is incomplete: the live curated creation catalog is V3 and Aerodrome Slipstream, while V2/V4 readers and action planners exist. Do not describe V2 or V4 as fully supported until the wallet path has been proven end to end on each chain.
+Current support includes reviewed creation routes, position discovery, and wallet action plans for V2, V3, and V4 on both chains. V2 fees stay inside the LP token, so there is no separate collect or compound action; withdrawal realizes the position. Pool availability still depends on the reviewed catalog, and every transaction remains subject to user review and wallet approval.
 
 ## Curation
 
@@ -60,7 +60,7 @@ Wizzy charges 0.15% when liquidity is added, withdrawn, or rebalanced, and 2% of
 
 ## Evidence and limits
 
-- The repository has Base and Robinhood chain definitions, V2/V3/V4 position readers and action calldata, V3 and Aerodrome creation planners, Relay funding, fee logic, curation policy, and wallet-plan tests.
+- The repository has Base and Robinhood chain definitions, V2/V3/V4 creation planners, position readers and action calldata, Aerodrome support, Relay funding, fee logic, curation policy, and wallet-plan tests.
 - Market statistics and imagery come from onchain reads and GeckoTerminal. Fomo is a discovery link, not a liquidity venue or endorsement.
 - There is no audited proprietary liquidity contract, verified performance history, legal opinion, or third-party endorsement. Do not imply otherwise.
 

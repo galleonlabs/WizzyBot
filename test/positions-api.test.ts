@@ -34,4 +34,16 @@ describe("positions API route", () => {
     expect(src).toContain('protocol: z.enum(["V2", "V3", "V4"]).optional()');
     expect(src).toContain("protocol: body.protocol");
   });
+
+  it("reads V2, V3, V4, and curated Aerodrome positions without silently forcing V3", () => {
+    const statusRoute = readFileSync(tokenRoute, "utf8");
+    const hostedLoader = readFileSync(loader, "utf8");
+    const hostedSurface = readFileSync("src/surfaces/hosted.ts", "utf8");
+    expect(statusRoute).toContain("protocolFromRequest");
+    expect(statusRoute).toContain("positionManager");
+    expect(hostedLoader).toContain("protocol: EvmProtocol");
+    expect(hostedSurface).toContain("AERODROME_DEPLOYMENTS");
+    expect(hostedSurface).toContain("connectRead(slug, { protocol, positionManager })");
+    expect(hostedSurface).not.toContain("new V3Adapter(client)");
+  });
 });

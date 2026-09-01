@@ -430,6 +430,7 @@ export function buildRebalancePositionActionPlan(
   treasury: Address,
   swap?: RebalanceSwap,
 ): PositionActionPlan {
+  if (snapshot.ref.protocol === "V2") throw new Error("Uniswap V2 positions are already full range");
   if (snapshot.inRange) throw new Error("position is already in range");
   const feeBps = getMarketCatalog().fees.rebalanceBps;
   const fee0 = bpsOf(snapshot.amount0, feeBps);

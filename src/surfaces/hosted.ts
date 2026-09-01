@@ -2,8 +2,8 @@ import { getAddress, isAddress, type Address } from "viem";
 import { loadEnv } from "../config/env.js";
 import { loadConfig, policyFor } from "../config/policy.js";
 import { makePublicClient } from "../signer/broadcast.js";
-import { V3Adapter } from "../chain/positions.js";
 import { AerodromeSlipstreamAdapter } from "../aerodrome/positions.js";
+import { AERODROME_DEPLOYMENTS } from "../aerodrome/deployments.js";
 import { snapshotUsd, usdPricesForPosition } from "../chain/prices.js";
 import { adapterFor } from "../core/protocols.js";
 import { formatReceipt, planCompound, planExit, planRerange, type PlanContext } from "../core/actions.js";
@@ -15,7 +15,7 @@ import { runMintFlow } from "../core/mint-flow.js";
 import { hydrateCalldata } from "../core/hydrate.js";
 import { decideForPosition, runOnce } from "../keeper/loop.js";
 import { StdoutSink } from "../keeper/alerts.js";
-import type { ActionReceipt, PositionSnapshot } from "../types.js";
+import type { ActionReceipt, PositionSnapshot, Protocol, ProtocolAdapter } from "../types.js";
 import { recenterSameWidth } from "../core/ticks.js";
 import {
   confirmFromMint,
@@ -24,7 +24,7 @@ import {
   serializeMintView,
   serializeProjectedRange,
 } from "../core/view.js";
-import { parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
+import { addressesFor, parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
 import { scoutMarkets as getMarketScout } from "../markets/scout.js";
 import { chainCatalog } from "../markets/catalog.js";
 
@@ -53,15 +53,41 @@ function slugOf(chain?: string | ChainSlug): ChainSlug {
   return parseChainSlug(chain ?? "base");
 }
 
-export function connectRead(chain: ChainSlug | string = "base") {
+type PositionSelector = {
+  protocol?: Protocol;
+  positionManager?: string;
+};
+
+function positionAdapter(
+  client: ReturnType<typeof makePublicClient>,
+  chain: ChainSlug,
+  selector: PositionSelector = {},
+): ProtocolAdapter {
+  const protocol = selector.protocol ?? "V3";
+  if (protocol !== "V3" || !selector.positionManager) return adapterFor(protocol, client);
+  if (!isAddress(selector.positionManager)) throw new Error("positionManager must be a valid address");
+  const manager = getAddress(selector.positionManager);
+  if (chain === "base") {
+    const deployment = Object.values(AERODROME_DEPLOYMENTS)
+      .find((candidate) => candidate.positionManager.toLowerCase() === manager.toLowerCase());
+    if (deployment) return new AerodromeSlipstreamAdapter(client, deployment.id);
+  }
+  const expectedManager = addressesFor(chain).nfpm;
+  if (manager.toLowerCase() !== expectedManager.toLowerCase()) {
+    throw new Error("position manager is not supported on this chain");
+  }
+  return adapterFor("V3", client);
+}
+
+export function connectRead(chain: ChainSlug | string = "base", selector: PositionSelector = {}) {
   const slug = slugOf(chain);
   const env = loadEnv();
   const client = makePublicClient(env.rpcByChain[slug], viemChainFor(slug));
-  return { env, client, adapter: new V3Adapter(client), chain: slug };
+  return { env, client, adapter: positionAdapter(client, slug, selector), chain: slug };
 }
 
-export async function connectHosted(ownerArg?: string, chain: ChainSlug | string = "base") {
-  const { env, client, adapter, chain: slug } = connectRead(chain);
+export async function connectHosted(ownerArg?: string, chain: ChainSlug | string = "base", selector: PositionSelector = {}) {
+  const { env, client, adapter, chain: slug } = connectRead(chain, selector);
   let owner: Address | undefined;
   if (ownerArg && isAddress(ownerArg)) owner = getAddress(ownerArg);
   if (!owner) {
@@ -156,13 +182,28 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
   return jsonSafe({ owner, chain: slug, count: out.length, positions: out });
 }
 
-export async function statusPosition(tokenId: string, chain: ChainSlug | string = "base") {
+export async function statusPosition(
+  tokenId: string,
+  chain: ChainSlug | string = "base",
+  protocol: Protocol = "V3",
+  positionManager?: string,
+) {
   const slug = slugOf(chain);
-  const { adapter, client, env } = connectRead(slug);
+  const { adapter, client, env } = connectRead(slug, { protocol, positionManager });
   const id = BigInt(tokenId);
   const snap = await adapter.readPosition(id);
   const { card, view } = await liveViewFor(snap, client, env.ethUsd);
-  return jsonSafe({ card: formatCard(card), view, tokenId, owner: snap.owner, chain: slug, chainId: snap.ref.chainId });
+  return jsonSafe({
+    card: formatCard(card),
+    view,
+    tokenId,
+    owner: snap.owner,
+    chain: slug,
+    chainId: snap.ref.chainId,
+    protocol: snap.ref.protocol,
+    venue: snap.venue ?? snap.ref.venue,
+    positionManager: snap.positionManager ?? snap.ref.positionManager,
+  });
 }
 
 async function planContext(
@@ -220,10 +261,11 @@ export async function compoundPosition(input: {
   noFee?: boolean;
   feeSource?: "fees" | "notional";
   chain?: ChainSlug | string;
+  protocol?: Protocol;
 }) {
   const live = assertWriteAllowed(input);
   const slug = slugOf(input.chain);
-  const { adapter, owner } = await connectHosted(input.owner, slug);
+  const { adapter, owner } = await connectHosted(input.owner, slug, { protocol: input.protocol });
   const snap = await adapter.readPosition(BigInt(input.tokenId));
   const ctx = await planContext(snap, owner, live, "compound", { ...input, chain: slug });
   const receipt = planCompound(snap, ctx);
@@ -245,10 +287,11 @@ export async function rangePosition(input: {
   feeSource?: "fees" | "notional";
   oorPercent?: number;
   chain?: ChainSlug | string;
+  protocol?: Protocol;
 }) {
   const live = assertWriteAllowed(input);
   const slug = slugOf(input.chain);
-  const { adapter, owner } = await connectHosted(input.owner, slug);
+  const { adapter, owner } = await connectHosted(input.owner, slug, { protocol: input.protocol });
   const snap = await adapter.readPosition(BigInt(input.tokenId));
   const policy = policyFor(loadConfig(), snap.ref.tokenId);
   const ctx = await planContext(snap, owner, live, "rerange", { ...input, chain: slug });
@@ -288,10 +331,11 @@ export async function exitPosition(input: {
   exitPrice?: number;
   swapTo?: string;
   chain?: ChainSlug | string;
+  protocol?: Protocol;
 }) {
   const live = assertWriteAllowed(input);
   const slug = slugOf(input.chain);
-  const { adapter, owner } = await connectHosted(input.owner, slug);
+  const { adapter, owner } = await connectHosted(input.owner, slug, { protocol: input.protocol });
   const snap = await adapter.readPosition(BigInt(input.tokenId));
   const policy = policyFor(loadConfig(), snap.ref.tokenId);
   const ctx = await planContext(snap, owner, live, "exit", { ...input, chain: slug });
@@ -327,6 +371,7 @@ export async function mintPosition(input: {
   amount0?: string;
   amount1?: string;
   chain?: ChainSlug | string;
+  protocol?: Protocol;
 }) {
   const live = assertWriteAllowed(input);
   const slug = slugOf(input.chain);
@@ -337,6 +382,7 @@ export async function mintPosition(input: {
     token0: input.token0,
     token1: input.token1,
     fee: input.fee,
+    protocol: input.protocol,
     widthPct: input.widthPct,
     tickLower: input.tickLower,
     tickUpper: input.tickUpper,

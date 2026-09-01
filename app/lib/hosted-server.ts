@@ -1,6 +1,8 @@
 import { createRequire } from "node:module";
 import type { ChainSlug } from "./chains";
 
+type EvmProtocol = "V2" | "V3" | "V4";
+
 /**
  * Server-only loader. Same CJS path eve tools use.
  * Do not import this from client components.
@@ -12,7 +14,7 @@ export type HostedSurface = {
     positions?: unknown[];
     chain?: string;
   }>;
-  statusPosition: (tokenId: string, chain?: ChainSlug) => Promise<unknown>;
+  statusPosition: (tokenId: string, chain?: ChainSlug, protocol?: EvmProtocol, positionManager?: string) => Promise<unknown>;
 };
 
 function loadHosted(): HostedSurface {
@@ -59,9 +61,14 @@ export async function fetchPositionList(owner?: string, chain: ChainSlug = "base
   }
 }
 
-export async function fetchPositionStatus(tokenId: string, chain: ChainSlug = "base") {
+export async function fetchPositionStatus(
+  tokenId: string,
+  chain: ChainSlug = "base",
+  protocol: EvmProtocol = "V3",
+  positionManager?: string,
+) {
   if (!tokenId.trim()) {
     throw new Error("tokenId is required");
   }
-  return hosted.statusPosition(tokenId.trim(), chain);
+  return hosted.statusPosition(tokenId.trim(), chain, protocol, positionManager);
 }

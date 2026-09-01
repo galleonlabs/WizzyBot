@@ -743,7 +743,11 @@ export function PortfolioApp() {
                   </div>
                   <IndexShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
                 </div>
-                {indexLedger}
+            </section>
+          ) : null}
+          {tab === "overview" ? (
+            <section className="index-main markets-view home-markets">
+              {indexLedger}
             </section>
           ) : (
             <section className="index-main markets-view">

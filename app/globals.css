@@ -1410,3 +1410,7 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
   .zap-controls { flex-direction: column; align-items: stretch; }
   .zap-cta { min-width: 0; }
 }
+
+/* Market-first home */
+.home-markets { padding-top: 0; }
+.index-shell[data-view="overview"] .index-hero { padding-bottom: 8px; }

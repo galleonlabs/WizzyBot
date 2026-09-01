@@ -267,7 +267,7 @@ export type DualChainPlan = {
 };
 
 export type PositionActionPlan = {
-  kind: "compound" | "rebalance" | "withdraw";
+  kind: "collect" | "compound" | "rebalance" | "withdraw";
   owner: `0x${string}`;
   chain: ChainSlug;
   chainId: number;

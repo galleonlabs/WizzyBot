@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { useAccount, useConfig, useConnect, useDisconnect, type Connector } from "wagmi";
 import { createPortal } from "react-dom";
 import { formatEther, parseEther } from "viem";
-import { lightRowToView, priceLabel, type PositionView } from "./lib/cards";
+import { compositionShares, lightRowToView, priceLabel, type PositionView } from "./lib/cards";
 import { readJsonPayload } from "./lib/api-payload";
 import { positionFeesEth, positionValueEth, positionValueUsd } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
@@ -30,7 +30,7 @@ type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" |
 type BalanceState = { kind: "idle" | "loading" | "ready" | "error"; balanceWei?: string };
 type ChainBalances = Record<ChainSlug, BalanceState>;
 type AnyPositionActionPlan = PositionActionPlan;
-type PositionActionKind = "compound" | "rebalance" | "withdraw";
+type PositionActionKind = "collect" | "compound" | "rebalance" | "withdraw";
 type MarketChain = ChainSlug | "solana";
 type MarketEntry = {
   market: CuratedMarket;
@@ -325,7 +325,9 @@ export function PortfolioApp() {
   async function preparePositionAction(position: PositionView, action: PositionActionKind) {
     if (!address || !position.tokenId || !position.chain) return;
     const withdrawsToEth = positionSettlesToEth(position);
-    const planningVerb = action === "compound"
+    const planningVerb = action === "collect"
+      ? "Preparing to collect fees from"
+      : action === "compound"
       ? "Preparing to reinvest"
       : action === "rebalance"
         ? "Preparing a new range for"
@@ -349,7 +351,9 @@ export function PortfolioApp() {
       const payload = await readJsonPayload(response) as { plan?: AnyPositionActionPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? `Could not prepare ${action}`);
       setActionPlan(payload.plan);
-      const message = action === "compound"
+      const message = action === "collect"
+        ? "Review the fees returning to your wallet."
+        : action === "compound"
         ? "Review the fees ready to reinvest."
         : action === "rebalance"
           ? "Review the new range before continuing."
@@ -396,7 +400,7 @@ export function PortfolioApp() {
           transactionHashes,
         });
       }
-      trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : actionPlan.kind === "rebalance" ? "Rebalance Confirmed" : "Compound Confirmed", { chainId: actionPlan.chainId });
+      trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : actionPlan.kind === "rebalance" ? "Rebalance Confirmed" : actionPlan.kind === "collect" ? "Fees Collected" : "Compound Confirmed", { chainId: actionPlan.chainId });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : "Wallet submission failed" });
       reportClientError("position-action", error);
@@ -971,46 +975,173 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
   onExecute: () => void;
   onCancel: () => void;
 }) {
+  const [managedKey, setManagedKey] = useState<string | null>(null);
   const showPositions = authenticated && positions.length > 0;
+  const managedPosition = managedKey ? positions.find((position) => positionKey(position) === managedKey) ?? null : null;
   const settlement = actionPlan?.settlement;
+  const actionBusy = actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting";
+
+  useEffect(() => {
+    if (!managedPosition) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !actionBusy) {
+        onCancel();
+        setManagedKey(null);
+        return;
+      }
+      if (event.key === "Tab") {
+        const focusable = [...document.querySelectorAll<HTMLButtonElement>(".position-manager button:not(:disabled)")];
+        if (!focusable.length) return;
+        const first = focusable[0]!;
+        const last = focusable.at(-1)!;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [actionBusy, managedPosition, onCancel]);
+
+  function closeManager() {
+    if (actionBusy) return;
+    onCancel();
+    setManagedKey(null);
+  }
+
   return (
     <section className={`position-ledger ${authenticated ? "" : "is-disconnected"}`} id="positions">
-      {actionState.kind !== "idle" ? (
-        <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
-          {actionState.kind === "submitted" ? <SuccessCelebration label={positionActionSuccessLabel(actionPlan)} /> : null}
-          <div className="action-copy"><b>{positionActionTitle(actionPlan, actionState)}</b><p>{positionActionDescription(actionPlan, actionState, settlement)}</p></div>
-          {actionPlan && actionState.kind === "ready" ? <span>{formatServiceFee(actionPlan.serviceFeeBps)}</span> : null}
-          <div className="action-buttons">{actionState.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>{positionActionButtonLabel(actionPlan)}</button> : null}<button type="button" onClick={onCancel} disabled={actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting"}>Close</button></div>
-        </section>
-      ) : null}
+      {actionState.kind !== "idle" && !managedPosition ? <PositionActionReview plan={actionPlan} state={actionState} settlement={settlement} onExecute={onExecute} onCancel={onCancel} /> : null}
       {!authenticated ? <PortfolioEmpty variant="disconnected" onPrimary={onStart} /> : null}
       {authenticated && (state === "idle" || state === "loading") ? <PortfolioEmpty variant="loading" /> : null}
       {authenticated && state === "error" ? <PortfolioEmpty variant="error" onPrimary={onRetry} /> : null}
       {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" onPrimary={onStart} /> : null}
-      {showPositions ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
+      {showPositions ? <div className="position-list">{positions.map((position) => <article key={positionKey(position)}>
         <span className="position-pair"><TokenIcon symbol={position.symbol0} src={positionTokenImage(position, markets, stats)} /><span><b>{position.pair}</b><small>{position.chainLabel} · {positionVenueLabel(position)}</small></span></span>
         <span><small>Position value</small><b>{positionValueLabel(position)}</b></span>
         <span><small>Ready to collect</small><b>{positionFeesLabel(position)}</b></span>
-        <span><small>Fee APR</small><b>{formatFeeAprFraction(position.feeApr ?? null)}</b></span>
-        <PositionRange position={position} />
-        <PositionActions position={position} onAction={onAction} />
+        <PositionRangeStatus position={position} />
+        <button className="position-manage" type="button" onClick={() => { onCancel(); setManagedKey(positionKey(position)); }}>Manage</button>
       </article>)}</div> : null}
+      {managedPosition && typeof document !== "undefined" ? createPortal(
+        <PositionManager
+          position={managedPosition}
+          image={positionTokenImage(managedPosition, markets, stats)}
+          actionPlan={actionPlan}
+          actionState={actionState}
+          onAction={onAction}
+          onExecute={onExecute}
+          onCancel={onCancel}
+          onClose={closeManager}
+        />,
+        document.body,
+      ) : null}
     </section>
   );
 }
 
-function PositionActions({ position, onAction }: {
-  position: PositionView;
-  onAction: (position: PositionView, action: PositionActionKind) => void;
+function PositionActionReview({ plan, state, settlement, onExecute, onCancel }: {
+  plan: AnyPositionActionPlan | null;
+  state: PlanState;
+  settlement: PositionActionPlan["settlement"] | undefined;
+  onExecute: () => void;
+  onCancel: () => void;
 }) {
-  const needsRebalance = !position.inRange;
-  const canRebalance = position.protocol === "V3" && position.chain !== "solana" && position.venue !== "aerodrome-slipstream";
-  const primaryAction: PositionActionKind = needsRebalance ? "rebalance" : "compound";
-  const primaryDisabled = position.closed || (needsRebalance && !canRebalance);
-  return <span className="position-actions">
-    {position.protocol !== "V2" ? <button type="button" onClick={() => onAction(position, primaryAction)} disabled={primaryDisabled} title={needsRebalance && !canRebalance ? "Rebalancing is not available for this pool yet" : undefined}>{needsRebalance ? "Rebalance" : "Compound"}</button> : null}
-    <button type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button>
-  </span>;
+  const busy = state.kind === "planning" || state.kind === "signing" || state.kind === "waiting";
+  return <section className={`action-preview is-${state.kind}`} aria-live="polite">
+    {state.kind === "submitted" ? <SuccessCelebration label={positionActionSuccessLabel(plan)} /> : null}
+    <div className="action-copy"><b>{positionActionTitle(plan, state)}</b><p>{positionActionDescription(plan, state, settlement)}</p></div>
+    {plan && state.kind === "ready" ? <span>{plan.serviceFeeBps === 0 ? "No Wizzy fee" : formatServiceFee(plan.serviceFeeBps)}</span> : null}
+    <div className="action-buttons">{state.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>{positionActionButtonLabel(plan)}</button> : null}<button type="button" onClick={onCancel} disabled={busy}>Close</button></div>
+  </section>;
+}
+
+function PositionManager({ position, image, actionPlan, actionState, onAction, onExecute, onCancel, onClose }: {
+  position: PositionView;
+  image?: string | null;
+  actionPlan: AnyPositionActionPlan | null;
+  actionState: PlanState;
+  onAction: (position: PositionView, action: PositionActionKind) => void;
+  onExecute: () => void;
+  onCancel: () => void;
+  onClose: () => void;
+}) {
+  const canCollect = position.protocol !== "V2" && hasCollectibleFees(position) && !position.closed;
+  const canRebalance = position.protocol === "V3" && !position.inRange && position.chain !== "solana" && position.venue !== "aerodrome-slipstream" && !position.closed;
+  const { share0, share1 } = compositionShares(position);
+  return <div className="position-manager-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="position-manager" role="dialog" aria-modal="true" aria-labelledby="position-manager-title">
+      <header className="position-manager-header">
+        <span className="position-pair"><TokenIcon symbol={position.symbol0} src={image} /><span><b id="position-manager-title">{position.pair}</b><small>{position.chainLabel} · {positionVenueLabel(position)} · {position.feeLabel}</small></span></span>
+        <button className="position-manager-close" type="button" onClick={onClose} aria-label="Close position manager" autoFocus>Close</button>
+      </header>
+      <div className="position-manager-scroll">
+        <section className="position-manager-value">
+          <small>Position value</small>
+          <strong>{positionValueLabel(position)}</strong>
+          <span className={`range-status is-${position.status}`}>{position.status === "in-range" ? "In range" : position.status === "oor" ? "Out of range" : "Closed"}</span>
+        </section>
+        <PositionRangeChart position={position} />
+        <dl className="position-manager-stats">
+          <div><dt>Fees ready</dt><dd className={hasCollectibleFees(position) ? "positive" : ""}>{positionFeesLabel(position)}</dd></div>
+          <div><dt>Fee APR</dt><dd>{formatFeeAprFraction(position.feeApr ?? null)}</dd></div>
+        </dl>
+        <section className="position-composition" aria-label="Position composition">
+          <header><b>Position</b><small>Current token mix</small></header>
+          <span className="composition-track" aria-hidden="true"><i style={{ width: `${share0}%` }} /><i style={{ width: `${share1}%` }} /></span>
+          <dl><div><dt>{position.symbol0}</dt><dd>{position.amount0}</dd></div><div><dt>{position.symbol1}</dt><dd>{position.amount1}</dd></div></dl>
+        </section>
+        {actionState.kind !== "idle" ? <PositionActionReview plan={actionPlan} state={actionState} settlement={actionPlan?.settlement} onExecute={onExecute} onCancel={onCancel} /> : null}
+      </div>
+      <footer className="position-manager-actions">
+        {position.protocol === "V2" ? <p>V2 fees stay invested in the LP token automatically.</p> : null}
+        {canCollect ? <button className="position-primary-action" type="button" onClick={() => onAction(position, "collect")}>Collect fees</button> : null}
+        {position.protocol !== "V2" && !position.closed ? <button type="button" onClick={() => onAction(position, "compound")} disabled={!hasCollectibleFees(position)}>Compound</button> : null}
+        {canRebalance ? <button type="button" onClick={() => onAction(position, "rebalance")}>Rebalance</button> : null}
+        <button className="position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button>
+      </footer>
+    </section>
+  </div>;
+}
+
+function PositionRangeChart({ position }: { position: PositionView }) {
+  const positionPct = rangePositionPercent(position);
+  const status = position.status === "in-range" ? "In range" : position.status === "oor" ? "Out of range" : "Closed";
+  return <section className={`position-range-chart is-${position.status} ${position.fullRange ? "is-full-range" : ""}`} style={{ "--range-position": `${positionPct}%` } as CSSProperties} aria-label={`${status}. Current price ${priceLabel(position.price)}.`}>
+    <header><div><b>{position.fullRange ? "Full range" : "Your price range"}</b><small>{position.fullRange ? "Always active while the pool trades" : `${priceLabel(position.priceMin)} – ${priceLabel(position.priceMax, position.priceMax === null)}`}</small></div><strong>{priceLabel(position.price)}</strong></header>
+    <div className="range-chart-canvas" aria-hidden="true"><span className="range-chart-area" /><span className="range-chart-current"><i /></span></div>
+    <footer><small>{position.fullRange ? "0" : priceLabel(position.priceMin)}</small><b>Current price</b><small>{position.fullRange ? "∞" : priceLabel(position.priceMax, position.priceMax === null)}</small></footer>
+  </section>;
+}
+
+function PositionRangeStatus({ position }: { position: PositionView }) {
+  const label = position.status === "in-range" ? "In range" : position.status === "oor" ? "Out of range" : "Closed";
+  return <span className={`position-range-status is-${position.status}`}><i />{position.fullRange ? "Full range" : label}</span>;
+}
+
+function positionKey(position: PositionView): string {
+  return `${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`;
+}
+
+function hasCollectibleFees(position: PositionView): boolean {
+  if ((position.feesUsd ?? 0) > 0) return true;
+  return [position.uncollected0, position.uncollected1].some((amount) => Number(amount.replaceAll(",", "")) > 0);
+}
+
+function rangePositionPercent(position: PositionView): number {
+  if (position.fullRange || position.closed) return 50;
+  if (position.tickCurrent < position.tickLower) return 0;
+  if (position.tickCurrent > position.tickUpper) return 100;
+  return Math.max(0, Math.min(100, position.percentThroughRange));
 }
 
 function positionSettlesToEth(position: PositionView): boolean {
@@ -1043,28 +1174,33 @@ function positionActionTitle(plan: AnyPositionActionPlan | null, state: PlanStat
   if (state.kind === "submitted") {
     if (plan.kind === "withdraw") return plan.settlement?.asset === "ETH" ? `${plan.pair} withdrawn to ETH` : `${plan.pair} withdrawn`;
     if (plan.kind === "rebalance") return `${plan.pair} rebalanced`;
+    if (plan.kind === "collect") return `${plan.pair} fees collected`;
     return `${plan.pair} fees compounded`;
   }
   if (plan.kind === "withdraw") return plan.settlement?.asset === "ETH" ? `Withdraw ${plan.pair} to ETH` : `Withdraw ${plan.pair}`;
   if (plan.kind === "rebalance") return `Rebalance ${plan.pair}`;
+  if (plan.kind === "collect") return `Collect ${plan.pair} fees`;
   return `Compound ${plan.pair} fees`;
 }
 
 function positionActionButtonLabel(plan: AnyPositionActionPlan | null): string {
   if (plan?.kind === "withdraw") return plan.settlement?.asset === "ETH" ? "Withdraw to ETH" : "Withdraw";
   if (plan?.kind === "rebalance") return "Rebalance";
+  if (plan?.kind === "collect") return "Collect fees";
   return "Compound";
 }
 
 function positionActionSuccessLabel(plan: AnyPositionActionPlan | null): string {
   if (plan?.kind === "withdraw") return plan.settlement?.asset === "ETH" ? "ETH returned" : "Position withdrawn";
   if (plan?.kind === "rebalance") return "Position rebalanced";
+  if (plan?.kind === "collect") return "Fees collected";
   return "Fees compounded";
 }
 
 function positionActionSuccessMessage(plan: AnyPositionActionPlan, settlesToEth: boolean): string {
   if (plan.kind === "withdraw") return settlesToEth ? "Your ETH is back in your wallet." : "Your pool tokens are back in your wallet.";
   if (plan.kind === "rebalance") return "Your position is earning in its new range.";
+  if (plan.kind === "collect") return "Your fees are in your wallet.";
   return "Your fees are back at work.";
 }
 
@@ -1079,6 +1215,7 @@ function positionActionDescription(
   }
   if (plan.kind === "withdraw") return "Close this position and return both pool tokens to your wallet.";
   if (plan.kind === "rebalance") return "Move this liquidity into a same-width range centred on the current price.";
+  if (plan.kind === "collect") return "Return all claimable fees to your wallet without changing the position.";
   return "Collect and reinvest the fees ready to claim.";
 }
 
@@ -1105,23 +1242,6 @@ function PortfolioEmpty({ variant, onPrimary }: {
     </div>
     {onPrimary && content.action ? <button className="empty-action" type="button" onClick={onPrimary}>{content.action}</button> : null}
   </section>;
-}
-
-function PositionRange({ position }: { position: PositionView }) {
-  const positionPct = position.closed
-    ? 50
-    : position.tickCurrent < position.tickLower
-      ? 0
-      : position.tickCurrent > position.tickUpper
-        ? 100
-        : Math.max(0, Math.min(100, position.percentThroughRange));
-  const status = position.status === "in-range" ? "In range" : position.status === "oor" ? "Out of range" : "Closed";
-  const description = `${status}. Current price ${priceLabel(position.price)}. Range ${priceLabel(position.priceMin)} to ${priceLabel(position.priceMax, position.priceMax === null)}.`;
-  return <span className={`position-range-viz is-${position.status}`} style={{ "--range-position": `${positionPct}%` } as CSSProperties} role="img" aria-label={description}>
-    <span className="range-heading"><small>Price range</small><b>{status}</b></span>
-    <span className="range-track"><i /><b /></span>
-    <span className="range-prices"><small>{priceLabel(position.priceMin)}</small><strong>{priceLabel(position.price)}</strong><small>{priceLabel(position.priceMax, position.priceMax === null)}</small></span>
-  </span>;
 }
 
 function chainLabel(chain: MarketChain): string {

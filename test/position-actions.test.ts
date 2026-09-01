@@ -10,6 +10,17 @@ import type { PositionSnapshot } from "../src/types.js";
 const owner = getAddress("0x1111111111111111111111111111111111111111");
 
 describe("self-custodial position actions", () => {
+  it("collects V3 fees directly to the owner without a Wizzy fee", () => {
+    const plan = buildPositionActionPlan(snapshot(), owner, "base", "collect", TREASURY);
+    expect(plan.kind).toBe("collect");
+    expect(plan.serviceFeeBps).toBe(0);
+    expect(plan.serviceFee).toEqual([]);
+    expect(plan.transactions).toHaveLength(1);
+    expect(plan.transactions[0]?.description).toBe("NFPM.collect");
+    expect(plan.allowedTargets).not.toContain(TREASURY);
+    expect(plan.notices[0]).toContain("does not charge");
+  });
+
   it("builds one non-empty batch that compounds after the disclosed 2% fee", () => {
     const plan = buildPositionActionPlan(snapshot(), owner, "base", "compound", TREASURY);
     expect(plan.serviceFeeBps).toBe(200);
@@ -81,6 +92,7 @@ describe("self-custodial position actions", () => {
     expect(plan.transactions.slice(2).every((tx) => tx.description.startsWith("ERC20.transfer"))).toBe(true);
     expect(plan.allowedTargets).toContain(addresses.v2Router);
     expect(() => buildPositionActionPlan(position, owner, "robinhood", "compound", TREASURY)).toThrow("already reinvested");
+    expect(() => buildPositionActionPlan(position, owner, "robinhood", "collect", TREASURY)).toThrow("already reinvested");
   });
 
   it("claims and compounds a Base V4 position through Permit2", () => {
@@ -92,6 +104,21 @@ describe("self-custodial position actions", () => {
     expect(plan.transactions.at(-1)?.to).toBe(addresses.v4PositionManager);
     expect(plan.transactions.at(-1)?.description).toContain("increase");
     expect(plan.transactions.every((tx) => tx.data !== "0x")).toBe(true);
+  });
+
+  it("collects V4 fees without increasing or charging the position", () => {
+    const addresses = addressesFor("base");
+    const position = snapshot({ ref: { protocol: "V4", chainId: 8453, tokenId: 92n } });
+    const plan = buildPositionActionPlan(position, owner, "base", "collect", TREASURY);
+    expect(plan.serviceFeeBps).toBe(0);
+    expect(plan.transactions).toHaveLength(1);
+    expect(plan.transactions[0]?.to).toBe(addresses.v4PositionManager);
+    expect(plan.transactions[0]?.description).toContain("claim");
+    expect(plan.transactions.some((transaction) => transaction.description.includes("increase"))).toBe(false);
+  });
+
+  it("refuses an empty fee collection", () => {
+    expect(() => buildPositionActionPlan(snapshot({ uncollected0: 0n, uncollected1: 0n }), owner, "base", "collect", TREASURY)).toThrow("No fees are ready");
   });
 
   it("burns a Base V4 position before transferring the disclosed fee", () => {

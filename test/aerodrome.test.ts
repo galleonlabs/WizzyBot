@@ -58,6 +58,10 @@ describe("Aerodrome Slipstream", () => {
   });
 
   it("compounds and withdraws through the Aerodrome position manager", () => {
+    const collect = buildPositionActionPlan(snapshot(), owner, "base", "collect", TREASURY);
+    expect(collect.serviceFeeBps).toBe(0);
+    expect(collect.transactions.map((tx) => tx.description)).toEqual(["Aerodrome collect"]);
+
     const compound = buildPositionActionPlan(snapshot(), owner, "base", "compound", TREASURY);
     expect(compound.transactions[0]?.description).toBe("Aerodrome collect");
     expect(compound.transactions.at(-1)?.description).toBe("Aerodrome increaseLiquidity");

@@ -76,7 +76,7 @@ describe("meme market maker UI", () => {
   it("uses deliberate mobile layouts instead of shrinking desktop rows", () => {
     expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
     expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))");
-    expect(css).toContain(".position-list article { grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(css).toContain(".position-list article { grid-template-columns: repeat(2, minmax(0, 1fr)) auto");
     expect(css).toContain(".zap-backdrop { align-items: end;");
     expect(css).toContain(".portfolio-empty .empty-symbol { display: none; }");
     expect(css).toContain(".market-link-label { display: none; }");
@@ -93,7 +93,7 @@ describe("meme market maker UI", () => {
     expect(css).toContain(".action-preview.is-submitted > .action-buttons { grid-column: 1 / -1; }");
     expect(css).toContain(".market-link { width: 48px; min-height: 48px");
     expect(css).toContain(".market-table .market-links:has(.fomo-link)");
-    expect(css).toContain(".position-actions button,\n  .action-buttons button { min-height: 48px; }");
+    expect(css).toContain(".position-manage,\n  .action-buttons button { min-height: 48px; }");
     expect(css).toContain(".empty-action { width: 100%; min-height: 48px");
   });
 
@@ -177,7 +177,9 @@ describe("meme market maker UI", () => {
     expect(portfolio).not.toContain('className="portfolio-summary"');
     expect(portfolio).not.toContain("summarizePositions");
     expect(portfolio).toContain('action: "Connect wallet"');
-    expect(css).not.toContain(".composition-track");
+    expect(css).toContain(".position-manager .action-preview");
+    expect(css).toContain(".composition-track");
+    expect(portfolio).toContain('className="position-composition"');
     expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
   });
 
@@ -402,13 +404,15 @@ describe("meme market maker UI", () => {
   it("matches live position artwork by pool and offers an out-of-range rebalance", () => {
     expect(portfolio).toContain("positionTokenImage(position, markets, stats)");
     expect(portfolio).toContain("market.pool.toLowerCase() === position.pool.toLowerCase()");
-    expect(portfolio).toContain('needsRebalance ? "Rebalance" : "Compound"');
-    expect(positionActionRoute).toContain('z.enum(["compound", "rebalance", "withdraw"])');
+    expect(portfolio).toContain('const canRebalance = position.protocol === "V3" && !position.inRange');
+    expect(positionActionRoute).toContain('z.enum(["collect", "compound", "rebalance", "withdraw"])');
+    expect(portfolio).toContain('role="dialog" aria-modal="true" aria-labelledby="position-manager-title"');
+    expect(portfolio).toContain('onAction(position, "collect")');
   });
 
   it("keeps withdrawal confirmation concise and removes the fee from success rows", () => {
     expect(portfolio).toContain("Close this position and return at least");
-    expect(portfolio).toContain('actionPlan && actionState.kind === "ready"');
+    expect(portfolio).toContain('plan && state.kind === "ready"');
     expect(portfolio).not.toContain("one atomic approval.`");
   });
 

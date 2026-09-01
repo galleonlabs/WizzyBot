@@ -41,7 +41,6 @@ export type AllocationMarketPlan = {
   venue: "uniswap-v2" | "uniswap-v3" | "uniswap-v4" | "aerodrome-slipstream";
   liquidityTarget: Address;
   quoteSymbol: "ETH" | "WETH";
-  weightBps: number;
   budgetWei: string;
   swapInWei: string;
   quotedMemeOut: string;
@@ -64,8 +63,8 @@ export type AllocationPlan = {
   serviceFeeWei: string;
   netAllocationWei: string;
   expectedConfirmations: 1;
-  execution: "wallet_sendCalls";
-  atomic: true;
+  execution: "wallet_transactions";
+  atomic: false;
   createdAt: string;
   expiresAt: string;
   markets: AllocationMarketPlan[];
@@ -89,8 +88,7 @@ export async function planAllocation(input: {
   owner: string;
   chain: ChainSlug;
   amountWei: bigint;
-  marketIds?: readonly string[];
-  markets?: readonly CuratedMarket[];
+  marketId: string;
   serviceFeeBps?: number;
   protocol?: "V2" | "V3" | "V4";
   client?: PublicClient;
@@ -102,9 +100,9 @@ export async function planAllocation(input: {
   if (input.amountWei < BigInt(configured.minimumAllocationWei)) {
     throw new Error(`Minimum ${configured.label} allocation is ${configured.minimumAllocationWei} wei`);
   }
-  const markets = input.markets ? [...input.markets] : activeMarkets(input.chain, input.marketIds);
-  const activeWeight = markets.reduce((sum, market) => sum + market.weightBps, 0);
-  if (activeWeight <= 0) throw new Error("selected market weights must be positive");
+  const markets = activeMarkets(input.chain, [input.marketId]);
+  const market = markets[0];
+  if (!market) throw new Error("Choose an active reviewed market");
 
   const feeBps = input.serviceFeeBps ?? getMarketCatalog().fees.allocateBps;
   if (!Number.isSafeInteger(feeBps) || feeBps < 0 || feeBps > 10_000) throw new Error("service fee must be valid basis points");
@@ -114,10 +112,7 @@ export async function planAllocation(input: {
 
   const env = loadEnv();
   const client = input.client ?? makePublicClient(env.rpcByChain[input.chain], chain.viem);
-  if (input.protocol && markets.length !== 1) throw new Error("Choose one market before selecting a pool version");
   if (input.protocol === "V2" || input.protocol === "V4") {
-    const market = markets[0];
-    if (!market) throw new Error("Choose a market");
     return planAlternativeAllocation({
       owner,
       chain: input.chain,
@@ -132,13 +127,7 @@ export async function planAllocation(input: {
       treasury: env.treasury ?? TREASURY,
     });
   }
-  const budgets = weightedBudgets(net, sleeveAwareWeights(markets));
-  const quotes: MarketQuote[] = [];
-  for (const [index, market] of markets.entries()) {
-    const budget = budgets[index];
-    if (budget === undefined) throw new Error(`missing allocation budget for ${market.id}`);
-    quotes.push(await quoteMarket(client, owner, chain.id, market, budget));
-  }
+  const quotes: MarketQuote[] = [await quoteMarket(client, owner, chain.id, market, net)];
 
   const addresses = addressesFor(input.chain);
   const transactions: PlannedTx[] = [wrapEthTx(net, chain.id)];
@@ -191,18 +180,18 @@ export async function planAllocation(input: {
     serviceFeeWei: serviceFee.toString(),
     netAllocationWei: net.toString(),
     expectedConfirmations: 1,
-    execution: "wallet_sendCalls",
-    atomic: true,
+    execution: "wallet_transactions",
+    atomic: false,
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString(),
     markets: quotes.map((quote) => quote.marketPlan),
     transactions: transactions.map(serializeTx),
     allowedTargets,
     notices: [
-      "Every LP NFT is minted directly to your wallet.",
-      "One atomic wallet batch is requested on this chain; if any call fails, the entire batch reverts.",
-      "Quoted outputs and ranges expire. Re-plan instead of signing an expired batch.",
-      "Wizzy selects the reviewed Uniswap or Aerodrome venue for each market; there is no pool builder to configure.",
+      "The selected LP position is minted directly to your wallet.",
+      "Your wallet confirms each step. Every completed step settles to your wallet, and Wizzy never takes custody.",
+      "Quoted outputs and ranges expire. Re-plan instead of signing an expired plan.",
+      "Wizzy uses the reviewed Uniswap or Aerodrome pool selected on the market row; there is no basket allocation.",
       "Any unused WETH or meme tokens remain in your wallet.",
     ],
   };
@@ -276,7 +265,6 @@ async function planAlternativeAllocation(input: {
       venue: "uniswap-v2",
       liquidityTarget: addresses.v2Router,
       quoteSymbol: "WETH",
-      weightBps: input.market.weightBps,
       budgetWei: input.net.toString(),
       swapInWei: swapIn.toString(),
       quotedMemeOut: acquisition.marketPlan.quotedMemeOut,
@@ -331,7 +319,6 @@ async function planAlternativeAllocation(input: {
       venue: "uniswap-v4",
       liquidityTarget: addresses.v4PositionManager,
       quoteSymbol: "ETH",
-      weightBps: input.market.weightBps,
       budgetWei: input.net.toString(),
       swapInWei: swapIn.toString(),
       quotedMemeOut: acquisition.marketPlan.quotedMemeOut,
@@ -371,8 +358,8 @@ async function planAlternativeAllocation(input: {
     serviceFeeWei: input.serviceFee.toString(),
     netAllocationWei: input.net.toString(),
     expectedConfirmations: 1,
-    execution: "wallet_sendCalls",
-    atomic: true,
+    execution: "wallet_transactions",
+    atomic: false,
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString(),
     markets: [marketPlan],
@@ -380,49 +367,11 @@ async function planAlternativeAllocation(input: {
     allowedTargets,
     notices: [
       custodyNotice,
-      "One atomic wallet batch is requested; if any call fails, the entire batch reverts.",
-      "Quoted outputs and ranges expire. Re-plan instead of signing an expired batch.",
+      "Your wallet confirms each step. Every completed step settles to your wallet, and Wizzy never takes custody.",
+      "Quoted outputs and ranges expire. Re-plan instead of signing an expired plan.",
       "Any unused ETH, WETH, or meme tokens remain in your wallet.",
     ],
   };
-}
-
-/**
- * Keeps a related-party sleeve at exactly its configured share of every
- * deposit: the sleeve market keeps its bps and the selected ordinary markets
- * are rescaled to the remainder of 10,000 with largest-remainder rounding, so
- * partial breadth tiers cannot overweight the sleeve.
- */
-export function sleeveAwareWeights(markets: readonly { weightBps: number; sleeve?: boolean }[]): number[] {
-  const sleeveBps = markets.reduce((sum, market) => sum + (market.sleeve ? market.weightBps : 0), 0);
-  const ordinaryTotal = markets.reduce((sum, market) => sum + (market.sleeve ? 0 : market.weightBps), 0);
-  if (!sleeveBps || !ordinaryTotal) return markets.map((market) => market.weightBps);
-  const target = 10_000 - sleeveBps;
-  const shares = markets.map((market, index) => {
-    if (market.sleeve) return { index, floor: market.weightBps, remainder: -1 };
-    const exact = (market.weightBps * target) / ordinaryTotal;
-    return { index, floor: Math.floor(exact), remainder: exact - Math.floor(exact) };
-  });
-  let leftover = target - shares.filter((share) => share.remainder >= 0).reduce((sum, share) => sum + share.floor, 0);
-  for (const share of [...shares].sort((a, b) => b.remainder - a.remainder || a.index - b.index)) {
-    if (share.remainder < 0 || leftover <= 0) continue;
-    share.floor += 1;
-    leftover -= 1;
-  }
-  return shares.map((share) => share.floor);
-}
-
-export function weightedBudgets(total: bigint, weights: readonly number[]): bigint[] {
-  const sum = weights.reduce((acc, value) => acc + value, 0);
-  if (!Number.isSafeInteger(sum) || sum <= 0) throw new Error("weights must sum to a positive safe integer");
-  let allocated = 0n;
-  return weights.map((weight, index) => {
-    if (!Number.isSafeInteger(weight) || weight <= 0) throw new Error("weights must be positive safe integers");
-    if (index === weights.length - 1) return total - allocated;
-    const amount = (total * BigInt(weight)) / BigInt(sum);
-    allocated += amount;
-    return amount;
-  });
 }
 
 async function quoteMarket(
@@ -479,8 +428,8 @@ async function quoteUniswapMarket(
   const token0 = quoteIsToken0 ? quoteToken : memeToken;
   const token1 = quoteIsToken0 ? memeToken : quoteToken;
   // The swap may settle anywhere between minimumMemeOut and quotedMemeOut.
-  // Plan the mint against the guaranteed floor so the atomic batch does not
-  // revert merely because the quote moved within the accepted slippage band.
+  // Plan the mint against the guaranteed floor so the transaction plan does
+  // not fail merely because the quote moved within the accepted slippage band.
   const amount0Desired = quoteIsToken0 ? wethForMint : minimumMemeOut;
   const amount1Desired = quoteIsToken0 ? minimumMemeOut : wethForMint;
   const mintQuote = quoteMintFromPool({
@@ -531,7 +480,6 @@ async function quoteUniswapMarket(
       venue: "uniswap-v3",
       liquidityTarget: addressesFor(chainId === 4663 ? "robinhood" : "base").nfpm,
       quoteSymbol: "WETH",
-      weightBps: market.weightBps,
       budgetWei: budget.toString(),
       swapInWei: swapIn.toString(),
       quotedMemeOut: quotedMemeOut.toString(),
@@ -651,7 +599,6 @@ async function quoteAerodromeMarket(
       venue: "aerodrome-slipstream",
       liquidityTarget: deployment.positionManager,
       quoteSymbol: "WETH",
-      weightBps: market.weightBps,
       budgetWei: budget.toString(),
       swapInWei: swapIn.toString(),
       quotedMemeOut: quotedMemeOut.toString(),

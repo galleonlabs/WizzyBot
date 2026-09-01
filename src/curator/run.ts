@@ -56,12 +56,12 @@ export function renderCuratorMarkdown(report: CuratorReport): string {
     const liquidity = row.summary.medianLiquidityUsd === null ? "—" : `$${Math.round(row.summary.medianLiquidityUsd).toLocaleString("en-US")}`;
     const volume = row.summary.medianVolume24hUsd === null ? "—" : `$${Math.round(row.summary.medianVolume24hUsd).toLocaleString("en-US")}`;
     const apr = row.summary.medianFeeAprPct === null ? "—" : `${row.summary.medianFeeAprPct.toFixed(1)}%`;
-    return `| ${row.symbol} | ${row.chain} | ${row.incumbent ? "index" : "watch"} | ${row.recommendation} | ${liquidity} | ${volume} | ${apr} | ${row.summary.historyHours.toFixed(0)}h |`;
+    return `| ${row.symbol} | ${row.chain} | ${row.incumbent ? "active" : "watch"} | ${row.recommendation} | ${liquidity} | ${volume} | ${apr} | ${row.summary.historyHours.toFixed(0)}h |`;
   }).join("\n");
   const replacements = report.replacements.length
     ? report.replacements.map((row) => `- ${row.chain}: replace ${row.incumbentSymbol} with ${row.candidateSymbol} (${row.aprMultiple.toFixed(1)}× median fee APR)`).join("\n")
     : "- None.";
-  return `# Wizzy index curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live index. This report supplies evidence and policy-valid proposals for the curator agent to apply through the normal tested deployment path.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
+  return `# Wizzy market curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live market set. This report supplies evidence and policy-valid proposals for the curator agent to apply through the normal tested deployment path.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
 }
 
 export async function runCurator(options: { stateDir?: string; persist?: boolean; observedAt?: string } = {}): Promise<CuratorReport> {

@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 // stray probes from crashing into the framework's missing-page fallback.
 export async function GET() {
   return NextResponse.json(
-    { error: "Use /api/portfolio/allocate, /api/portfolio/action, or /api/portfolio/migrate" },
+    { error: "Use /api/portfolio/allocate or /api/portfolio/action" },
     { status: 404 },
   );
 }

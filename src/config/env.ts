@@ -44,7 +44,6 @@ export const EnvSchema = z.object({
   UNABOT_PRIVATE_KEY: hexKey,
   UNA_TREASURY_PRIVATE_KEY: hexKey,
   UNABOT_TREASURY: address,
-  UNA_INDEX_REGISTRY_ADDRESS: address,
   UNABOT_ETH_USD: z.coerce.number().positive().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional().default(""),
   UNABOT_ALERT_WEBHOOK: z.string().optional().default(""),
@@ -57,7 +56,6 @@ export type Env = {
   uniswapApiKey: string | undefined;
   privateKey: Hex | undefined;
   treasury: Address;
-  indexRegistryAddress: Address | undefined;
   ethUsd: number | undefined;
   telegramBotToken: string | undefined;
   alertWebhook: string | undefined;
@@ -83,7 +81,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       UNABOT_PRIVATE_KEY: env.UNABOT_PRIVATE_KEY || undefined,
       UNA_TREASURY_PRIVATE_KEY: env.UNA_TREASURY_PRIVATE_KEY || undefined,
       UNABOT_TREASURY: env.UNABOT_TREASURY || undefined,
-      UNA_INDEX_REGISTRY_ADDRESS: env.UNA_INDEX_REGISTRY_ADDRESS || undefined,
       UNABOT_ETH_USD: env.UNABOT_ETH_USD || undefined,
       TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN ?? "",
       UNABOT_ALERT_WEBHOOK: env.UNABOT_ALERT_WEBHOOK ?? "",
@@ -110,7 +107,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     uniswapApiKey: parsed.UNISWAP_API_KEY || undefined,
     privateKey: (parsed.UNABOT_PRIVATE_KEY ?? parsed.UNA_TREASURY_PRIVATE_KEY) as Hex | undefined,
     treasury: (parsed.UNABOT_TREASURY as Address | undefined) ?? TREASURY,
-    indexRegistryAddress: parsed.UNA_INDEX_REGISTRY_ADDRESS as Address | undefined,
     ethUsd: parsed.UNABOT_ETH_USD,
     telegramBotToken: parsed.TELEGRAM_BOT_TOKEN || undefined,
     alertWebhook: parsed.UNABOT_ALERT_WEBHOOK || undefined,

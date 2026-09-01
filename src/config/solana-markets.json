@@ -21,7 +21,6 @@
         "feeBps": 20,
         "binStep": 20,
         "rangeDelta": 34,
-        "weightBps": 6000,
         "status": "active",
         "risk": "established",
         "color": "#d9ff74"
@@ -38,7 +37,6 @@
         "feeBps": 20,
         "binStep": 20,
         "rangeDelta": 34,
-        "weightBps": 4000,
         "status": "active",
         "risk": "emerging",
         "color": "#ffd36b"
@@ -55,7 +53,6 @@
         "feeBps": 20,
         "binStep": 20,
         "rangeDelta": 34,
-        "weightBps": 2500,
         "status": "paused",
         "risk": "established",
         "color": "#9dc4ff"

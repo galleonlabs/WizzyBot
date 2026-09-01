@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const page = readFileSync("app/page.tsx", "utf8");
@@ -24,6 +24,11 @@ const poolActivitySource = readFileSync("src/markets/activity.ts", "utf8");
 const apiBoundary = readFileSync("app/lib/api-request-server.ts", "utf8");
 const balanceRoute = readFileSync("app/api/balance/route.ts", "utf8");
 const positionActionRoute = readFileSync("app/api/portfolio/action/route.ts", "utf8");
+const allocationRoute = readFileSync("app/api/portfolio/allocate/route.ts", "utf8");
+const portfolioRoute = readFileSync("app/api/portfolio/route.ts", "utf8");
+const hostedBundle = readFileSync("src/hosted-bundle.ts", "utf8");
+const portfolioTypes = readFileSync("app/lib/portfolio-types.ts", "utf8");
+const allocationSource = readFileSync("src/portfolio/allocation.ts", "utf8");
 const achievementCenter = readFileSync("app/achievement-center.tsx", "utf8");
 const achievementsRoute = readFileSync("app/api/achievements/route.ts", "utf8");
 const telemetry = readFileSync("app/lib/telemetry.ts", "utf8");
@@ -228,8 +233,8 @@ describe("meme market maker UI", () => {
     expect(portfolio).not.toContain('className="portfolio-summary"');
     expect(portfolio).not.toContain("Your liquidity and the index, in one place.");
     expect(portfolio).not.toContain("Deposit ETH. Earn trading fees across Base, Robinhood, and Solana.");
-    expect(css).toContain(".index-hero { grid-template-columns: 1fr; gap: 48px; padding: 68px 0 64px");
-    expect(css).toMatch(/\.index-hero \{[\s\S]*?align-items: start;/);
+    expect(css).toContain(".market-hero { grid-template-columns: 1fr; gap: 48px; padding: 68px 0 64px");
+    expect(css).toMatch(/\.market-hero \{[\s\S]*?align-items: start;/);
     expect(css).toContain("min-height: 44px");
     expect(css).toContain(".cross-chain-fund");
     expect(portfolio).toContain('<small role="status">Balance');
@@ -251,6 +256,23 @@ describe("meme market maker UI", () => {
     expect(sendEthDialog).toContain("Paid by your wallet");
     expect(sendEthDialog).not.toContain("Sponsored");
     expect(readFileSync("app/lib/shot-fixture.ts", "utf8")).not.toContain('chain: "solana"');
+  });
+
+  it("models one selected market without index, basket, or chain-allocation contracts", () => {
+    expect(portfolio).toContain("marketId,");
+    expect(portfolio).not.toContain("marketIds");
+    expect(allocationRoute).toContain('chain: z.enum(["base", "robinhood"])');
+    expect(allocationRoute).toContain("marketId: z.string().min(1)");
+    expect(allocationRoute).not.toMatch(/marketIds|planDual|\"both\"/);
+    expect(allocationSource).toContain("const markets = activeMarkets(input.chain, [input.marketId])");
+    expect(allocationSource).not.toContain("weightBps");
+    expect(portfolioTypes).not.toMatch(/MemeIndex|DualChain|IndexMigration|weightBps/);
+    expect(hostedBundle).not.toMatch(/index-plan|dual-chain|index-migration|index-selection/);
+    expect(portfolioRoute).toContain("/api/portfolio/allocate or /api/portfolio/action");
+    expect(existsSync("app/api/portfolio/index/route.ts")).toBe(false);
+    expect(existsSync("app/api/portfolio/migrate/route.ts")).toBe(false);
+    expect(existsSync("src/portfolio/index-plan.ts")).toBe(false);
+    expect(existsSync("src/portfolio/dual-chain.ts")).toBe(false);
   });
 
   it("ships the Wizzy identity and canonical domain without stale public Una assets", () => {
@@ -362,7 +384,7 @@ describe("meme market maker UI", () => {
     expect(portfolio).toContain('fetch("/api/pool-activity"');
     expect(portfolio).toContain("POOL_ACTIVITY_REFRESH_MS = 60_000");
     expect(portfolio).toContain('document.visibilityState === "hidden"');
-    expect(css).toMatch(/\.index-nav \{[\s\S]*?z-index: 2;/);
+    expect(css).toMatch(/\.market-nav \{[\s\S]*?z-index: 2;/);
     expect(css).toMatch(/\.pool-activity \{[\s\S]*?z-index: 1;/);
     expect(css).toContain("@keyframes pool-activity-scroll");
     expect(css).toContain('.pool-activity-group[aria-hidden="true"]');

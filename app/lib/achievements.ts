@@ -10,7 +10,7 @@ export const ACHIEVEMENT_SECTIONS = [
 
 export const ACHIEVEMENTS = [
   { id: "first-spell", section: "markets", metric: "positions", target: 1, mark: "I", title: "First spell", description: "Open your first Wizzy market.", xp: 100 },
-  { id: "full-spellbook", section: "markets", metric: "markets", target: 6, mark: "VI", title: "Full spellbook", description: "Hold all 6 index markets.", xp: 150 },
+  { id: "full-spellbook", section: "markets", metric: "markets", target: 6, mark: "VI", title: "Full spellbook", description: "Hold positions in 6 reviewed markets.", xp: 150 },
   { id: "first-fees", section: "fees", metric: "fees", target: 1, mark: "$1", title: "First sparkle", description: "Earn $1 in market fees.", xp: 50 },
   { id: "fee-collector", section: "fees", metric: "fees", target: 10, mark: "10", title: "Fee collector", description: "Earn $10 in market fees.", xp: 75 },
   { id: "pocket-full", section: "fees", metric: "fees", target: 25, mark: "25", title: "Pocket full", description: "Earn $25 in market fees.", xp: 100 },
@@ -67,7 +67,7 @@ const LEVELS = [
   { level: 2, title: "Market mage", minimumXp: 200 },
   { level: 3, title: "Liquidity wizard", minimumXp: 500 },
   { level: 4, title: "Fee alchemist", minimumXp: 900 },
-  { level: 5, title: "Index archmage", minimumXp: 1_400 },
+  { level: 5, title: "Market archmage", minimumXp: 1_400 },
   { level: 6, title: "Market myth", minimumXp: 2_000 },
 ] as const;
 

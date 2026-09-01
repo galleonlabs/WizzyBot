@@ -50,7 +50,7 @@ These controls apply to the separate future token launch. They are not part of t
 - [ ] Creator and treasury addresses are dedicated and independently verified.
 - [ ] No secret is present in Git history, build output, Vercel client variables, logs, or browser storage.
 - [ ] Product copy makes no token date, market-inclusion, buyback, fee-support, yield, or appreciation promise.
-- [ ] The application, curator, and deployment path cannot create a token, add a related-party sleeve, or route fees into token/WETH liquidity.
+- [ ] The application, curator, and deployment path cannot create a token, auto-allocate to a related-party market, or route fees into token/WETH liquidity.
 - [ ] Public language says pseudonymous, not anonymous.
 - [ ] Legal, tax, sanctions, KYC, financial-promotion, and record-keeping requirements are handled where applicable.
 
@@ -59,9 +59,9 @@ These controls apply to the separate future token launch. They are not part of t
 - [ ] The token go/no-go record in the [future token plan](TOKEN_FLYWHEEL.md) is complete after at least 30 days of application evidence.
 - [ ] Launch-provider and X identities use dedicated credentials and hardened recovery.
 - [ ] Connected-wallet account, chain, recipients, permissions, and full transaction simulation are reviewed before signing.
-- [ ] Token contract, allocation, vesting, treasury, related-party sleeve, and risk disclosures are public.
+- [ ] Token contract, allocation, vesting, treasury, related-party market, and risk disclosures are public.
 - [ ] Public language says pseudonymous, not anonymous.
-- [ ] Independent legal review covers the launch jurisdictions, public communications, related-party sleeve, treasury policy, and financial-promotion requirements.
+- [ ] Independent legal review covers the launch jurisdictions, public communications, related-party market, treasury policy, and financial-promotion requirements.
 - [ ] A token launch does not automatically add the token to Wizzy's reviewed market list; inclusion remains a later, separately evidenced release.
 
 ## Incident response

@@ -32,7 +32,7 @@ The hook is the category: Make Meme Markets. The infrastructure and curator mech
 > 2. Pick a reviewed market
 > 3. Enter an ETH amount
 > 4. Review the swap, range and fee
-> 5. Approve the transaction batch
+> 5. Approve each wallet transaction
 >
 > No vault. The LP position goes to your wallet.
 
@@ -161,10 +161,10 @@ The asset is a launch billboard, not a UI screenshot. “Make Meme Markets” is
 Repository evidence is the source of truth for Wizzy-specific behavior:
 
 - `README.md` — one amount, an external wallet, Relay funding, user-visible positions, and six-hour curation.
-- `docs/CURATION.md` — launch membership, weights, policy, cadence, and Robinhood-only public MVP.
+- `docs/CURATION.md` — market membership, review policy, cadence, and replacement rules.
 - `docs/LAUNCH_PRIVACY.md` — no implied affiliation, no personal identity, no token bundling.
 - `docs/TOKEN_FLYWHEEL.md` — the app launches without a token.
-- `src/portfolio/index-selection.ts` — reviewed market selection rules.
+- `src/portfolio/allocation.ts` — one-selected-market transaction planning.
 - `src/portfolio/allocation.ts` — reviewed venue/range selection and user-owned mint recipient.
 - `src/portfolio/position-actions.ts` — compound, rebalance, and ETH withdrawal preparation.
 

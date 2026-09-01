@@ -3,27 +3,21 @@ import { activeMarkets, chainCatalog, getMarketCatalog, parseMarketCatalog } fro
 import { deriveGeckoMarketStats, deriveMarketStats } from "../src/markets/stats.js";
 import { activeSolanaMarkets, getSolanaMarketCatalog } from "../src/markets/solana-catalog.js";
 import { deriveSolanaMarketStats } from "../src/markets/solana-stats.js";
-import { liquidityVenueFor, weightedBudgets } from "../src/portfolio/allocation.js";
+import { liquidityVenueFor } from "../src/portfolio/allocation.js";
 
 describe("curated meme markets", () => {
-  it("keeps every active chain portfolio at 100%", () => {
+  it("keeps every reviewed market uniquely addressable without chain allocations", () => {
     const catalog = getMarketCatalog();
     for (const chain of catalog.chains) {
       const active = activeMarkets(chain.slug);
       expect(active.length).toBeGreaterThan(0);
       expect(new Set(active.map((market) => market.symbol)).size).toBe(active.length);
-      expect(active.reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
+      expect(active.every((market) => !("weightBps" in market))).toBe(true);
     }
     expect(chainCatalog("base").markets.find((market) => market.symbol === "BRETT")?.protocol).toBe("AERODROME_SLIPSTREAM");
     const cashcat = chainCatalog("robinhood").markets.find((market) => market.id === "robinhood-cashcat")!;
     expect(cashcat.pool.toLowerCase()).toBe("0xd42a491087a15e5afd51feb3606066cc152d2b09");
     expect(cashcat).toMatchObject({ fee: 3000, tickSpacing: 60 });
-  });
-
-  it("allocates integer dust to the final market without losing wei", () => {
-    const amounts = weightedBudgets(101n, [3_000, 3_000, 2_500, 1_500]);
-    expect(amounts).toEqual([30n, 30n, 25n, 16n]);
-    expect(amounts.reduce((sum, amount) => sum + amount, 0n)).toBe(101n);
   });
 
   it("offers only reviewed per-market V2 and V4 alternatives", () => {
@@ -37,31 +31,22 @@ describe("curated meme markets", () => {
     expect(() => liquidityVenueFor(basecat, "V4")).toThrow("no reviewed Uniswap V4 pool");
   });
 
-  it("only accepts curator migrations that preserve the outgoing index slot", () => {
+  it("accepts a reviewed market replacement without allocation weights", () => {
     const candidate = structuredClone(getMarketCatalog());
     const robinhood = candidate.chains.find((chain) => chain.slug === "robinhood")!;
     const outgoing = robinhood.markets.find((market) => market.id === "robinhood-cashcat")!;
     outgoing.status = "paused";
     robinhood.markets.push({ ...outgoing, id: "robinhood-cashcat-next", name: "Cashcat Next", symbol: "CASHNEXT", status: "active" });
-    candidate.migrations.push({
-      id: "cashcat-next",
-      chain: "robinhood",
-      fromMarketId: outgoing.id,
-      toMarketId: "robinhood-cashcat-next",
-      effectiveAt: "2026-08-30",
-    });
-
     expect(() => parseMarketCatalog(candidate)).not.toThrow();
-    robinhood.markets.at(-1)!.weightBps -= 1;
-    expect(() => parseMarketCatalog(candidate)).toThrow("active market weights must sum to 10,000 bps");
+    expect(robinhood.markets.at(-1)).not.toHaveProperty("weightBps");
   });
 
-  it("keeps the hidden Solana index at 100% with maintained Meteora pools", () => {
+  it("keeps the legacy Solana catalog at 100% with maintained Meteora pools", () => {
     const catalog = getSolanaMarketCatalog();
     const markets = activeSolanaMarkets();
     expect(catalog.chainId).toBe(792703809);
     expect(markets.map((market) => market.symbol)).toEqual(["FARTCOIN", "USELESS"]);
-    expect(markets.reduce((sum, market) => sum + market.weightBps, 0)).toBe(10_000);
+    expect(markets.every((market) => !("weightBps" in market))).toBe(true);
     expect(markets.every((market) => market.protocol === "Meteora DLMM" && market.pool.length >= 32)).toBe(true);
     expect(deriveSolanaMarketStats(markets[0]!, { info: { imageUrl: "https://cdn.example/solana.png" } }).tokenImageUrl).toBe("https://cdn.example/solana.png");
   });

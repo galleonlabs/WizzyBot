@@ -69,7 +69,7 @@ export async function verifyOnchainQuestAction(input: {
     const activePools = new Set(catalog.chains?.find((chain) => chain.slug === "robinhood")?.markets
       ?.filter((market) => market.status === "active" && typeof market.pool === "string")
       .map((market) => market.pool!.toLowerCase()) ?? []);
-    if (!activePools.has(pool)) throw new Error("quest position is not in the curated Robinhood index");
+    if (!activePools.has(pool)) throw new Error("quest position is not in a reviewed Robinhood market");
     verified = { transactionHash: anchor.transactionHash, blockNumber: anchor.blockNumber, positionTokenId: action.positionTokenId };
   } catch {
     verified = null;

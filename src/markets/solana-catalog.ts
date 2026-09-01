@@ -15,7 +15,6 @@ const SolanaMarketSchema = z.object({
   feeBps: z.number().int().positive().max(10_000),
   binStep: z.number().int().positive(),
   rangeDelta: z.number().int().positive().max(34),
-  weightBps: z.number().int().positive().max(10_000),
   status: z.enum(["active", "paused", "watch"]),
   risk: z.enum(["established", "emerging", "experimental"]),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
@@ -30,12 +29,6 @@ const SolanaChainSchema = z.object({
   gasReserveLamports: z.string().regex(/^\d+$/),
   markets: z.array(SolanaMarketSchema).min(1),
 }).superRefine((chain, ctx) => {
-  const activeWeight = chain.markets
-    .filter((market) => market.status === "active")
-    .reduce((sum, market) => sum + market.weightBps, 0);
-  if (activeWeight !== 10_000) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["markets"], message: "active market weights must sum to 10,000 bps" });
-  }
   const ids = new Set<string>();
   for (const market of chain.markets) {
     if (ids.has(market.id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["markets"], message: `duplicate market id ${market.id}` });

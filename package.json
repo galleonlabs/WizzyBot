@@ -31,11 +31,8 @@
     "build:eve": "node scripts/bundle-hosted.mjs && eve build",
     "eve:dev": "node scripts/bundle-hosted.mjs && eve dev",
     "eve:deploy": "eve deploy --project unabot",
-    "curate:index": "bun src/curator/cli.ts",
-    "curate:apply-research": "bun scripts/apply-curator-research.ts",
-    "registry:deploy": "bun scripts/registry-deploy.ts",
-    "registry:calldata": "bun scripts/registry-calldata.ts",
-    "registry:sync": "bun scripts/registry-sync.ts"
+    "curate:markets": "bun src/curator/cli.ts",
+    "curate:apply-research": "bun scripts/apply-curator-research.ts"
   },
   "engines": {
     "node": ">=20"

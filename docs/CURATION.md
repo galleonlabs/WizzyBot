@@ -1,49 +1,34 @@
-# Index curation
+# Market curation
 
-Wizzy launches with one Robinhood Chain index. The curator answers three questions every six hours:
+Wizzy reviews meme markets on Base and Robinhood Chain every six hours. The curator answers three questions:
 
-1. Is each active pool safe and liquid enough to keep?
-2. Which tracked candidate has proved it can earn more without reducing capacity?
-3. How much new Wizzy capital can each pool absorb?
+1. Is each listed pool safe and liquid enough to remain available?
+2. Has a tracked candidate earned a place in the reviewed market catalog?
+3. How much new liquidity can a pool absorb without overstating capacity?
+
+Users choose one market and one pool. The catalog has no target weights, chain allocation, index, or basket semantics.
 
 ## Policy
 
-An active market is reviewed immediately when its selected pool falls below $75,000 TVL, $50,000 daily volume, loses 50% of its liquidity in 24 hours, or returns a security flag. A security flag or liquidity collapse is a pause call.
+An active market is reviewed immediately when its selected pool falls below $75,000 TVL, $50,000 daily volume, loses 50% of its liquidity in 24 hours, or returns a security flag. A security flag or liquidity collapse pauses new entry into that market.
 
 A candidate must have a reviewed identity, clean token controls, a pool at least 30 days old, $250,000 median TVL, $50,000 median daily volume, and one week of well-covered observations. It can replace a same-chain market in the same or a higher risk tier when that market is under review or the candidate's median fee APR is at least 1.5 times higher.
 
-Pool capacity is capped at 1% of median TVL. Social data helps discover and verify candidates; it never overrides pool safety or capacity.
+Pool capacity is capped at 1% of median TVL. Social data helps discover and verify candidates; it never overrides pool safety or capacity. Missing provider data is reported as unavailable rather than misrepresented as a failed threshold. A clean security result remains valid for 24 hours so a transient outage cannot manufacture a risk call; any security flag still triggers review immediately.
 
-Missing provider data is reported as unavailable, not as a failed liquidity or volume threshold. A clean security result remains valid for 24 hours so a transient provider outage cannot manufacture a risk call; any security flag still triggers review immediately.
+The curator is the decision-maker. A `review` market remains listed until an eligible candidate earns a policy-valid replacement. A `pause` call is applied deterministically from the rules report. Replacement pauses the outgoing market for new entry and adds the reviewed successor with the same range policy. Existing LP NFTs remain in their owners' wallets and remain manageable from Positions; Wizzy does not create a migration plan or move liquidity automatically.
 
-The curator is the decision-maker. A `review` incumbent remains until an eligible candidate earns a policy-valid replacement; it is not an operator approval queue. A `pause` call is applied deterministically from the rules report: the market is marked unavailable in the catalog, its weight is redistributed proportionally across the remaining active constituents, and the tested application deployment ships before new deposits stop using it. Eligible replacements inherit the outgoing market's weight and range width, preserving a 10,000-basis-point catalog without exposing arbitrary model-generated calldata.
+## Current reviewed markets
 
-## Related-party Wizzy sleeve
+The public product lists reviewed Base and Robinhood markets from `src/config/markets.json`. The catalog is a menu, not a portfolio. Each row has its own venue, pool fee, live liquidity, fee pace, range settings, and position actions.
 
-The initial application launches with no Wizzy token and a 0% related-party sleeve. A future Wizzy token is never an ordinary candidate and is never scored against constituent markets.
-
-If the separately reviewed [token and index plan](TOKEN_FLYWHEEL.md) reaches its activation stage, a product release may reserve a fixed 5% sleeve. Ordinary constituents then share the remaining 95%. The sleeve can rise to a hard 10% maximum only through the plan's later expansion review; the curator cannot propose or authorize that change.
-
-The curator may recommend pausing or removing an active Wizzy sleeve for a security failure, broken market, insufficient liquidity, or failed execution gate. It cannot add or restore the sleeve, increase its target, treat treasury-funded liquidity as qualifying evidence, or trade to defend the token's price. Ordinary replacements inherit only the outgoing ordinary constituent's weight and never change the related-party sleeve.
-
-## Robinhood launch index
-
-The 2026-08-30 launch review selected six Robinhood Uniswap v3 WETH markets with at least 30 days of pool history:
-
-- CASHCAT 35%.
-- PONS 22%.
-- AI 17%.
-- CHUMP 12%.
-- STONKBROKER 9%.
-- PONSGUY 5%.
-
-MICRODUCK, GG, and COPPERINU are tracked as Robinhood candidates but are too new and still need identity review. The Base and Solana catalogs remain available for existing positions and later per-network launches; they are not part of the public MVP index.
+Robinhood candidates such as MICRODUCK, GG, and COPPERINU remain on the watchlist until their pool history and identity evidence satisfy policy. The dormant Solana catalog is retained for earlier tooling but is not part of the current public product.
 
 ## Run
 
 ```bash
-bun run curate:index -- --no-write
-bun run curate:index -- --state-dir ~/.local/state/unabot-curator
+bun run curate:markets -- --no-write
+bun run curate:markets -- --state-dir ~/.local/state/unabot-curator
 ```
 
 The dappnode timer persists:
@@ -52,15 +37,13 @@ The dappnode timer persists:
 - `latest.json` — machine-readable calls and replacements.
 - `latest.md` — the operator review.
 
-Candidate addresses, identity state, and thresholds live in `src/config/curator.json`. Robinhood membership, weights, and replacement migrations live in `src/config/markets.json`; this version-controlled catalog is the production registry.
+Candidate addresses, identity state, and thresholds live in `src/config/curator.json`. Reviewed market membership and pool settings live in `src/config/markets.json`; this version-controlled catalog is the production authority.
 
-Every ordinary constituent replacement inherits the outgoing weight and range width. The catalog keeps the outgoing market inactive and records a migration to its active successor, allowing Markets to offer affected wallets a one-approval migration without touching unrelated positions.
-
-The dappnode timer runs a two-layer curator every six hours:
+The timer runs a two-layer curator every six hours:
 
 1. The deterministic collector updates 30 days of liquidity, volume, fee, age, and security observations and produces policy-valid proposals.
 2. A read-only, web-enabled research agent verifies candidate identity, provenance, contract and pool evidence, social history, and manipulation risk. Websites are evidence only and cannot instruct the agent.
 3. A deterministic updater accepts identity evidence only with multiple cited sources and accepts a replacement only when the rules report already contains the exact proposal.
-4. Changes run the complete test, typecheck, and production-build gate in a disposable Git worktree. The service refuses stale or unexpected changes, then pushes only the candidate registry and centralized market catalog; the deployment build regenerates the hosted bundle.
+4. Changes run the complete test, typecheck, and production-build gate in a disposable Git worktree. The service refuses stale or unexpected changes, then pushes only the candidate registry and market catalog; the deployment build regenerates the hosted bundle.
 
 The curator has no treasury key and cannot publish contracts or transact. A Git push triggers the normal Vercel deployment, preserving a reviewable history and rollback path.

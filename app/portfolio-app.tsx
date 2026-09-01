@@ -76,7 +76,7 @@ const BRAND_ASSETS = {
 } as const;
 
 const EMPTY_MARKETS: MarketsPayload = {
-  catalog: { version: 1, updatedAt: "", fees: { allocateBps: 15, withdrawBps: 15, rebalanceBps: 15, compoundBps: 200 }, migrations: [], chains: [] },
+  catalog: { version: 1, updatedAt: "", fees: { allocateBps: 15, withdrawBps: 15, rebalanceBps: 15, compoundBps: 200 }, chains: [] },
   solana: {
     slug: "solana",
     chainId: 792703809,
@@ -445,7 +445,7 @@ export function PortfolioApp() {
           owner: address,
           chain: selected.chain,
           amountWei: amountWei.toString(),
-          marketIds: [marketId],
+          marketId,
           ...(zapProtocol === "V3" ? {} : { protocol: zapProtocol }),
         }),
       });
@@ -506,7 +506,7 @@ export function PortfolioApp() {
     />
   );
   const marketLedger = (
-    <section className="index-section index-catalog">
+    <section className="market-section market-catalog">
       <header className="section-title">
         <div><h2>Meme markets</h2><p>Reviewed every six hours.</p></div>
       </header>
@@ -532,7 +532,7 @@ export function PortfolioApp() {
   );
 
   return (
-    <main className="index-app">
+    <main className="market-app">
       <div className="wizzy-atmosphere" aria-hidden="true">
         <span className="wizzy-ghost wizzy-ghost-1" />
         <span className="wizzy-ghost wizzy-ghost-2" />
@@ -542,7 +542,7 @@ export function PortfolioApp() {
         <span className="wizzy-ghost wizzy-ghost-6" />
       </div>
       <div className="nav-stack">
-        <header className="index-nav">
+        <header className="market-nav">
           <button className="wizzy-wordmark" type="button" onClick={() => changeTab("overview")} aria-label="Wizzy overview">
             <picture className="wizzy-mark" aria-hidden="true">
               {theme === "system" ? <source media="(prefers-color-scheme: dark)" srcSet="/brand/wizzy-mascot-dark.svg" /> : null}
@@ -582,9 +582,9 @@ export function PortfolioApp() {
 
       {previewMode ? <div className="preview-banner">Illustrative preview · development only</div> : null}
 
-      <div className="index-shell" data-view={tab}>
+      <div className="market-shell" data-view={tab}>
           {tab === "overview" ? (
-            <section className="index-hero">
+            <section className="market-hero">
                 <div className="hero-stage">
                   <div className="hero-copy">
                     <h1>Make Meme Markets</h1>
@@ -595,12 +595,12 @@ export function PortfolioApp() {
             </section>
           ) : null}
           {tab === "overview" ? (
-            <section className="index-main markets-view home-markets">
+            <section className="market-main markets-view home-markets">
               {marketLedger}
             </section>
           ) : (
-            <section className="index-main markets-view">
-              <header className="index-title-row">
+            <section className="market-main markets-view">
+              <header className="market-title-row">
                 <div><h1>Your positions</h1><p>{hasPortfolioAccess ? (positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "New positions appear here after they are confirmed.") : "Connect your wallet to see positions on Base and Robinhood."}</p></div>
               </header>
               {positionLedger}
@@ -694,7 +694,7 @@ function PoolActivityGroup({ items, duplicate = false }: { items: PoolActivityIt
 }
 
 function MarketShowcase({ markets, stats, loading }: { markets: MarketEntry[]; stats: Map<string, MarketStats>; loading: boolean }) {
-  return <div className="index-showcase" aria-label="Base and Robinhood meme markets">
+  return <div className="market-showcase" aria-label="Base and Robinhood meme markets">
     <div className="network-lockup" aria-label="Built on Base and Robinhood Chain">
       <span className="network-icons" aria-hidden="true"><img src={BRAND_ASSETS.base} alt="" /><img src={BRAND_ASSETS.robinhood} alt="" /></span>
       <span className="network-name"><small>Built on</small><b>Base + Robinhood</b></span>

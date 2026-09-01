@@ -89,7 +89,7 @@ if git diff --cached --quiet; then
   printf '{"status":"complete","base":"%s","action":"no-change"}\n' "${base_commit}"
   exit 0
 fi
-git -c user.name="Wizzy Curator" -c user.email="curator@wizzy.meme" commit --quiet -m "curator: apply researched index decision"
+git -c user.name="Wizzy Curator" -c user.email="curator@wizzy.meme" commit --quiet -m "curator: apply researched market decision"
 current_remote="$(git ls-remote origin refs/heads/main | cut -f1)"
 if [[ "${current_remote}" != "${base_commit}" ]]; then
   printf 'Main advanced from %s to %s during curator validation; refusing stale push\n' "${base_commit}" "${current_remote}" >&2

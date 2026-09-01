@@ -15,7 +15,6 @@ import { slipstreamQuoterV2Abi } from "../aerodrome/abi.js";
 import { loadEnv } from "../config/env.js";
 import { bpsOf } from "../core/fees.js";
 import { recenterSameWidth } from "../core/ticks.js";
-import { getRobinhoodIndexState } from "../index/registry.js";
 import { chainCatalog, getMarketCatalog, type CuratedMarket } from "../markets/catalog.js";
 import { makePublicClient } from "../signer/broadcast.js";
 import type { PlannedTx, PositionSnapshot, Protocol } from "../types.js";
@@ -94,9 +93,7 @@ export async function planPositionAction(input: {
     snapshot = await adapter.readPosition(input.tokenId);
   }
   if (snapshot.owner.toLowerCase() !== owner.toLowerCase()) throw new Error("wallet does not own this position");
-  const configuredMarkets = input.chain === "robinhood"
-    ? (await getRobinhoodIndexState()).catalog.chains.find((catalogChain) => catalogChain.slug === "robinhood")?.markets ?? []
-    : chainCatalog(input.chain).markets;
+  const configuredMarkets = chainCatalog(input.chain).markets;
   const configured = configuredMarkets.find((market) => positionPoolIsConfigured(snapshot, [market]));
   if (!configured) throw new Error("position pool is not in Wizzy's curated market catalog");
   if (input.action === "rebalance") {
@@ -268,7 +265,7 @@ export function buildPositionActionPlan(
             "The fee is calculated below the slippage-adjusted expected withdrawal amounts; re-plan if this quote expires.",
           ]
       : [
-          "The full position is removed and the empty NFT is burned in the same wallet batch.",
+          "The full position is removed and the empty NFT is burned during the wallet transaction sequence.",
           "You receive both underlying pool tokens. Consolidating them to ETH is a separate quoted action so no hidden swap is taken.",
           "The fee is calculated below the slippage-adjusted expected withdrawal amounts; re-plan if this quote expires.",
         ],

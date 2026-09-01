@@ -21,7 +21,7 @@ describe("self-custodial position actions", () => {
     expect(plan.notices[0]).toContain("does not charge");
   });
 
-  it("builds one non-empty batch that compounds after the disclosed 2% fee", () => {
+  it("builds a non-empty transaction sequence that compounds after the disclosed 2% fee", () => {
     const plan = buildPositionActionPlan(snapshot(), owner, "base", "compound", TREASURY);
     expect(plan.serviceFeeBps).toBe(200);
     expect(plan.serviceFee.map((fee) => fee.amount)).toEqual(["200", "400"]);

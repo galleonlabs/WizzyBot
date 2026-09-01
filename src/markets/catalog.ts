@@ -36,9 +36,7 @@ const MarketSchema = z.object({
   fee: z.number().int().positive(),
   tickSpacing: z.number().int().positive(),
   rangeWidthPct: z.number().positive().lt(100),
-  weightBps: z.number().int().positive().max(10_000),
   status: z.enum(["active", "paused", "watch"]),
-  sleeve: z.boolean().optional(),
   risk: z.enum(["established", "emerging", "experimental"]),
   coingeckoId: z.string().min(1).optional(),
   imageUrl: z.string().url().optional(),
@@ -55,14 +53,6 @@ const ChainMarketSchema = z.object({
   markets: z.array(MarketSchema).min(1),
 });
 
-const MarketMigrationSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]+$/),
-  chain: z.literal("robinhood"),
-  fromMarketId: z.string().regex(/^[a-z0-9-]+$/),
-  toMarketId: z.string().regex(/^[a-z0-9-]+$/),
-  effectiveAt: z.string().date(),
-});
-
 const CatalogSchema = z.object({
   version: z.number().int().positive(),
   updatedAt: z.string().date(),
@@ -72,18 +62,10 @@ const CatalogSchema = z.object({
     rebalanceBps: z.number().int().min(0).max(10_000),
     compoundBps: z.number().int().min(0).max(10_000),
   }),
-  migrations: z.array(MarketMigrationSchema).default([]),
   chains: z.array(ChainMarketSchema).length(2),
 }).superRefine((catalog, ctx) => {
   const ids = new Set<string>();
   for (const [chainIndex, chain] of catalog.chains.entries()) {
-    if (chain.markets.filter((market) => market.status === "active").reduce((sum, market) => sum + market.weightBps, 0) !== 10_000) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["chains", chainIndex, "markets"],
-        message: "active market weights must sum to 10,000 bps",
-      });
-    }
     for (const market of chain.markets) {
       if (ids.has(market.id)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `duplicate market id ${market.id}` });
@@ -105,38 +87,6 @@ const CatalogSchema = z.object({
       if (new Set(alternativeProtocols).size !== alternativeProtocols.length) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} has duplicate alternative protocols` });
       }
-    }
-    const sleeves = chain.markets.filter((market) => market.sleeve);
-    if (sleeves.length > 1) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: "at most one related-party sleeve per chain" });
-    }
-    for (const market of sleeves) {
-      if (market.weightBps > 1_000) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} sleeve weight exceeds the 10% hard maximum` });
-      }
-    }
-  }
-  const migrations = new Set<string>();
-  const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood");
-  for (const [index, migration] of catalog.migrations.entries()) {
-    if (migrations.has(migration.id)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index, "id"], message: `duplicate migration id ${migration.id}` });
-    }
-    migrations.add(migration.id);
-    const from = robinhood?.markets.find((market) => market.id === migration.fromMarketId);
-    const to = robinhood?.markets.find((market) => market.id === migration.toMarketId);
-    if (!from || !to) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index], message: "migration markets must remain in the Robinhood catalog" });
-      continue;
-    }
-    if (from.status === "active" || to.status !== "active") {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index], message: "migration must move from an inactive market to an active market" });
-    }
-    if (from.weightBps !== to.weightBps || from.rangeWidthPct !== to.rangeWidthPct) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index], message: "replacement must inherit the outgoing weight and range width" });
-    }
-    if (from.sleeve || to.sleeve) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["migrations", index], message: "the related-party sleeve is never a replacement endpoint" });
     }
   }
 });

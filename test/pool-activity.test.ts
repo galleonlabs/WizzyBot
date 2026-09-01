@@ -28,7 +28,7 @@ describe("pool activity", () => {
     ]);
   });
 
-  it("ignores logs outside the current index pools and omits zero-sided WETH amounts", () => {
+  it("ignores logs outside the reviewed pools and omits zero-sided WETH amounts", () => {
     const markets = activeMarkets("robinhood");
     const cashcat = markets.find((market) => market.symbol === "CASHCAT")!;
     const logs: DecodedPoolActivityLog[] = [

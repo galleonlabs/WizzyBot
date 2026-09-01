@@ -6,16 +6,16 @@ How to run Wizzy. The consumer app presents reviewed meme markets on Base and Ro
 
 ## Current release scope
 
-The initial application launch does not deploy, buy, list, or include a Wizzy token. Its related-party sleeve is 0%, and all implemented product fees continue to accumulate in the Wizzy treasury.
+The application does not automatically buy, bundle, or allocate to WIZZY. All implemented product fees continue to accumulate in the Wizzy treasury.
 
 No application, curator, CLI, keeper, or ordinary deployment path may:
 
 - create or announce a Wizzy token;
-- add a related-party market or route fees into its liquidity;
+- add a related-party market without the same explicit review and opt-in listing used for other markets;
 - route product fees into token/WETH liquidity;
 - describe treasury revenue as a buyback, yield, price floor, or token-holder entitlement.
 
-A future token is a separate, manually authorized release governed by the [future token plan](TOKEN_FLYWHEEL.md). Token launch and any later market inclusion are also separate releases.
+Token graduation and any later opt-in market listing are separate releases governed by the [token and treasury plan](TOKEN_FLYWHEEL.md).
 
 ## Pool activity
 
@@ -138,7 +138,7 @@ Production EVM authority: Vercel stores the public address and the retrievable p
 
 Production Solana treasury custody: Vercel stores only the public address. The independent private key is in the Mac login Keychain under service `unabot-solana-treasury`.
 
-Robinhood membership and weights come from `src/config/markets.json`. Metadata for tracked candidates remains version-controlled so existing positions stay readable and withdrawable.
+Robinhood market membership comes from `src/config/markets.json`. Metadata for tracked candidates remains version-controlled so existing positions stay readable and withdrawable.
 
 The persistent workflow is documented in `docs/CURATION.md`. The dappnode timer collects evidence, runs a read-only web-research agent, validates its structured decision against deterministic policy, and ships only tested centralized catalog changes. Registry contract tooling is deferred and is not part of the production workflow.
 

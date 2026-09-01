@@ -19,7 +19,7 @@ How it works:
 2. Pick a reviewed market
 3. Enter an ETH amount
 4. Review the swap, range and fee
-5. Approve the transaction batch
+5. Approve each wallet transaction
 
 No vault. The LP position goes to your wallet.
 

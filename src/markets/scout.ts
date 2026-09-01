@@ -8,7 +8,6 @@ export type MarketScoutRow = {
   symbol: string;
   status: "included" | "watch";
   risk: "established" | "emerging" | "experimental";
-  weightBps: number;
   rangeWidthPct: number;
   liquidityUsd: number | null;
   volume24hUsd: number | null;
@@ -21,8 +20,8 @@ export type MarketScoutRow = {
 };
 
 /**
- * Deterministic evidence packet for the curator. Contract publication remains
- * bounded by the policy engine and the canonical-factory registry checks.
+ * Deterministic evidence packet for the curator. Catalog changes remain
+ * bounded by the policy engine and reviewed-pool checks.
  */
 export async function scoutMarkets(chain?: ChainSlug): Promise<{
   role: "advisory";
@@ -42,7 +41,7 @@ export async function scoutMarkets(chain?: ChainSlug): Promise<{
     catalogVersion: catalog.version,
     updatedAt: catalog.updatedAt,
     methodology: [
-      "Membership and weights come from the versioned onchain curator registry when it is configured.",
+      "Market membership comes from the version-controlled reviewed catalog.",
       "Liquidity, volume, price movement, and fee pace are short-window market signals, not return forecasts.",
       "The curator may apply a policy-valid replacement; hard security failures pause new deposits.",
     ],
@@ -79,7 +78,6 @@ function scoutRow(
     symbol: market.symbol,
     status: market.status === "active" ? "included" : "watch",
     risk: market.risk,
-    weightBps: market.weightBps,
     rangeWidthPct: market.rangeWidthPct,
     liquidityUsd: stats?.liquidityUsd ?? null,
     volume24hUsd: stats?.volume24hUsd ?? null,

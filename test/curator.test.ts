@@ -39,7 +39,7 @@ function history(overrides: Partial<CuratorObservation> = {}, hours = 14 * 24): 
   }));
 }
 
-describe("index curator", () => {
+describe("market curator", () => {
   it("describes centralized catalog curation without claiming automatic onchain publication", () => {
     const report: CuratorReport = {
       version: 1,
@@ -51,7 +51,7 @@ describe("index curator", () => {
       replacements: [],
     };
     const markdown = renderCuratorMarkdown(report);
-    expect(markdown).toContain("version-controlled market catalog remains the live index");
+    expect(markdown).toContain("version-controlled market catalog remains the live market set");
     expect(markdown).toContain("curator agent");
     expect(markdown).not.toContain("publish to the onchain registry automatically");
   });

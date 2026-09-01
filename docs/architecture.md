@@ -8,7 +8,7 @@ Wizzy is self-custodial portfolio software. The wallet owns every LP NFT and sig
 
 | Concern | Authority |
 | --- | --- |
-| Curated chains, tokens, pools, weights, ranges, and product fees | `src/config/markets.json` in git |
+| Reviewed chains, tokens, pools, ranges, and product fees | `src/config/markets.json` in git |
 | Wallet, balances, LP ownership, liquidity, fees, and range state | Base, Robinhood Chain, and Solana contracts/events |
 | Short-lived price, liquidity, and volume context | Pool contracts and indexed market APIs, labeled with source/time window |
 | Cross-chain intent and fill status | Relay quote plus Relay intent status, tied to its request ID |
@@ -30,19 +30,19 @@ The public product presents reviewed markets on Base and Robinhood Chain. Protoc
 
 ### One chain
 
-1. The server validates the selected allowlisted markets and quotes every WETH-to-meme swap onchain.
-2. It prepares one EIP-5792 `wallet_sendCalls` batch: wrap ETH, exact approvals, swaps with minimum outputs, mints with the user's wallet as NFT recipient, and a disclosed Wizzy fee transfer.
-3. The client shows the complete plan and requests one wallet confirmation. An expired plan must be rebuilt.
+1. The server validates one selected allowlisted market and quotes its WETH-to-meme swap onchain.
+2. It prepares the exact wrap, approval, swap, mint, and disclosed Wizzy fee transactions for that market, with the user's wallet as NFT recipient.
+3. The client shows the complete plan and requests each wallet confirmation in order, waiting for a successful receipt before continuing. An expired plan must be rebuilt.
 
 ### Base and Robinhood Chain
 
-Permissionless launch path: two confirmations from one Base funding balance.
+Permissionless launch path: one selected market on one funded chain.
 
 1. The user chooses one market on Base or Robinhood Chain.
 2. Wizzy prepares the allowlisted swap, range, LP mint, and service-fee steps for that market.
-3. The connected wallet approves the atomic batch when supported, or the same steps sequentially when it is not.
+3. The connected wallet reviews and approves the allowlisted transactions sequentially. Completed steps remain self-custodial if a later transaction fails.
 
-A one-confirmation cross-chain call path is a later capability gate. Relay can execute destination calls with smart accounts, but preserving the user's `msg.sender` and safely returning dynamic swap leftovers must be proven with the actual EOA/Relay path before Wizzy advertises it.
+Cross-chain funding remains a separate action. Wizzy does not advertise a basket, automatic chain split, or one-confirmation cross-chain execution path.
 
 ### Solana
 
@@ -58,4 +58,4 @@ Annualized numbers are unstable for young or briefly active positions. Wizzy lab
 
 ## Compounding
 
-Compound only when simulated fees after Wizzy's disclosed fee exceed estimated gas and the configured economic threshold. Revert Compoundor's keeper is a useful model: compare estimated gains against execution cost, prefer the least costly viable token conversion, group compatible work, and back off after failures. Wizzy's self-custodial launch flow prepares the compound batch for user approval; delegated automation requires a separate, narrowly scoped session-key policy and is not implied by login.
+Compound only when simulated fees after Wizzy's disclosed fee exceed estimated gas and the configured economic threshold. Revert Compoundor's keeper is a useful model: compare estimated gains against execution cost, prefer the least costly viable token conversion, group compatible work, and back off after failures. Wizzy's self-custodial launch flow prepares the compound transaction plan for user approval; delegated automation requires a separate, narrowly scoped session-key policy and is not implied by login.

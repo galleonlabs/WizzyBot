@@ -30,29 +30,9 @@ type HostedPortfolioSurface = {
     owner: string;
     chain: "base" | "robinhood";
     amountWei: bigint;
-    marketIds?: readonly string[];
+    marketId: string;
     protocol?: "V2" | "V3" | "V4";
   }) => Promise<unknown>;
-  planDualChainAllocation: (input: {
-    owner: string;
-    totalAmountWei: bigint;
-    robinhoodShareBps?: number;
-    baseMarketIds?: readonly string[];
-    robinhoodMarketIds?: readonly string[];
-  }) => Promise<unknown>;
-  planMemeIndex: (input: {
-    owner: string;
-    solanaOwner: string;
-    totalAmountWei: bigint;
-  }) => Promise<unknown>;
-  planRobinhoodIndex: (input: {
-    owner: string;
-    totalAmountWei: bigint;
-    originChainId?: number;
-  }) => Promise<unknown>;
-  getMemeIndexBreadthPolicy: () => unknown;
-  getRobinhoodIndexBreadthPolicy: () => unknown;
-  getRobinhoodIndexState: () => Promise<unknown>;
   planPositionAction: (input: {
     owner: string;
     chain: "base" | "robinhood";
@@ -61,11 +41,6 @@ type HostedPortfolioSurface = {
     protocol?: "V2" | "V3" | "V4";
     venue?: "uniswap-v3" | "aerodrome-slipstream";
     positionManager?: string;
-  }) => Promise<unknown>;
-  planIndexMigration: (input: {
-    owner: string;
-    tokenId: bigint;
-    migrationId: string;
   }) => Promise<unknown>;
   quoteBaseToRobinhoodEth: (input: { owner: string; amountInWei: bigint }) => Promise<unknown>;
   quoteEthToRobinhood: (input: { owner: string; amountInWei: bigint; originChainId: number }) => Promise<unknown>;
@@ -91,14 +66,7 @@ export const fetchRecentPoolActivity = hosted.fetchRecentPoolActivity;
 export const mergePoolActivityItems = hosted.mergePoolActivityItems;
 export const fetchSolanaMarketStats = hosted.fetchSolanaMarketStats;
 export const planAllocation = hosted.planAllocation;
-export const planDualChainAllocation = hosted.planDualChainAllocation;
-export const planMemeIndex = hosted.planMemeIndex;
-export const planRobinhoodIndex = hosted.planRobinhoodIndex;
-export const getMemeIndexBreadthPolicy = hosted.getMemeIndexBreadthPolicy;
-export const getRobinhoodIndexBreadthPolicy = hosted.getRobinhoodIndexBreadthPolicy;
-export const getRobinhoodIndexState = hosted.getRobinhoodIndexState;
 export const planPositionAction = hosted.planPositionAction;
-export const planIndexMigration = hosted.planIndexMigration;
 export const quoteBaseToRobinhoodEth = hosted.quoteBaseToRobinhoodEth;
 export const quoteEthToRobinhood = hosted.quoteEthToRobinhood;
 export const ETH_FUNDING_CHAINS = hosted.ETH_FUNDING_CHAINS;

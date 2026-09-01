@@ -7,7 +7,7 @@ export type ProductVerb = (typeof PRODUCT_VERBS)[number];
 
 export const PRODUCT_HELP = [
   `Wizzy. ${PRODUCT_LINE}`,
-  "Consumer launch index: Robinhood Chain. Multi-network engines remain available to operators.",
+  "Reviewed meme markets on Base and Robinhood Chain.",
   "list | status | mint | compound | range | exit | simulate",
   "--protocol v2|v3|v4 (default v3). --chain base|robinhood (default base).",
   "Dry-run default. --live and yes to broadcast.",

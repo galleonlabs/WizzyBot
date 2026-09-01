@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PositionView } from "../app/lib/cards.js";
-import { positionFeesEth, positionValueEth, positionValueUsd, summarizePositions } from "../app/lib/portfolio-summary.js";
+import { positionFeesEth, positionValueEth, positionValueUsd } from "../app/lib/portfolio-summary.js";
 
 function position(overrides: Partial<PositionView> = {}): PositionView {
   return {
@@ -30,28 +30,10 @@ function position(overrides: Partial<PositionView> = {}): PositionView {
   };
 }
 
-describe("portfolio fee summary", () => {
-  it("keeps current position value separate from unclaimed fees", () => {
-    const first = position({ positionUsd: 100, feesUsd: 4, lpUsd: 104, feeApr: 0.2 });
-    const second = position({ positionUsd: 300, feesUsd: 6, lpUsd: 306, feeApr: 0.1, status: "oor", inRange: false });
-    expect(summarizePositions([first, second])).toEqual({
-      priced: 2,
-      valueUsd: 400,
-      feesPriced: 2,
-      feesUsd: 10,
-      earning: 1,
-      feeApr: 0.125,
-    });
-  });
-
+describe("position values", () => {
   it("derives position value from a combined LP value only when necessary", () => {
     expect(positionValueUsd(position({ lpUsd: 52, feesUsd: 2 }))).toBe(50);
     expect(positionValueUsd(position({ lpUsd: 52 }))).toBe(52);
-  });
-
-  it("does not invent values for an empty or unpriced wallet", () => {
-    expect(summarizePositions([])).toEqual({ priced: 0, valueUsd: 0, feesPriced: 0, feesUsd: 0, earning: 0, feeApr: null });
-    expect(summarizePositions([position()])).toEqual({ priced: 0, valueUsd: 0, feesPriced: 0, feesUsd: 0, earning: 1, feeApr: null });
   });
 
   it("derives an honest ETH value when Robinhood USD pricing is unavailable", () => {

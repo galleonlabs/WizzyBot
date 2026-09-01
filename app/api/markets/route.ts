@@ -7,21 +7,19 @@ export const revalidate = 30;
 
 const getMarketsPayload = unstable_cache(async () => {
   const solana = getSolanaMarketCatalog();
-  const [indexState, evmStats, solanaStats] = await Promise.all([
-    getRobinhoodIndexState() as Promise<{ source: "catalog" | "onchain"; catalog: unknown; policy: unknown; registry: unknown }>,
+  const [catalogState, evmStats, solanaStats] = await Promise.all([
+    getRobinhoodIndexState() as Promise<{ source: "catalog" | "onchain"; catalog: unknown }>,
     fetchMarketStats().catch(() => []),
     fetchSolanaMarketStats().catch(() => []),
   ]);
   return {
-    catalog: indexState.catalog,
+    catalog: catalogState.catalog,
     solana,
-    index: indexState.policy,
-    registry: indexState.registry,
     fundingChains: ETH_FUNDING_CHAINS,
     stats: [...evmStats as unknown[], ...solanaStats as unknown[]],
-    source: `${indexState.source === "onchain" ? "onchain Robinhood index" : "version-controlled Robinhood index"} + live GeckoTerminal pool data`,
+    source: `${catalogState.source === "onchain" ? "onchain market catalog" : "version-controlled market catalog"} + live pool data`,
   };
-}, ["wizzy-markets-v1"], { revalidate: 30, tags: ["markets"] });
+}, ["wizzy-markets-v2"], { revalidate: 30, tags: ["markets"] });
 
 export async function GET() {
   return NextResponse.json(await getMarketsPayload(), {

@@ -73,7 +73,6 @@ export type MarketStats = {
 export type MarketsPayload = {
   catalog: MarketCatalog;
   solana: SolanaChainCatalog;
-  index: RobinhoodIndexBreadthPolicy;
   fundingChains: EthFundingChain[];
   stats: MarketStats[];
   source: string;

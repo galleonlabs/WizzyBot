@@ -6,19 +6,15 @@ import { createPortal } from "react-dom";
 import { formatEther, parseEther } from "viem";
 import { lightRowToView, priceLabel, type PositionView } from "./lib/cards";
 import { readJsonPayload } from "./lib/api-payload";
-import { positionFeesEth, positionValueEth, positionValueUsd, summarizePositions } from "./lib/portfolio-summary";
+import { positionFeesEth, positionValueEth, positionValueUsd } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
 import {
   type CuratedMarket,
-  type AllocationMarketPlan,
   type AllocationPlan,
   type MarketsPayload,
   type MarketStats,
   type PoolActivityItem,
   type PoolActivityPayload,
-  type RobinhoodIndexBreadthPolicy,
-  type RobinhoodIndexBreadthTier,
-  type RobinhoodIndexPlan,
   type PositionActionPlan,
 } from "./lib/portfolio-types";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
@@ -39,7 +35,6 @@ type MarketChain = ChainSlug | "solana";
 type MarketEntry = {
   market: CuratedMarket;
   chain: MarketChain;
-  indexWeightBps: number;
 };
 const MARKET_SKELETON_COUNT = 6;
 const FOMO_URL = "https://fomo.family/r/makemememarkets";
@@ -87,14 +82,6 @@ const EMPTY_MARKETS: MarketsPayload = {
     minimumAllocationLamports: "300000000",
     gasReserveLamports: "25000000",
     markets: [],
-  },
-  index: {
-    chain: "robinhood",
-    breadthUnitWei: "20000000000000000",
-    minimumAmountWei: "20000000000000000",
-    maximumConstituents: MARKET_SKELETON_COUNT,
-    tiers: [],
-    selectionRules: { minimumPoolAgeDays: 30, minimumLiquidityUsd: 75_000, quoteSymbol: "WETH", venue: "Uniswap v3" },
   },
   fundingChains: [{ id: 8453, label: "Base" }, { id: 4663, label: "Robinhood Chain" }],
   stats: [],
@@ -284,7 +271,7 @@ export function PortfolioApp() {
   const activeMarkets = useMemo<MarketEntry[]>(() => {
     return markets.catalog.chains.flatMap((chain) => chain.markets
       .filter((market) => market.status === "active")
-      .map((market) => ({ market, chain: chain.slug, indexWeightBps: market.weightBps })));
+      .map((market) => ({ market, chain: chain.slug })));
   }, [markets]);
   const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
   const hasPortfolioAccess = authenticated || previewMode;
@@ -512,7 +499,6 @@ export function PortfolioApp() {
         markets={activeMarkets}
         stats={stats}
         state={marketsState}
-        policy={markets.index}
         zapMarketId={zapMarketId}
         zapAmount={zapAmount}
         zapPlan={zapPlan}
@@ -822,11 +808,10 @@ function SuccessCelebration({ label }: { label: string }) {
   </div>;
 }
 
-function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balances, onFund }: {
+function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balances, onFund }: {
   markets: MarketEntry[];
   stats: Map<string, MarketStats>;
   state: "loading" | "ready" | "error";
-  policy: RobinhoodIndexBreadthPolicy;
   zapMarketId: string | null;
   zapAmount: string;
   zapPlan: AllocationPlan | null;
@@ -841,9 +826,6 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
 }) {
   const [chainFilter, setChainFilter] = useState<"all" | ChainSlug>("all");
   const visibleMarkets = chainFilter === "all" ? markets : markets.filter((entry) => entry.chain === chainFilter);
-  const orderedMarkets = [...visibleMarkets].sort(
-    (a, b) => marketTierRank(policy, a.market.id) - marketTierRank(policy, b.market.id) || b.indexWeightBps - a.indexWeightBps,
-  );
   const selected = markets.find(({ market, chain }) => market.id === zapMarketId && (chain === "base" || chain === "robinhood"));
 
   useEffect(() => {
@@ -871,7 +853,7 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
           <tbody>
             {state === "loading" ? Array.from({ length: MARKET_SKELETON_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={5}><i /></td></tr>) : null}
             {state === "error" ? <tr><td colSpan={5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
-            {state === "ready" ? orderedMarkets.map(({ market, chain }) => {
+            {state === "ready" ? visibleMarkets.map(({ market, chain }) => {
               const row = stats.get(market.id);
               const zappable = chain === "base" || chain === "robinhood";
               return <tr key={market.id}>
@@ -894,8 +876,8 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
       <div className="zap-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onCloseZap(); }}>
         <section className="zap-dialog" role="dialog" aria-modal="true" aria-labelledby="zap-dialog-title">
           <header>
-            <span><TokenIcon symbol={selected.market.symbol} src={stats.get(selected.market.id)?.tokenImageUrl} color={selected.market.color} /><span><small>{chainLabel(selected.chain)}</small><b id="zap-dialog-title">Make {selected.market.symbol}/WETH</b></span></span>
-            <button type="button" onClick={onCloseZap}>Close</button>
+            <span><TokenIcon symbol={selected.market.symbol} src={stats.get(selected.market.id)?.tokenImageUrl} color={selected.market.color} /><span><b id="zap-dialog-title">{selected.market.symbol}/WETH</b><small>{chainLabel(selected.chain)} · {selected.market.protocol === "AERODROME_SLIPSTREAM" ? "Aerodrome" : "Uniswap V3"} · ±{selected.market.rangeWidthPct.toFixed(0)}% range</small></span></span>
+            <button type="button" onClick={onCloseZap} aria-label="Close"><CloseIcon /></button>
           </header>
           <ZapPanel
             market={selected.market}
@@ -931,19 +913,15 @@ function ZapPanel({ market, chain, amount, plan, state, onAmount, onPrepare, onE
   const planMarket = plan?.markets[0];
   const busy = state.kind === "signing" || state.kind === "waiting";
   return <div className="zap-panel" aria-label={`Make the ${market.symbol}/WETH market`}>
-    <div className="zap-head">
-      <span><b>Add liquidity</b><small>Wizzy prepares the swap and range.</small></span>
-      <span className="zap-range"><small>Range</small><b>±{market.rangeWidthPct.toFixed(0)}%</b></span>
-    </div>
     <div className="zap-controls">
+      <span className="zap-balance">Amount {balance ? <small role="status">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></small> : null}</span>
       <label className="zap-amount">
         <input autoFocus inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
         <b>ETH</b>
       </label>
-      {balance ? <span className="wallet-balance" role="status" title={`${chainLabel(chain)} ETH balance`}>Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></span> : null}
       {plan && (state.kind === "ready" || busy) ? (
         <button className="fund-button zap-cta" type="button" disabled={busy} onClick={onExecute}>
-          {busy ? state.message : `Mint ${market.symbol} position`}
+          {busy ? state.message : "Add liquidity"}
         </button>
       ) : (
         <button className="fund-button zap-cta" type="button" disabled={state.kind === "planning"} onClick={onPrepare}>
@@ -951,18 +929,12 @@ function ZapPanel({ market, chain, amount, plan, state, onAmount, onPrepare, onE
         </button>
       )}
     </div>
-    {plan && planMarket ? <div className="zap-preview">
-      <span><small>Position</small><b>{formatWalletBalance(planMarket.mintWeth)} WETH + {compactAmount(planMarket.mintMeme, 18)} {market.symbol}</b></span>
-      <span><small>Wizzy fee</small><b>{formatWalletBalance(plan.serviceFeeWei)} ETH</b></span>
-    </div> : null}
-    <div className="funding-choice">
-      <span><b>Need ETH on {chainLabel(chain)}?</b><small>Bridge directly to this same wallet.</small></span>
-      <button className="cross-chain-fund" type="button" onClick={onFund}>
-        <EthereumIcon />Add ETH<ExternalLinkIcon />
-      </button>
-    </div>
+    {plan && planMarket ? <dl className="zap-preview">
+      <div><dt>Position</dt><dd>{formatWalletBalance(planMarket.mintWeth)} WETH + {compactAmount(planMarket.mintMeme, 18)} {market.symbol}</dd></div>
+      <div><dt>Wizzy fee</dt><dd>{formatWalletBalance(plan.serviceFeeWei)} ETH</dd></div>
+    </dl> : null}
     {state.kind === "submitted" || state.kind === "error" ? <p className={`funding-status is-${state.kind === "submitted" ? "submitted" : "error"}`} aria-live="polite">{state.message}</p> : null}
-    <p className="action-assurance">{chainLabel(chain)} · Your wallet owns the position</p>
+    <footer><span>Your wallet owns the position</span><button type="button" onClick={onFund}>Need {chainLabel(chain)} ETH?</button></footer>
   </div>;
 }
 
@@ -980,9 +952,6 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
   onExecute: () => void;
   onCancel: () => void;
 }) {
-  const summary = summarizePositions(positions);
-  const summaryValueEth = positions.reduce((total, position) => total + (positionValueEth(position) ?? 0), 0);
-  const summaryFeesEth = positions.reduce((total, position) => total + (positionFeesEth(position) ?? 0), 0);
   const showPositions = authenticated && positions.length > 0;
   const settlement = actionPlan?.settlement;
   return (
@@ -999,12 +968,6 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
       {authenticated && (state === "idle" || state === "loading") ? <PortfolioEmpty variant="loading" /> : null}
       {authenticated && state === "error" ? <PortfolioEmpty variant="error" onPrimary={onRetry} /> : null}
       {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" onPrimary={onStart} /> : null}
-      {showPositions ? <section className="portfolio-summary" aria-label="Portfolio summary">
-        <div><span>Position value</span><strong>{summary.valueUsd > 0 ? money(summary.valueUsd) : summaryValueEth > 0 ? ethValue(summaryValueEth) : "—"}</strong><small>{summary.valueUsd > 0 ? `${summary.priced} of ${positions.length} priced` : "From live token balances"}</small></div>
-        <div><span>Ready to collect</span><strong>{summary.feesUsd > 0 ? money(summary.feesUsd) : ethValue(summaryFeesEth)}</strong><small>Unclaimed fees</small></div>
-        <div><span>In range</span><strong>{summary.earning}</strong><small>of {positions.length} {positions.length === 1 ? "position" : "positions"}</small></div>
-        <div><span>Fee APR</span><strong>{formatFeeAprFraction(summary.feeApr)}</strong><small>Across priced positions</small></div>
-      </section> : null}
       {showPositions ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
         <span className="position-pair"><TokenIcon symbol={position.symbol0} src={positionTokenImage(position, markets, stats)} /><span><b>{position.pair}</b><small>{position.chainLabel} · {positionVenueLabel(position)}</small></span></span>
         <span><small>Position value</small><b>{positionValueLabel(position)}</b></span>
@@ -1142,11 +1105,6 @@ function PositionRange({ position }: { position: PositionView }) {
   </span>;
 }
 
-function marketTierRank(policy: RobinhoodIndexBreadthPolicy, marketId: string): number {
-  const rank = policy.tiers.findIndex((tier) => tier.marketIds.includes(marketId));
-  return rank === -1 ? Number.MAX_SAFE_INTEGER : rank;
-}
-
 function chainLabel(chain: MarketChain): string {
   if (chain === "base") return "Base";
   if (chain === "robinhood") return "Robinhood";
@@ -1226,17 +1184,6 @@ function ThemeIcon({ preference }: { preference: ThemePreference }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2.5" /><path d="M8 21h8M12 17v4M12 4v13" /></svg>;
 }
 
-function EthereumIcon() {
-  return <svg className="ethereum-icon" viewBox="0 0 256 417" aria-hidden="true">
-    <path d="M127.9 0 125 9.8v272l2.9 2.9 127.9-75.6Z" fill="currentColor" opacity=".72" />
-    <path d="m127.9 0-128 209.1 128 75.6Z" fill="currentColor" />
-    <path d="m127.9 309.2-1.6 2v98.2l1.6 4.7L256 233.6Z" fill="currentColor" opacity=".72" />
-    <path d="M127.9 414.1V309.2L0 233.6Z" fill="currentColor" />
-    <path d="m127.9 284.7 127.9-75.6-127.9-58.1Z" fill="currentColor" opacity=".45" />
-    <path d="m0 209.1 127.9 75.6V151Z" fill="currentColor" opacity=".72" />
-  </svg>;
-}
-
 function TokenIcon({ symbol, src, color }: { symbol: string; src?: string | null; color?: string }) {
   return <span className="token-icon" style={{ backgroundColor: color ?? "var(--surface-3)" }} aria-hidden="true">
     {src ? <img src={src} alt="" /> : <b>{symbol.slice(0, 1)}</b>}
@@ -1264,6 +1211,7 @@ function VenueTrail({ chain, protocol }: { chain: MarketChain; protocol: Curated
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }
 function ChevronIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" /></svg>; }
 function ExternalLinkIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M17 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" /></svg>; }
+function CloseIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>; }
 function SendIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-5 14-2.5-5.5L5 12Z" /><path d="m11.5 13.5 3-3" /></svg>; }
 function DisconnectIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3M14 8l4 4-4 4M18 12H9" /></svg>; }
 function CheckIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9" /></svg>; }

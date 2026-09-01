@@ -24,7 +24,7 @@ const display = Unbounded({
 const siteUrl = "https://wizzy.meme";
 const socialTitle = "Wizzy: Make Meme Markets";
 const socialDescription =
-  "Deposit ETH into a curated index of meme markets and earn trading fees, managed by agents on Robinhood Chain.";
+  "Pick a reviewed meme pool on Base or Robinhood, add ETH, and own the liquidity position.";
 const socialImage = {
   url: "/brand/wizzy-social-unbounded-v1.png",
   width: 1200,
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   creator: "Wizzy",
   publisher: "Wizzy",
   category: "finance",
-  keywords: ["meme markets", "Robinhood Chain", "liquidity index", "DeFi", "Wizzy"],
+  keywords: ["meme markets", "Robinhood Chain", "Base", "liquidity", "DeFi", "Wizzy"],
   formatDetection: { email: false, address: false, telephone: false },
   robots: {
     index: true,

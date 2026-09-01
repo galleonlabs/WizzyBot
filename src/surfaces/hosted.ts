@@ -27,6 +27,7 @@ import {
 import { addressesFor, parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
 import { scoutMarkets as getMarketScout } from "../markets/scout.js";
 import { chainCatalog } from "../markets/catalog.js";
+import { readLiquidityProfile } from "../portfolio/liquidity-profile.js";
 
 export type WriteFlags = {
   live?: boolean;
@@ -97,6 +98,7 @@ export async function connectHosted(ownerArg?: string, chain: ChainSlug | string
 }
 
 async function liveViewFor(snap: PositionSnapshot, client: ReturnType<typeof makePublicClient>, ethUsd?: number) {
+  const profilePromise = readLiquidityProfile(client, snap).catch(() => undefined);
   const prices = await usdPricesForPosition(client, snap, ethUsd);
   const rec = await readHoldBaseline(client, snap.ref.tokenId, { amount0: snap.amount0, amount1: snap.amount1 }, {
     positionManager: snap.positionManager,
@@ -105,7 +107,7 @@ async function liveViewFor(snap: PositionSnapshot, client: ReturnType<typeof mak
     source: rec.source,
     note: formatHoldNote(rec),
   });
-  return { card, view: serializeLiveView(card) };
+  return { card, view: serializeLiveView(card), liquidityProfile: await profilePromise };
 }
 
 export async function listPositions(ownerArg?: string, chain: ChainSlug | string = "base") {
@@ -152,7 +154,7 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
           positionManager: snap.positionManager ?? snap.ref.positionManager,
         };
         try {
-          const { view } = await liveViewFor(snap, client, env.ethUsd);
+          const { view, liquidityProfile } = await liveViewFor(snap, client, env.ethUsd);
           row.view = view;
           row.positionUsd = view.positionUsd;
           row.feesUsd = view.feesUsd;
@@ -161,6 +163,7 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
           row.holdUsd = view.holdUsd;
           row.feeLabel = view.feeLabel;
           row.status = view.status;
+          row.liquidityProfile = liquidityProfile;
           row.closed = view.closed;
           row.fullRange = view.fullRange;
           row.lpUsd = view.lpUsd;
@@ -192,7 +195,7 @@ export async function statusPosition(
   const { adapter, client, env } = connectRead(slug, { protocol, positionManager });
   const id = BigInt(tokenId);
   const snap = await adapter.readPosition(id);
-  const { card, view } = await liveViewFor(snap, client, env.ethUsd);
+  const { card, view, liquidityProfile } = await liveViewFor(snap, client, env.ethUsd);
   return jsonSafe({
     card: formatCard(card),
     view,
@@ -203,6 +206,7 @@ export async function statusPosition(
     protocol: snap.ref.protocol,
     venue: snap.venue ?? snap.ref.venue,
     positionManager: snap.positionManager ?? snap.ref.positionManager,
+    liquidityProfile,
   });
 }
 

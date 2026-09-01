@@ -1,6 +1,32 @@
 /** Local preview only. Never served as a live wallet list. */
 import type { PositionView } from "./cards";
 
+function previewLiquidity(tickLower: number, tickUpper: number, tickCurrent: number, venue: "uniswap-v3" | "aerodrome-slipstream") {
+  const count = 32;
+  const width = (tickUpper - tickLower) / count;
+  return {
+    source: "live" as const,
+    protocol: "V3" as const,
+    venue,
+    tickCurrent,
+    tickSpacing: 200,
+    tickLower,
+    tickUpper,
+    complete: true,
+    bins: Array.from({ length: count }, (_, index) => {
+      const center = index / (count - 1);
+      const shoulder = Math.exp(-Math.pow((center - 0.44) / 0.2, 2));
+      const secondary = 0.44 * Math.exp(-Math.pow((center - 0.76) / 0.11, 2));
+      return {
+        tickLower: Math.round(tickLower + width * index),
+        tickUpper: Math.round(tickLower + width * (index + 1)),
+        liquidity: String(Math.round((shoulder + secondary) * 1_000_000)),
+        height: Math.min(1, shoulder + secondary),
+      };
+    }),
+  };
+}
+
 export const SHOT_VIEWS: PositionView[] = [
   {
     kind: "live",
@@ -44,6 +70,7 @@ export const SHOT_VIEWS: PositionView[] = [
     holdDeltaPct: 0.023,
     ilUsd: -110.2,
     divergence: 0.023,
+    liquidityProfile: previewLiquidity(-160000, -148000, -153920, "uniswap-v3"),
   },
   {
     kind: "live",
@@ -87,6 +114,7 @@ export const SHOT_VIEWS: PositionView[] = [
     holdDeltaPct: -0.060,
     ilUsd: -344,
     divergence: -0.060,
+    liquidityProfile: previewLiquidity(-132000, -117000, -119800, "aerodrome-slipstream"),
   },
   {
     kind: "live",
@@ -126,6 +154,7 @@ export const SHOT_VIEWS: PositionView[] = [
     holdUsd: 2980,
     holdDeltaUsd: 48.68,
     holdDeltaPct: 0.016,
+    liquidityProfile: previewLiquidity(-123000, -111000, -116200, "uniswap-v3"),
   },
 ];
 

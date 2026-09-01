@@ -274,6 +274,7 @@ export class V4Protocol implements ProtocolAdapter {
       inRange: isInRange(tickCurrent, tickLower, tickUpper),
       percentThroughRange: percentThroughRange(tickCurrent, tickLower, tickUpper),
       pool: addrs.v4PoolManager,
+      poolId,
     };
   }
 }

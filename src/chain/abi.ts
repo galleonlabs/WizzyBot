@@ -150,6 +150,13 @@ export const poolAbi = [
   },
   {
     type: "function",
+    name: "tickBitmap",
+    stateMutability: "view",
+    inputs: [{ name: "wordPosition", type: "int16" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "token0",
     stateMutability: "view",
     inputs: [],
@@ -495,6 +502,29 @@ export const v4StateViewAbi = [
     stateMutability: "view",
     inputs: [{ name: "poolId", type: "bytes32" }],
     outputs: [{ type: "uint128" }],
+  },
+  {
+    type: "function",
+    name: "getTickBitmap",
+    stateMutability: "view",
+    inputs: [
+      { name: "poolId", type: "bytes32" },
+      { name: "tick", type: "int16" },
+    ],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getTickLiquidity",
+    stateMutability: "view",
+    inputs: [
+      { name: "poolId", type: "bytes32" },
+      { name: "tick", type: "int24" },
+    ],
+    outputs: [
+      { name: "liquidityGross", type: "uint128" },
+      { name: "liquidityNet", type: "int128" },
+    ],
   },
   {
     type: "function",

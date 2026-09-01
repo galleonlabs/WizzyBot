@@ -108,6 +108,7 @@ export interface PositionSnapshot {
   inRange: boolean;
   percentThroughRange: number;
   pool: Address;
+  poolId?: Hex;
   venue?: PositionVenue;
   positionManager?: Address;
   factory?: Address;

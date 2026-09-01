@@ -9,6 +9,19 @@ export const MIN_TICK = -887272;
 export const MAX_TICK = 887272;
 export type RangePreset = "focused" | "balanced" | "wide";
 
+export type LiquidityProfile = {
+  source: "live";
+  protocol: "V3" | "V4";
+  venue: "uniswap-v3" | "aerodrome-slipstream" | "uniswap-v4";
+  tickCurrent: number;
+  tickSpacing: number;
+  tickLower: number;
+  tickUpper: number;
+  complete: boolean;
+  notice?: string;
+  bins: Array<{ tickLower: number; tickUpper: number; liquidity: string; height: number }>;
+};
+
 export const RANGE_PRESET_MULTIPLIER: Record<RangePreset, number> = {
   focused: 0.6,
   balanced: 1,
@@ -62,6 +75,7 @@ export type PositionView = {
   pool?: string;
   owner?: string;
   holdNote?: string;
+  liquidityProfile?: LiquidityProfile;
 };
 
 export type PositionRangeGeometry = {
@@ -189,7 +203,7 @@ function numOrNull(value: unknown): number | null | undefined {
 }
 
 export function lightRowToView(row: Record<string, unknown>): PositionView | null {
-  if (isPositionView(row.view)) return row.view;
+  if (isPositionView(row.view)) return { ...row.view, liquidityProfile: asLiquidityProfile(row.liquidityProfile) };
   if (typeof row.pair !== "string") return null;
   const fee = typeof row.fee === "number" ? row.fee : Number(row.fee ?? 0);
   const protocol = asProtocol(row.protocol);
@@ -248,6 +262,31 @@ export function lightRowToView(row: Record<string, unknown>): PositionView | nul
     holdDeltaPct: num(row.holdDeltaPct) ?? num(row.divergence),
     ilUsd: num(row.ilUsd),
     feesVsIlUsd: num(row.feesVsIlUsd) ?? holdDeltaUsd,
+    liquidityProfile: asLiquidityProfile(row.liquidityProfile),
+  };
+}
+
+function asLiquidityProfile(value: unknown): LiquidityProfile | undefined {
+  if (!isRecord(value) || value.source !== "live" || !Array.isArray(value.bins)) return undefined;
+  if (value.protocol !== "V3" && value.protocol !== "V4") return undefined;
+  const venue = value.venue;
+  if (venue !== "uniswap-v3" && venue !== "aerodrome-slipstream" && venue !== "uniswap-v4") return undefined;
+  const bins = value.bins.flatMap((bin) => {
+    if (!isRecord(bin) || typeof bin.tickLower !== "number" || typeof bin.tickUpper !== "number" || typeof bin.liquidity !== "string" || typeof bin.height !== "number") return [];
+    return [{ tickLower: bin.tickLower, tickUpper: bin.tickUpper, liquidity: bin.liquidity, height: Math.max(0, Math.min(1, bin.height)) }];
+  });
+  if (!bins.length || typeof value.tickCurrent !== "number" || typeof value.tickSpacing !== "number" || typeof value.tickLower !== "number" || typeof value.tickUpper !== "number") return undefined;
+  return {
+    source: "live",
+    protocol: value.protocol,
+    venue,
+    tickCurrent: value.tickCurrent,
+    tickSpacing: value.tickSpacing,
+    tickLower: value.tickLower,
+    tickUpper: value.tickUpper,
+    complete: value.complete === true,
+    notice: typeof value.notice === "string" ? value.notice : undefined,
+    bins,
   };
 }
 

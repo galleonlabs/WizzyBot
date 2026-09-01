@@ -1169,15 +1169,38 @@ function PositionRangePlanner({ position, preset, preview, previousTickLower, pr
       {choices.map((choice) => <button key={choice.id} type="button" className={preset === choice.id ? "is-active" : ""} aria-pressed={preset === choice.id} disabled={disabled} onClick={() => onPreset(choice.id)}><b>{choice.label}</b><small>{choice.detail}</small></button>)}
     </div>
     <div className="range-compare" style={styles} aria-label={`Current ticks ${previousTickLower} to ${previousTickUpper}. New ticks ${preview.tickLower} to ${preview.tickUpper}.`}>
+      <LiquidityBars profile={position.liquidityProfile} domainMin={domainMin} domainMax={domainMax} />
       <span className="range-compare-axis" aria-hidden="true" />
       <span className="range-compare-window is-current" aria-hidden="true" />
       <span className="range-compare-window is-new" aria-hidden="true" />
       <span className="range-compare-price" aria-hidden="true"><i /></span>
     </div>
-    <div className="range-compare-legend"><span><i className="is-current" />Current</span><span><i className="is-new" />New</span></div>
+    <div className="range-compare-legend"><span><i className="is-current" />Current</span><span><i className="is-new" />New</span>{position.liquidityProfile ? <span><i className="is-liquidity" />Live pool liquidity</span> : null}</div>
     <dl className="range-preview-values"><div><dt>Min · current → new</dt><dd>{priceLabel(position.price * Math.pow(1.0001, previousTickLower - position.tickCurrent))} <i>→</i> {priceLabel(preview.priceMin)}</dd></div><div><dt>Max · current → new</dt><dd>{priceLabel(position.price * Math.pow(1.0001, previousTickUpper - position.tickCurrent))} <i>→</i> {priceLabel(preview.priceMax)}</dd></div></dl>
     <p className="range-preview-ticks">Ticks {previousTickLower}–{previousTickUpper} → {preview.tickLower}–{preview.tickUpper}</p>
   </section>;
+}
+
+function LiquidityBars({ profile, domainMin, domainMax }: {
+  profile: PositionView["liquidityProfile"];
+  domainMin: number;
+  domainMax: number;
+}) {
+  if (!profile || domainMax <= domainMin) return null;
+  const span = domainMax - domainMin;
+  const visible = profile.bins.filter((bin) => bin.tickUpper > domainMin && bin.tickLower < domainMax);
+  if (!visible.length) return null;
+  return <span className="liquidity-profile" aria-hidden="true">
+    {visible.map((bin) => {
+      const lower = Math.max(domainMin, bin.tickLower);
+      const upper = Math.min(domainMax, bin.tickUpper);
+      return <i key={`${bin.tickLower}:${bin.tickUpper}`} style={{
+        left: `${((lower - domainMin) / span) * 100}%`,
+        width: `${Math.max(0.35, ((upper - lower) / span) * 100)}%`,
+        height: `${Math.max(3, bin.height * 88)}%`,
+      }} />;
+    })}
+  </span>;
 }
 
 function PositionRangeChart({ position }: { position: PositionView }) {

@@ -21,6 +21,8 @@ export const slipstreamPoolAbi = [
   { type: "function", name: "tickSpacing", stateMutability: "view", inputs: [], outputs: [{ type: "int24" }] },
   { type: "function", name: "feeGrowthGlobal0X128", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "feeGrowthGlobal1X128", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "liquidity", stateMutability: "view", inputs: [], outputs: [{ type: "uint128" }] },
+  { type: "function", name: "tickBitmap", stateMutability: "view", inputs: [{ name: "wordPosition", type: "int16" }], outputs: [{ type: "uint256" }] },
   {
     type: "function",
     name: "ticks",

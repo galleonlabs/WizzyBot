@@ -977,16 +977,19 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
 .range-preset-options button.is-active { border-color: color-mix(in srgb, var(--coral) 62%, var(--line)); background: color-mix(in srgb, var(--coral) 9%, var(--surface-2)); }
 .range-preset-options button.is-active b { color: var(--ink); }
 .range-compare { position: relative; height: 76px; margin-top: 12px; overflow: hidden; border-radius: 9px; background: var(--surface-2); }
+.liquidity-profile { position: absolute; inset: 8px 0; overflow: hidden; opacity: .72; }
+.liquidity-profile i { position: absolute; bottom: 0; min-height: 2px; border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--ink-soft) 13%, transparent); }
 .range-compare-axis { position: absolute; top: 50%; right: 0; left: 0; height: 1px; background: var(--line-strong); }
-.range-compare-window { position: absolute; left: var(--old-range-start); width: var(--old-range-width); border-radius: 5px; }
+.range-compare-window { position: absolute; z-index: 1; left: var(--old-range-start); width: var(--old-range-width); border-radius: 5px; }
 .range-compare-window.is-current { top: 17px; height: 15px; border: 1px solid var(--line-strong); background: transparent; }
 .range-compare-window.is-new { top: 43px; left: var(--new-range-start); width: var(--new-range-width); height: 18px; border: 1px solid color-mix(in srgb, var(--mint) 58%, var(--line)); background: color-mix(in srgb, var(--mint) 14%, var(--surface-2)); }
-.range-compare-price { position: absolute; z-index: 1; top: 8px; bottom: 8px; left: var(--range-position); width: 1px; border-left: 1px dashed var(--ink-soft); transform: translateX(-50%); }
+.range-compare-price { position: absolute; z-index: 2; top: 8px; bottom: 8px; left: var(--range-position); width: 1px; border-left: 1px dashed var(--ink-soft); transform: translateX(-50%); }
 .range-compare-price i { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; border: 2px solid var(--surface-2); border-radius: 50%; background: var(--ink); transform: translate(-50%, -50%); }
 .range-compare-legend { display: flex; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 8px; }
 .range-compare-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .range-compare-legend i { width: 12px; height: 6px; border: 1px solid var(--line-strong); border-radius: 2px; }
 .range-compare-legend i.is-new { border-color: color-mix(in srgb, var(--mint) 58%, var(--line)); background: color-mix(in srgb, var(--mint) 14%, var(--surface)); }
+.range-compare-legend i.is-liquidity { border: 0; background: color-mix(in srgb, var(--ink-soft) 16%, transparent); }
 .range-preview-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 12px 0 0; }
 .range-preview-values > div { display: grid; gap: 3px; }
 .range-preview-values > div:last-child { justify-items: end; }

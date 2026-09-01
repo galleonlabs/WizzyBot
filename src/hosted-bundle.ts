@@ -18,5 +18,6 @@ export { getSolanaMarketCatalog } from "./markets/solana-catalog.js";
 export { fetchSolanaMarketStats } from "./markets/solana-stats.js";
 export { planAllocation } from "./portfolio/allocation.js";
 export { planPositionAction } from "./portfolio/position-actions.js";
+export { readLiquidityProfile } from "./portfolio/liquidity-profile.js";
 export { quoteBaseToRobinhoodEth, quoteBaseToSolanaSol, quoteEthToRobinhood, relayIntentStatus } from "./relay/client.js";
 export { ETH_FUNDING_CHAINS } from "./relay/origins.js";

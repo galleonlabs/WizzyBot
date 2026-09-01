@@ -1,3 +1,4 @@
+import { getAddress, isAddress } from "viem";
 import { z } from "zod";
 import type { MarketCatalog } from "../markets/catalog.js";
 import type { CuratorConfig } from "./config.js";
@@ -23,12 +24,20 @@ const CandidateNominationSchema = z.object({
   sources: z.array(ResearchSourceSchema).min(3).max(12),
 });
 
+const VenueAdditionSchema = z.object({
+  discoveryId: z.string().regex(/^[a-z0-9-]+$/),
+  marketId: z.string().regex(/^[a-z0-9-]+$/),
+  rationale: z.array(z.string().min(1).max(500)).min(1).max(10),
+  sources: z.array(ResearchSourceSchema).min(3).max(12),
+});
+
 export const CuratorResearchDecisionSchema = z.object({
   schemaVersion: z.literal(1),
   verdict: z.enum(["no_change", "replace"]),
   summary: z.string().min(1).max(1_500),
   candidateReviews: z.array(CandidateReviewSchema).max(32),
   candidateNominations: z.array(CandidateNominationSchema).max(16),
+  venueAdditions: z.array(VenueAdditionSchema).max(16),
   replacement: z.object({
     fromMarketId: z.string().regex(/^[a-z0-9-]+$/),
     toMarketId: z.string().regex(/^[a-z0-9-]+$/),
@@ -48,6 +57,7 @@ export type CentralizedCatalogUpdate = {
   changedFiles: Array<"src/config/curator.json" | "src/config/markets.json">;
   appliedReviews: string[];
   appliedNominations: string[];
+  appliedVenues: string[];
   appliedReplacement: null | { fromMarketId: string; toMarketId: string };
   appliedPauses: string[];
 };
@@ -70,11 +80,15 @@ export function planCentralizedCatalogUpdate(input: {
   const evaluations = new Map(input.report.evaluations.map((evaluation) => [evaluation.marketId, evaluation]));
   const appliedReviews: string[] = [];
   const appliedNominations: string[] = [];
+  const appliedVenues: string[] = [];
 
   const discoveries = new Map(input.report.discoveries.map((discovery) => [discovery.id, discovery]));
   for (const nomination of decision.candidateNominations) {
     const discovery = discoveries.get(nomination.discoveryId);
     if (!discovery) throw new Error(`Research nominated unknown discovery ${nomination.discoveryId}`);
+    if (discovery.kind !== "candidate" || !discovery.executionReady || discovery.protocol !== "V3" || !isAddress(discovery.pool)) {
+      throw new Error(`Discovery ${discovery.id} is a research lead, not an executable V3 catalog candidate`);
+    }
     assertResearchEvidence(nomination.sources, discovery.chain);
     if (candidates.has(discovery.id)) throw new Error(`Candidate ${discovery.id} is already tracked`);
     const duplicate = [
@@ -93,7 +107,12 @@ export function planCentralizedCatalogUpdate(input: {
       chain: discovery.chain,
       token: discovery.token,
       pool: discovery.pool,
-      protocol: "V3" as const,
+      protocol: discovery.protocol,
+      liquidityVenues: discovery.venues.flatMap((venue) =>
+        venue.protocol === "V2" && venue.autoAttachable && isAddress(venue.pool)
+          ? [{ protocol: "V2" as const, pool: getAddress(venue.pool) }]
+          : []
+      ).slice(0, 1),
       sources: nomination.sources.map((source) => source.url),
     };
     curatorConfig.candidates.push(candidate);
@@ -118,6 +137,28 @@ export function planCentralizedCatalogUpdate(input: {
   if (appliedReviews.length || appliedNominations.length) {
     curatorConfig.version += 1;
     curatorConfig.updatedAt = input.today;
+  }
+
+  for (const addition of decision.venueAdditions) {
+    const discovery = discoveries.get(addition.discoveryId);
+    if (!discovery) throw new Error(`Research selected unknown venue discovery ${addition.discoveryId}`);
+    if (discovery.kind !== "venue" || discovery.marketId !== addition.marketId) {
+      throw new Error(`Discovery ${addition.discoveryId} does not belong to market ${addition.marketId}`);
+    }
+    if (!discovery.executionReady || discovery.protocol !== "V2" || !isAddress(discovery.pool)) {
+      throw new Error(`Discovery ${addition.discoveryId} is not an attachable Uniswap V2 venue`);
+    }
+    assertResearchEvidence(addition.sources, discovery.chain);
+    const chain = catalog.chains.find((entry) => entry.slug === discovery.chain);
+    const market = chain?.markets.find((entry) => entry.id === addition.marketId);
+    if (!market || market.token.toLowerCase() !== discovery.token.toLowerCase()) {
+      throw new Error(`Tracked market ${addition.marketId} does not match venue discovery ${addition.discoveryId}`);
+    }
+    if (market.liquidityVenues.some((venue) => venue.protocol === "V2")) {
+      throw new Error(`${market.id} already has a Uniswap V2 venue`);
+    }
+    market.liquidityVenues.push({ protocol: "V2", pool: getAddress(discovery.pool) });
+    appliedVenues.push(`${market.id}:V2:${getAddress(discovery.pool)}`);
   }
 
   let appliedReplacement: CentralizedCatalogUpdate["appliedReplacement"] = null;
@@ -161,10 +202,8 @@ export function planCentralizedCatalogUpdate(input: {
       status: "active",
       risk: candidate.risk,
       color: colorFor(candidate.id),
-      liquidityVenues: [],
+      liquidityVenues: candidate.liquidityVenues ?? [],
     });
-    catalog.version += 1;
-    catalog.updatedAt = input.today;
     appliedReplacement = { fromMarketId: outgoing.id, toMarketId: candidate.id };
   }
 
@@ -180,15 +219,15 @@ export function planCentralizedCatalogUpdate(input: {
     market.status = "paused";
     appliedPauses.push(`${market.id}:${evaluation.reasons.join("; ")}`);
   }
-  if (appliedPauses.length && !appliedReplacement) {
-    catalog.version += 1;
+  if (appliedVenues.length || appliedReplacement || appliedPauses.length) {
+    catalog.version = input.catalog.version + 1;
     catalog.updatedAt = input.today;
   }
 
   const changedFiles: CentralizedCatalogUpdate["changedFiles"] = [];
   if (appliedReviews.length || appliedNominations.length) changedFiles.push("src/config/curator.json");
-  if (appliedReplacement || appliedPauses.length) changedFiles.push("src/config/markets.json");
-  return { curatorConfig, catalog, changedFiles, appliedReviews, appliedNominations, appliedReplacement, appliedPauses };
+  if (appliedVenues.length || appliedReplacement || appliedPauses.length) changedFiles.push("src/config/markets.json");
+  return { curatorConfig, catalog, changedFiles, appliedReviews, appliedNominations, appliedVenues, appliedReplacement, appliedPauses };
 }
 
 function assertResearchEvidence(

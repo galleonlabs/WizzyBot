@@ -50,6 +50,7 @@ const audit = {
   changedFiles: result.changedFiles,
   appliedReviews: result.appliedReviews,
   appliedNominations: result.appliedNominations,
+  appliedVenues: result.appliedVenues,
   appliedReplacement: result.appliedReplacement,
   appliedPauses: result.appliedPauses,
 };

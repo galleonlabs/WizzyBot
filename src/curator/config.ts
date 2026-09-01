@@ -4,6 +4,19 @@ import rawConfig from "../config/curator.json" with { type: "json" };
 
 const EvmAddress = z.string().refine(isAddress, "invalid EVM address").transform((value) => getAddress(value));
 const Base58Address = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
+const PoolId = z.string().regex(/^0x[0-9a-fA-F]{64}$/, "invalid v4 pool id");
+
+const CandidateLiquidityVenueSchema = z.discriminatedUnion("protocol", [
+  z.object({ protocol: z.literal("V2"), pool: EvmAddress }),
+  z.object({
+    protocol: z.literal("V4"),
+    poolId: PoolId,
+    quoteSymbol: z.literal("ETH"),
+    fee: z.number().int().positive(),
+    tickSpacing: z.number().int().positive(),
+    hooks: EvmAddress,
+  }),
+]);
 
 const PolicySchema = z.object({
   snapshotMinutes: z.number().int().min(15).max(1_440),
@@ -41,12 +54,14 @@ const CandidateSchema = z.discriminatedUnion("chain", [
     protocol: z.enum(["V3", "AERODROME_SLIPSTREAM"]),
     aerodromeDeployment: z.enum(["legacy", "min-unstake"]).optional(),
     tickSpacing: z.number().int().positive().optional(),
+    liquidityVenues: z.array(CandidateLiquidityVenueSchema).max(2).optional(),
   }),
   CandidateBase.extend({
     chain: z.literal("robinhood"),
     token: EvmAddress,
     pool: EvmAddress,
     protocol: z.literal("V3"),
+    liquidityVenues: z.array(CandidateLiquidityVenueSchema).max(2).optional(),
   }),
   CandidateBase.extend({
     chain: z.literal("solana"),
@@ -77,6 +92,9 @@ const CuratorConfigSchema = z.object({
     }
     if (candidate.chain === "base" && candidate.protocol === "V3" && (candidate.aerodromeDeployment || candidate.tickSpacing)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["candidates", index], message: `${candidate.id} has unused Aerodrome settings` });
+    }
+    if (candidate.chain !== "solana" && new Set(candidate.liquidityVenues?.map((venue) => venue.protocol)).size !== (candidate.liquidityVenues?.length ?? 0)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["candidates", index, "liquidityVenues"], message: `${candidate.id} has duplicate alternative protocols` });
     }
   }
 });

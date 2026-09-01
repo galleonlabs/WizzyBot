@@ -164,6 +164,7 @@ describe("agentic centralized curator", () => {
     const config = structuredClone(getCuratorConfig());
     const discovery = {
       id: "base-fresh-555555",
+      kind: "candidate" as const,
       chain: "base" as const,
       name: "Fresh Meme",
       symbol: "FRESH",
@@ -176,6 +177,31 @@ describe("agentic centralized curator", () => {
       poolAgeDays: 90,
       sourceUrl: "https://www.geckoterminal.com/base/pools/0x6666666666666666666666666666666666666666",
       dexId: "uniswap-v3-base",
+      executionReady: true,
+      venues: [
+        {
+          protocol: "V3" as const,
+          pool: "0x6666666666666666666666666666666666666666" as const,
+          feePips: 10_000,
+          liquidityUsd: 700_000,
+          volume24hUsd: 300_000,
+          poolAgeDays: 90,
+          sourceUrl: "https://www.geckoterminal.com/base/pools/0x6666666666666666666666666666666666666666",
+          dexId: "uniswap-v3-base",
+          autoAttachable: true,
+        },
+        {
+          protocol: "V2" as const,
+          pool: "0x7777777777777777777777777777777777777777" as const,
+          feePips: 3_000,
+          liquidityUsd: 200_000,
+          volume24hUsd: 100_000,
+          poolAgeDays: 80,
+          sourceUrl: "https://www.geckoterminal.com/base/pools/0x7777777777777777777777777777777777777777",
+          dexId: "uniswap-v2-base",
+          autoAttachable: true,
+        },
+      ],
     };
     const baseSources = [
       { url: discovery.sourceUrl, title: "Pool", finding: "Pool identity and live market data" },
@@ -198,6 +224,7 @@ describe("agentic centralized curator", () => {
       risk: "experimental",
       chain: "base",
       protocol: "V3",
+      liquidityVenues: [{ protocol: "V2", pool: "0x7777777777777777777777777777777777777777" }],
       sources: baseSources.map((source) => source.url),
     });
     expect(result.catalog).toEqual(getMarketCatalog());
@@ -218,6 +245,104 @@ describe("agentic centralized curator", () => {
       catalog: structuredClone(getMarketCatalog()),
       today: "2026-09-01",
     })).toThrow("unknown discovery");
+  });
+
+  it("keeps a V4-only discovery in research instead of inventing executable pool-key data", () => {
+    const poolId = `0x${"a".repeat(64)}` as `0x${string}`;
+    const discovery = {
+      id: "base-v4-lead-555555",
+      kind: "candidate" as const,
+      chain: "base" as const,
+      name: "V4 Lead",
+      symbol: "V4LEAD",
+      token: "0x5555555555555555555555555555555555555555" as const,
+      pool: poolId,
+      protocol: "V4" as const,
+      feePips: 3_000,
+      liquidityUsd: 500_000,
+      volume24hUsd: 100_000,
+      poolAgeDays: 60,
+      sourceUrl: `https://www.geckoterminal.com/base/pools/${poolId}`,
+      dexId: "uniswap-v4-base",
+      executionReady: false,
+      executionNote: "Pool key research is required.",
+      venues: [{
+        protocol: "V4" as const,
+        pool: poolId,
+        feePips: 3_000,
+        liquidityUsd: 500_000,
+        volume24hUsd: 100_000,
+        poolAgeDays: 60,
+        sourceUrl: `https://www.geckoterminal.com/base/pools/${poolId}`,
+        dexId: "uniswap-v4-base",
+        autoAttachable: false,
+      }],
+    };
+    expect(() => planCentralizedCatalogUpdate({
+      report: { ...report([]), discoveries: [discovery] },
+      decision: decision({
+        candidateNominations: [{ discoveryId: discovery.id, identity: "watch", rationale: ["research further"], sources: [
+          { url: discovery.sourceUrl, title: "Pool", finding: "Pool identity" },
+          { url: `https://basescan.org/token/${discovery.token}`, title: "Contract", finding: "Token contract" },
+          { url: "https://example.com/v4lead", title: "Project", finding: "Project identity" },
+        ] }],
+      }),
+      curatorConfig: structuredClone(getCuratorConfig()),
+      catalog: structuredClone(getMarketCatalog()),
+      today: "2026-09-01",
+    })).toThrow("research lead, not an executable V3 catalog candidate");
+  });
+
+  it("adds a researched V2 venue to an existing market without replacing the market", () => {
+    const catalog = structuredClone(getMarketCatalog());
+    const market = catalog.chains.find((chain) => chain.slug === "base")!.markets.find((entry) => entry.id === "base-basecat")!;
+    const pool = "0x1111111111111111111111111111111111111111" as const;
+    const discovery = {
+      id: `base-basecat-${market.token.slice(2, 8).toLowerCase()}`,
+      kind: "venue" as const,
+      marketId: market.id,
+      chain: "base" as const,
+      name: market.name,
+      symbol: market.symbol,
+      token: market.token,
+      pool,
+      protocol: "V2" as const,
+      feePips: 3_000,
+      liquidityUsd: 500_000,
+      volume24hUsd: 100_000,
+      poolAgeDays: 60,
+      sourceUrl: `https://www.geckoterminal.com/base/pools/${pool}`,
+      dexId: "uniswap-v2-base",
+      executionReady: true,
+      venues: [{
+        protocol: "V2" as const,
+        pool,
+        feePips: 3_000,
+        liquidityUsd: 500_000,
+        volume24hUsd: 100_000,
+        poolAgeDays: 60,
+        sourceUrl: `https://www.geckoterminal.com/base/pools/${pool}`,
+        dexId: "uniswap-v2-base",
+        autoAttachable: true,
+      }],
+    };
+    const baseSources = [
+      { url: discovery.sourceUrl, title: "Pool", finding: "V2 pair and liquidity" },
+      { url: `https://basescan.org/token/${market.token}`, title: "Contract", finding: "Tracked token contract" },
+      { url: "https://example.com/basecat", title: "Project", finding: "Project identity" },
+    ];
+    const result = planCentralizedCatalogUpdate({
+      report: { ...report([]), discoveries: [discovery] },
+      decision: decision({ venueAdditions: [{ discoveryId: discovery.id, marketId: market.id, rationale: ["verified V2 route"], sources: baseSources }] }),
+      curatorConfig: structuredClone(getCuratorConfig()),
+      catalog,
+      today: "2026-09-01",
+    });
+    expect(result.appliedVenues).toEqual([`${market.id}:V2:${pool}`]);
+    expect(result.appliedReplacement).toBeNull();
+    expect(result.changedFiles).toEqual(["src/config/markets.json"]);
+    expect(result.catalog.version).toBe(getMarketCatalog().version + 1);
+    expect(result.catalog.chains.find((chain) => chain.slug === "base")!.markets.find((entry) => entry.id === market.id)!.liquidityVenues).toContainEqual({ protocol: "V2", pool });
   });
 
   it("pauses an incumbent the deterministic report calls pause", () => {
@@ -340,6 +465,7 @@ function decision(overrides: Partial<CuratorResearchDecision> = {}): CuratorRese
     summary: "No policy-authorized replacement",
     candidateReviews: [],
     candidateNominations: [],
+    venueAdditions: [],
     replacement: null,
     ...overrides,
   };

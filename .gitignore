@@ -24,3 +24,6 @@ pglite-debug.log
 tsconfig.tsbuildinfo
 dogfood-output/
 .playwright-mcp/
+contracts/lib/
+contracts/out/
+contracts/cache/

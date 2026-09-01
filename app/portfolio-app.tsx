@@ -120,7 +120,6 @@ export function PortfolioApp() {
   const { signTransaction } = useSignTransaction();
   const [tab, setTab] = useState<ViewTab>("overview");
   const [theme, setTheme] = useState<ThemePreference>("dark");
-  const [amount, setAmount] = useState("1.00");
   const [fundingState, setFundingState] = useState<PlanState>({ kind: "idle" });
   const [balanceState, setBalanceState] = useState<BalanceState>({ kind: "idle" });
   const [markets, setMarkets] = useState<MarketsPayload>(EMPTY_MARKETS);
@@ -128,8 +127,6 @@ export function PortfolioApp() {
   const [positions, setPositions] = useState<PositionView[]>([]);
   const [positionsState, setPositionsState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [previewMode, setPreviewMode] = useState(false);
-  const [plan, setPlan] = useState<RobinhoodIndexPlan | null>(null);
-  const [planState, setPlanState] = useState<PlanState>({ kind: "idle" });
   const [actionPlan, setActionPlan] = useState<AnyPositionActionPlan | null>(null);
   const [actionState, setActionState] = useState<PlanState>({ kind: "idle" });
   const [migrationPlan, setMigrationPlan] = useState<IndexMigrationPlan | null>(null);
@@ -298,8 +295,7 @@ export function PortfolioApp() {
       setPositionsState("ready");
       const previewState = params.get("state");
       if (previewState === "deposit-success") {
-        setAmount("");
-        setPlanState({ kind: "submitted", message: "Your markets are live and earning in your wallet." });
+        setZapState({ kind: "submitted", message: "Market made. Your position NFT is in your wallet." });
       }
       if (previewState === "withdraw-ready" || previewState === "withdraw-success") {
         setActionPlan(PREVIEW_WITHDRAWAL_PLAN);
@@ -328,8 +324,8 @@ export function PortfolioApp() {
 
   useEffect(() => {
     if (previewMode || isShotQuery()) return;
-    setPlan(null);
-    setPlanState({ kind: "idle" });
+    setZapPlan(null);
+    setZapState({ kind: "idle" });
     setActionPlan(null);
     setActionState({ kind: "idle" });
     setMigrationPlan(null);
@@ -343,38 +339,7 @@ export function PortfolioApp() {
       .filter((market) => market.status === "active")
       .map((market) => ({ market, chain: "robinhood" as const, indexWeightBps: market.weightBps })) ?? [];
   }, [markets]);
-  const selectedTier = useMemo(() => selectIndexTier(markets.index, amount), [amount, markets.index]);
-  const amountError = useMemo(() => validateIndexAmount(markets.index, amount), [amount, markets.index]);
-  const balanceError = useMemo(() => {
-    if (balanceState.kind !== "ready" || balanceState.balanceWei === undefined) return null;
-    try {
-      const required = parseEther(amount);
-      const available = BigInt(balanceState.balanceWei);
-      if (required <= available) return null;
-      return `Add ${trimEth(required - available)} ETH to continue.`;
-    } catch {
-      return null;
-    }
-  }, [amount, balanceState]);
-  const selectedMarkets = useMemo(() => {
-    if (!markets.index.tiers.length) return activeMarkets;
-    if (!selectedTier) return [];
-    const ids = new Set(selectedTier.marketIds);
-    return activeMarkets
-      .filter(({ market }) => ids.has(market.id))
-      .sort((a, b) => marketTierIndex(markets.index, a.market.id) - marketTierIndex(markets.index, b.market.id) || b.indexWeightBps - a.indexWeightBps);
-  }, [activeMarkets, markets.index, selectedTier]);
-  const displayedMarkets = useMemo(() => {
-    if (planState.kind !== "submitted" || !plan) return selectedMarkets;
-    const allocation = plan.stages.find((stage) => stage.id === "make-robinhood-markets")?.allocation;
-    if (!allocation) return selectedMarkets;
-    const order = new Map(allocation.markets.map((market, index) => [market.marketId, index]));
-    return activeMarkets
-      .filter(({ market }) => order.has(market.id))
-      .sort((a, b) => order.get(a.market.id)! - order.get(b.market.id)!);
-  }, [activeMarkets, plan, planState.kind, selectedMarkets]);
   const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
-  const feeApr = weightedFeeApr(displayedMarkets, stats);
   const availableIndexUpdates = useMemo<AvailableIndexUpdate[]>(() => {
     const robinhood = markets.catalog.chains.find((chain) => chain.slug === "robinhood");
     if (!robinhood) return [];
@@ -399,13 +364,6 @@ export function PortfolioApp() {
     if (next === "overview") url.searchParams.delete("view");
     else url.searchParams.set("view", next);
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-  }
-
-  function changeDepositAmount(next: string) {
-    setAmount(next);
-    setPlan(null);
-    setPlanState({ kind: "idle" });
-    setFundingState({ kind: "idle" });
   }
 
   function cycleTheme() {
@@ -467,77 +425,6 @@ export function PortfolioApp() {
       }
       setFundingState({ kind: "error", message: "Privy could not route that deposit. Try another supported chain or asset." });
       reportClientError("cross-chain-funding", error);
-    }
-  }
-
-  async function prepareIndex() {
-    if (!authenticated || !address) {
-      startLogin("make-markets");
-      return;
-    }
-    let amountWei: bigint;
-    try {
-      amountWei = parseEther(amount);
-    } catch {
-      setPlanState({ kind: "error", message: "Enter a valid ETH amount." });
-      return;
-    }
-    if (balanceState.kind === "ready" && balanceState.balanceWei !== undefined && amountWei > BigInt(balanceState.balanceWei)) {
-      await fundRobinhood();
-      return;
-    }
-    setPlanState({ kind: "planning", message: "Getting the latest price for your deposit…" });
-    setPlan(null);
-    trackProductEvent("Index Quote Started", { originChainId: 4663 });
-    try {
-      const response = await fetch("/api/portfolio/index", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ owner: address, amountWei: amountWei.toString(), originChainId: 4663 }),
-      });
-      const payload = await readJsonPayload(response) as { plan?: RobinhoodIndexPlan; error?: string };
-      if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not prepare the index deposit");
-      setPlan(payload.plan);
-      setPlanState({ kind: "ready", message: "Review your deposit and fees before continuing." });
-      trackProductEvent("Index Quote Ready", { originChainId: 4663, constituents: payload.plan.constituentCount });
-    } catch (error) {
-      setPlanState({ kind: "error", message: error instanceof Error ? error.message : "Could not prepare the index deposit" });
-      reportClientError("index-plan", error);
-    }
-  }
-
-  async function executeIndex() {
-    if (!plan || !wallet || !address) return;
-    if (!sameAddress(plan.owner, address) || !sameAddress(plan.owner, wallet.address)) {
-      setPlan(null);
-      setPlanState({ kind: "error", message: "Your wallet changed. Review a fresh deposit before continuing." });
-      return;
-    }
-    if (Date.now() >= Date.parse(plan.expiresAt)) {
-      setPlanState({ kind: "error", message: "This deposit quote expired. Review a fresh one before continuing." });
-      return;
-    }
-    const robinhood = plan.stages.find((stage) => stage.id === "make-robinhood-markets");
-    if (!robinhood) {
-      setPlanState({ kind: "error", message: "This deposit plan is incomplete. Please prepare it again." });
-      return;
-    }
-    try {
-      trackProductEvent("Index Submit Started", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
-      setPlanState({ kind: "signing", message: `Approve ${plan.constituentCount} Robinhood market positions.` });
-      await sendEvmBatch({
-        owner: plan.owner,
-        chainId: robinhood.chainId,
-        transactions: robinhood.transactions,
-        onSubmitted: () => setPlanState({ kind: "waiting", message: "Approved. Robinhood is confirming every market now…" }),
-      });
-      await Promise.all([loadPositions(), loadRobinhoodBalance()]);
-      setAmount("");
-      setPlanState({ kind: "submitted", message: `${plan.constituentCount === 1 ? "Your market is" : "Your markets are"} live and earning in your wallet.` });
-      trackProductEvent("Index Confirmed", { originChainId: plan.sourceChainId, constituents: plan.constituentCount });
-    } catch (error) {
-      setPlanState({ kind: "error", message: error instanceof Error ? error.message : "The deposit could not be completed" });
-      reportClientError("index-submit", error);
     }
   }
 
@@ -610,10 +497,10 @@ export function PortfolioApp() {
       }
       await Promise.all([loadPositions(), loadRobinhoodBalance()]);
       if (actionPlan.kind === "withdraw") {
-        // The exit invalidates the earlier deposit celebration. Returning to Make
-        // must show a fresh form, never a stale "Markets made" state.
-        setPlan(null);
-        setPlanState({ kind: "idle" });
+        // The exit invalidates the earlier zap celebration. Returning to Make
+        // must show a fresh form, never a stale "Market made" state.
+        setZapPlan(null);
+        setZapState({ kind: "idle" });
       }
       setActionState({
         kind: "submitted",
@@ -718,7 +605,12 @@ export function PortfolioApp() {
   }
 
   async function executeZap() {
-    if (!zapPlan || !address) return;
+    if (!zapPlan || !address || !wallet) return;
+    if (!sameAddress(zapPlan.owner, address) || !sameAddress(zapPlan.owner, wallet.address)) {
+      setZapPlan(null);
+      setZapState({ kind: "error", message: "Your wallet changed. Review a fresh quote before continuing." });
+      return;
+    }
     if (Date.now() >= Date.parse(zapPlan.expiresAt)) {
       setZapState({ kind: "error", message: "This quote expired. Quote it again." });
       return;
@@ -782,6 +674,9 @@ export function PortfolioApp() {
         onPrepareZap={(id) => void prepareZap(id)}
         onExecuteZap={() => void executeZap()}
         onCloseZap={() => { setZapMarketId(null); setZapPlan(null); setZapState({ kind: "idle" }); }}
+        balance={authenticated ? balanceState : null}
+        fundingState={fundingState}
+        onFund={() => void fundRobinhood()}
       />
     </section>
   );
@@ -806,7 +701,7 @@ export function PortfolioApp() {
             <span>Wizzy</span>
           </button>
           <nav aria-label="Primary navigation">
-            {([{ id: "overview", label: "Make" }, { id: "markets", label: "Markets" }] as const).map((item) => (
+            {([{ id: "overview", label: "Make" }, { id: "markets", label: "Portfolio" }] as const).map((item) => (
               <button key={item.id} type="button" className={tab === item.id ? "is-active" : ""} onClick={() => changeTab(item.id)}>{item.label}</button>
             ))}
           </nav>
@@ -844,40 +739,18 @@ export function PortfolioApp() {
                 <div className="hero-stage">
                   <div className="hero-copy">
                     <h1>Make Meme Markets</h1>
-                    <p>Deposit ETH into a curated index of meme markets and earn.<br /><span>Updated and managed by agents.</span></p>
+                    <p>Pick a meme market. One amount, one confirmation, real LP fees.<br /><span>Curated and watched by agents around the clock.</span></p>
                   </div>
                   <IndexShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
                 </div>
-                <MarketAction
-                  amount={amount}
-                  onAmount={changeDepositAmount}
-                  markets={displayedMarkets}
-                  stats={stats}
-                  loading={marketsState === "loading"}
-                  feeApr={feeApr}
-                  amountError={amountError ?? balanceError}
-                  balanceInsufficient={Boolean(balanceError) && !amountError}
-                  maximumConstituents={markets.index.maximumConstituents || INDEX_MARKET_COUNT}
-                  ready={ready}
-                  fundingState={fundingState}
-                  balance={authenticated ? balanceState : null}
-                  onFund={() => void fundRobinhood()}
-                  onPrepare={() => void prepareIndex()}
-                  plan={plan}
-                  state={planState}
-                  onExecute={() => void executeIndex()}
-                  onCancel={() => { setPlan(null); setPlanState({ kind: "idle" }); }}
-                  onViewMarkets={() => changeTab("markets")}
-                />
+                {indexLedger}
             </section>
           ) : (
             <section className="index-main markets-view">
               <header className="index-title-row">
                 <div><h1>{hasPortfolioAccess ? "Your markets" : "The live index"}</h1><p>{hasPortfolioAccess ? (positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Your wallet is connected. New positions appear here.") : "Wizzy agents regularly review which markets qualify."}</p></div>
               </header>
-              {hasPortfolioAccess ? positionLedger : null}
-              {indexLedger}
-              {!hasPortfolioAccess ? positionLedger : null}
+              {positionLedger}
             </section>
           )}
       </div>
@@ -976,65 +849,6 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
   </div>;
 }
 
-function MarketAction({ amount, onAmount, markets, stats, loading, feeApr, amountError, balanceInsufficient, maximumConstituents, ready, fundingState, balance, onFund, onPrepare, plan, state, onExecute, onCancel, onViewMarkets }: {
-  amount: string;
-  onAmount: (amount: string) => void;
-  markets: IndexMarket[];
-  stats: Map<string, MarketStats>;
-  loading: boolean;
-  feeApr: number | null;
-  amountError: string | null;
-  balanceInsufficient: boolean;
-  maximumConstituents: number;
-  ready: boolean;
-  fundingState: PlanState;
-  balance: BalanceState | null;
-  onFund: () => void;
-  onPrepare: () => void;
-  plan: RobinhoodIndexPlan | null;
-  state: PlanState;
-  onExecute: () => void;
-  onCancel: () => void;
-  onViewMarkets: () => void;
-}) {
-  const constituentCount = state.kind === "submitted" && plan ? plan.constituentCount : markets.length;
-  const visibleAmountError = state.kind === "submitted" ? null : amountError;
-  return (
-    <aside className="market-action" aria-label="Make markets">
-      <label className={`amount-field ${visibleAmountError ? "is-invalid" : ""}`}>
-        <span className="amount-heading"><span>You deposit</span>{balance ? <span className="wallet-balance" role="status" title="Robinhood Chain ETH balance">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></span> : null}</span>
-        <span className="amount-input"><input id="deposit-amount" name="depositAmount" inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" aria-invalid={Boolean(visibleAmountError)} aria-describedby={visibleAmountError ? "amount-error" : undefined} /><b>ETH</b></span>
-        {visibleAmountError ? <small className="amount-error" id="amount-error">{visibleAmountError}</small> : null}
-      </label>
-
-      <div className="funding-choice">
-        <span><b>ETH on another chain?</b><small>Bridge to your Wizzy account.</small></span>
-        <button className="cross-chain-fund" type="button" disabled={!ready || fundingState.kind === "planning"} onClick={onFund}>
-          <EthereumIcon />{fundingState.kind === "planning" ? "Opening Privy…" : "Add ETH"}
-        </button>
-      </div>
-      {fundingState.kind === "submitted" || fundingState.kind === "error" ? <p className={`funding-status is-${fundingState.kind}`} aria-live="polite">{fundingState.message}</p> : null}
-
-      <div className={`market-output ${loading ? "is-loading" : ""}`} aria-label="Index markets">
-        <span className="market-breadth">
-          <span className="market-stack" role="img" aria-label={loading ? "Reading markets" : markets.map(({ market }) => market.symbol).join(", ")}>
-            {loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />) : markets.map(({ market }) => <TokenIcon key={market.id} symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />)}
-          </span>
-          <span><b>{loading ? "Reading markets" : `${constituentCount} ${constituentCount === 1 ? "market" : "markets"}`}</b><small>{loading ? "Current index" : constituentCount >= maximumConstituents ? "Full index" : "More with a larger deposit"}</small></span>
-        </span>
-        <span className="action-economics"><small>24h fee APR</small><b>{formatFeeApr(feeApr)}</b></span>
-      </div>
-
-      {state.kind !== "idle" ? <PlanPreview plan={plan} state={state} onExecute={onExecute} onCancel={onCancel} onViewMarkets={onViewMarkets} /> : (
-        <button className="fund-button" type="button" disabled={!ready || loading || (Boolean(amountError) && !balanceInsufficient)} onClick={balanceInsufficient ? onFund : onPrepare}>
-          {!ready ? "Preparing wallets…" : loading ? "Reading markets…" : balanceInsufficient ? "Add ETH to continue" : "Make markets"}
-        </button>
-      )}
-      <p className="action-assurance">Robinhood Chain · Self-custodial</p>
-    </aside>
-  );
-}
-
 function WalletMenu({ address, onSend, onDisconnect }: { address: string; onSend: () => void; onDisconnect: () => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -1092,38 +906,6 @@ function handleMenuNavigation(event: ReactKeyboardEvent<HTMLDivElement>) {
   items[next]?.focus();
 }
 
-function PlanPreview({ plan, state, onExecute, onCancel, onViewMarkets }: { plan: RobinhoodIndexPlan | null; state: PlanState; onExecute: () => void; onCancel: () => void; onViewMarkets: () => void }) {
-  const robinhood = plan?.stages.find((stage) => stage.id === "make-robinhood-markets");
-  const feeWei = robinhood ? BigInt(robinhood.allocation.serviceFeeWei) : 0n;
-  const swapProtection = robinhood ? maximumSwapProtection(robinhood.allocation.markets) : null;
-  const busy = state.kind === "planning" || state.kind === "signing" || state.kind === "waiting";
-  const title = state.kind === "ready" ? "Review deposit" : state.kind === "error" ? "Deposit not ready" : state.kind === "submitted" ? "Markets made" : state.kind === "waiting" ? "Making your markets" : "Preparing deposit";
-  return (
-    <section className={`plan-preview is-${state.kind}`} aria-live="polite">
-      <header><span>{title}</span><button type="button" onClick={onCancel} disabled={busy}>Cancel</button></header>
-      {state.kind === "submitted" ? <SuccessCelebration label="Markets made" /> : null}
-      <p>{state.message}</p>
-      {plan && state.kind !== "submitted" ? <>
-        <dl>
-          <div><dt>Network</dt><dd><img src={BRAND_ASSETS.robinhood} alt="" />Robinhood Chain</dd></div>
-          <div><dt>You’ll open</dt><dd>{plan.constituentCount} Robinhood position{plan.constituentCount === 1 ? "" : "s"}</dd></div>
-          <div><dt>Wizzy fee</dt><dd>{trimEth(feeWei)} ETH</dd></div>
-          <div><dt>Swap protection</dt><dd>{swapProtection}</dd></div>
-          <div><dt>Network fee</dt><dd>Shown by your wallet</dd></div>
-        </dl>
-      </> : null}
-      {busy ? <div className="plan-loading" role="status" aria-label={state.message ?? title}><i /><i /><i /></div> : null}
-      {state.kind === "ready" && plan ? <>
-        <p className="approval-note">One approval opens every position. Everything stays in your wallet.</p>
-        <p className="risk-note">Meme prices can fall, and trading fees may not cover losses.</p>
-        <button className="fund-button" type="button" onClick={onExecute}>Make markets</button>
-      </> : null}
-      {state.kind === "submitted" ? <button className="fund-button" type="button" onClick={onViewMarkets}>View your markets</button> : null}
-      {state.kind === "error" ? <button className="secondary-button" type="button" onClick={onCancel}>Try again</button> : null}
-    </section>
-  );
-}
-
 function SuccessCelebration({ label }: { label: string }) {
   return <div className="success-celebration" role="img" aria-label={label}>
     <span className="success-spark success-spark-1" /><span className="success-spark success-spark-2" /><span className="success-spark success-spark-3" /><span className="success-spark success-spark-4" />
@@ -1132,7 +914,7 @@ function SuccessCelebration({ label }: { label: string }) {
   </div>;
 }
 
-function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap }: {
+function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balance, fundingState, onFund }: {
   markets: IndexMarket[];
   stats: Map<string, MarketStats>;
   state: "loading" | "ready" | "error";
@@ -1146,6 +928,9 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
   onPrepareZap: (marketId: string) => void;
   onExecuteZap: () => void;
   onCloseZap: () => void;
+  balance: BalanceState | null;
+  fundingState: PlanState;
+  onFund: () => void;
 }) {
   const orderedMarkets = [...markets].sort(
     (a, b) => marketTierIndex(policy, a.market.id) - marketTierIndex(policy, b.market.id) || b.indexWeightBps - a.indexWeightBps,
@@ -1185,6 +970,9 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
                   onPrepare={() => onPrepareZap(market.id)}
                   onExecute={onExecuteZap}
                   onClose={onCloseZap}
+                  balance={balance}
+                  fundingState={fundingState}
+                  onFund={onFund}
                 />
               </td></tr>);
               return rows;
@@ -1196,7 +984,7 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
   );
 }
 
-function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare, onExecute, onClose }: {
+function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare, onExecute, onClose, balance, fundingState, onFund }: {
   market: CuratedMarket;
   feeAprPct: number | null;
   amount: string;
@@ -1206,6 +994,9 @@ function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare,
   onPrepare: () => void;
   onExecute: () => void;
   onClose: () => void;
+  balance: BalanceState | null;
+  fundingState: PlanState;
+  onFund: () => void;
 }) {
   const planMarket = plan?.markets[0];
   const busy = state.kind === "signing" || state.kind === "waiting";
@@ -1220,6 +1011,7 @@ function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare,
         <input inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
         <b>ETH</b>
       </label>
+      {balance ? <span className="wallet-balance" role="status" title="Robinhood Chain ETH balance">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></span> : null}
       {plan && (state.kind === "ready" || busy) ? (
         <button className="fund-button zap-cta" type="button" disabled={busy} onClick={onExecute}>
           {busy ? state.message : `Mint ${market.symbol} position`}
@@ -1236,7 +1028,15 @@ function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare,
       <span><small>Service fee</small><b>{formatWalletBalance(plan.serviceFeeWei)} ETH</b></span>
       <span><small>Ticks</small><b>{planMarket.tickLower} → {planMarket.tickUpper}</b></span>
     </div> : null}
+    <div className="funding-choice">
+      <span><b>ETH on another chain?</b><small>Bridge to your Wizzy account.</small></span>
+      <button className="cross-chain-fund" type="button" disabled={fundingState.kind === "planning"} onClick={onFund}>
+        <EthereumIcon />{fundingState.kind === "planning" ? "Opening Privy…" : "Add ETH"}
+      </button>
+    </div>
+    {fundingState.kind === "submitted" || fundingState.kind === "error" ? <p className={`funding-status is-${fundingState.kind}`} aria-live="polite">{fundingState.message}</p> : null}
     {state.kind === "submitted" || state.kind === "error" ? <p className={`funding-status is-${state.kind === "submitted" ? "submitted" : "error"}`} aria-live="polite">{state.message}</p> : null}
+    <p className="action-assurance">Robinhood Chain · Self-custodial · The position NFT goes to your wallet</p>
   </div>;
 }
 
@@ -1454,31 +1254,6 @@ function weightedFeeApr(markets: IndexMarket[], stats: Map<string, MarketStats>)
   return available.reduce((sum, row) => sum + (stats.get(row.market.id)!.trailingFeeAprPct! * row.indexWeightBps) / weight, 0);
 }
 
-function selectIndexTier(policy: RobinhoodIndexBreadthPolicy, amount: string): RobinhoodIndexBreadthTier | null {
-  if (!policy.tiers.length) return null;
-  let amountWei: bigint;
-  try {
-    amountWei = parseEther(amount || "0");
-  } catch {
-    return null;
-  }
-  return [...policy.tiers].reverse().find((tier) => amountWei >= BigInt(tier.minimumAmountWei)) ?? null;
-}
-
-function validateIndexAmount(policy: RobinhoodIndexBreadthPolicy, amount: string): string | null {
-  if (!policy.tiers.length) return null;
-  if (!amount.trim()) return "Enter an ETH amount.";
-  let amountWei: bigint;
-  try {
-    amountWei = parseEther(amount);
-  } catch {
-    return "Enter a valid ETH amount.";
-  }
-  const minimum = BigInt(policy.minimumAmountWei);
-  if (amountWei < minimum) return `Minimum deposit is ${trimEth(minimum)} ETH.`;
-  return null;
-}
-
 function marketTierIndex(policy: RobinhoodIndexBreadthPolicy, marketId: string): number {
   const index = policy.tiers.findIndex((tier) => tier.marketIds.includes(marketId));
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
@@ -1524,19 +1299,6 @@ function formatFeeApr(value?: number | null): string {
 function formatFeeAprFraction(value?: number | null): string {
   if (value == null || !Number.isFinite(value)) return "—";
   return formatFeeApr(value * 100);
-}
-
-function maximumSwapProtection(markets: AllocationMarketPlan[]): string {
-  let maximumBps = 0n;
-  for (const market of markets) {
-    const quoted = BigInt(market.quotedMemeOut);
-    const minimum = BigInt(market.minimumMemeOut);
-    if (quoted > 0n && minimum <= quoted) {
-      const bps = ((quoted - minimum) * 10_000n) / quoted;
-      if (bps > maximumBps) maximumBps = bps;
-    }
-  }
-  return `${(Number(maximumBps) / 100).toFixed(1)}% max`;
 }
 
 function trimEth(value: bigint): string {

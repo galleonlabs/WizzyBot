@@ -33,23 +33,23 @@ describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
     expect(page).toContain("PortfolioApp");
     expect(portfolio).toContain("Make Meme Markets");
-    expect(portfolio).toContain("Deposit ETH into a curated index of meme markets and earn.");
-    expect(portfolio).toContain("Updated and managed by agents.");
+    expect(portfolio).toContain("Pick a meme market. One amount, one confirmation, real LP fees.");
+    expect(portfolio).toContain("Curated and watched by agents around the clock.");
     expect(portfolio).toContain("Make markets");
     expect(portfolio).toContain("Fee APR");
     expect(portfolio).toContain("Based on 24h fees");
     expect(portfolio).toContain("Robinhood Wizzy Index");
     expect(portfolio).toContain("Earning now");
-    expect(portfolio).toContain('{ id: "markets", label: "Markets" }');
+    expect(portfolio).toContain('{ id: "markets", label: "Portfolio" }');
     expect(portfolio).toContain('id="positions"');
-    expect(portfolio).toContain("More with a larger deposit");
-    expect(portfolio).toContain('name="depositAmount"');
+    expect(portfolio).toContain("Make market");
+    expect(portfolio).toContain('aria-label="ETH amount"');
     expect(portfolio).toContain("ETH on another chain?");
     expect(portfolio).toContain("Bridge to your Wizzy account.");
     expect(portfolio).toContain("useAddFunds");
     expect(portfolio).toContain('chain: "eip155:4663"');
     expect(portfolio).not.toContain('name="sourceChain"');
-    expect(portfolio).toContain('className="market-stack" role="img"');
+    expect(portfolio).toContain('className="pair-cell"');
     expect(portfolio).not.toContain("Choose where your ETH is now");
     expect(portfolio).not.toContain("<select");
     expect(portfolio).toContain("Reveal your markets");
@@ -164,8 +164,7 @@ describe("meme index product UI", () => {
   it("uses one live Markets surface differently before and after wallet connection", () => {
     expect(portfolio).toContain("const hasPortfolioAccess = authenticated || previewMode");
     expect(portfolio).toContain('hasPortfolioAccess ? "Your markets" : "The live index"');
-    expect(portfolio).toContain("{hasPortfolioAccess ? positionLedger : null}");
-    expect(portfolio).toContain("{!hasPortfolioAccess ? positionLedger : null}");
+    expect(portfolio).toContain("{positionLedger}");
     expect(portfolio).toContain('className="index-snapshot');
     expect(portfolio).toContain("Index composition");
     expect(portfolio).toContain("Curator weights");
@@ -194,14 +193,14 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Actively curated as meme markets change.");
     expect(portfolio).toContain('src={BRAND_ASSETS.robinhood}');
     expect(portfolio).toContain("Self-custodial");
-    expect(portfolio).toContain("One approval opens every position.");
-    expect(portfolio).toContain('useState("1.00")');
+    expect(portfolio).toContain("Wizzy swaps, ranges, and mints your position in a single confirmation.");
+    expect(portfolio).toContain('useState("0.05")');
     expect(portfolio).toContain('chain: "eip155:4663"');
     expect(portfolio).not.toContain("v{markets.catalog.version}");
-    expect(portfolio).toContain('loading ? "Reading markets"');
+    expect(portfolio).toContain('state.kind === "planning" ? "Quoting…" : "Review"');
     expect(portfolio).not.toContain("loading ? INDEX_MARKET_COUNT : constituentCount");
-    expect(portfolio).toContain('planState.kind !== "submitted" || !plan');
-    expect(portfolio).toContain('state.kind === "submitted" && plan ? plan.constituentCount : markets.length');
+    expect(portfolio).toContain('zapMarketId === market.id');
+    expect(portfolio).toContain('state.kind === "submitted" || state.kind === "error"');
     expect(portfolio).toContain("Ready to collect");
     expect(portfolio).toContain('positions.length === 1 ? "position" : "positions"');
     expect(portfolio).not.toContain("Your liquidity and the index, in one place.");
@@ -220,8 +219,8 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Index updated");
     expect(portfolio).toContain("Update position");
     expect(portfolio).toContain("/api/portfolio/migrate");
-    expect(portfolio).toContain("sameAddress(plan.owner, address)");
-    expect(portfolio).toContain("owner: plan.owner");
+    expect(portfolio).toContain("sameAddress(zapPlan.owner, address)");
+    expect(portfolio).toContain("owner: zapPlan.owner");
     expect(portfolio).toContain("owner: actionPlan.owner");
     expect(portfolio).toContain("owner: migrationPlan.owner");
   });
@@ -362,13 +361,14 @@ describe("meme index product UI", () => {
 
   it("clears the completed deposit celebration after an ETH withdrawal", () => {
     expect(portfolio).toContain('if (actionPlan.kind === "withdraw")');
-    expect(portfolio).toContain('setPlanState({ kind: "idle" });');
+    expect(portfolio).toContain('setZapState({ kind: "idle" });');
   });
 
   it("ends completed loaders and clears the successful deposit amount without showing a balance error", () => {
-    expect(portfolio).toContain('setAmount("");');
-    expect(portfolio).toContain('state.kind === "submitted" ? null : amountError');
-    expect(portfolio).toContain('{busy ? <div className="plan-loading"');
+    expect(portfolio).toContain('setZapPlan(null);');
+    expect(portfolio).toContain('setZapState({ kind: "idle" })');
+    // zap flow shows progress through button copy, not a plan loader
+    expect(portfolio).not.toContain('{busy ? <div className="plan-loading"');
     expect(portfolio).not.toContain('</> : <div className="plan-loading"><i /><i /><i /></div>}');
   });
 

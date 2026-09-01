@@ -9,6 +9,7 @@ import {
   decreaseSlipstreamTx,
   exactInSlipstreamTx,
   increaseSlipstreamTx,
+  mintSlipstreamTx,
 } from "../aerodrome/calldata.js";
 import { slipstreamQuoterV2Abi } from "../aerodrome/abi.js";
 import { loadEnv } from "../config/env.js";
@@ -101,7 +102,6 @@ export async function planPositionAction(input: {
   if (input.action === "rebalance") {
     if (snapshot.ref.protocol === "V2") throw new Error("Uniswap V2 positions are already full range");
     if (snapshot.inRange) throw new Error("position is already in range");
-    if (snapshot.venue === "aerodrome-slipstream") throw new Error("Aerodrome rebalancing is not available yet");
     const feeBps = getMarketCatalog().fees.rebalanceBps;
     const available0 = ((snapshot.amount0 + snapshot.uncollected0) * WITHDRAW_FEE_SAFETY_BPS) / BPS - bpsOf(snapshot.amount0, feeBps);
     const available1 = ((snapshot.amount1 + snapshot.uncollected1) * WITHDRAW_FEE_SAFETY_BPS) / BPS - bpsOf(snapshot.amount1, feeBps);
@@ -434,7 +434,6 @@ export function buildRebalancePositionActionPlan(
   swap?: RebalanceSwap,
 ): PositionActionPlan {
   if (snapshot.inRange) throw new Error("position is already in range");
-  if (snapshot.venue === "aerodrome-slipstream") throw new Error("Aerodrome rebalancing is not available yet");
   const feeBps = getMarketCatalog().fees.rebalanceBps;
   const fee0 = bpsOf(snapshot.amount0, feeBps);
   const fee1 = bpsOf(snapshot.amount1, feeBps);
@@ -459,8 +458,22 @@ export function buildRebalancePositionActionPlan(
   const range = recenterSameWidth(snapshot.tickLower, snapshot.tickUpper, snapshot.tickCurrent, snapshot.tickSpacing);
   const positionManager = managerFor(snapshot, chain);
   const addresses = addressesFor(chain);
+  const aerodrome = snapshot.venue === "aerodrome-slipstream";
   const transactions: PlannedTx[] = snapshot.ref.protocol === "V4"
     ? [v4BurnTx(snapshot, owner, 150)]
+    : aerodrome
+      ? [
+          decreaseSlipstreamTx({
+            positionManager,
+            tokenId: snapshot.ref.tokenId,
+            liquidity: snapshot.liquidity,
+            amount0Min: (snapshot.amount0 * (BPS - WITHDRAW_SWAP_SLIPPAGE_BPS)) / BPS,
+            amount1Min: (snapshot.amount1 * (BPS - WITHDRAW_SWAP_SLIPPAGE_BPS)) / BPS,
+            deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+          }),
+          collectSlipstreamTx(positionManager, snapshot.ref.tokenId, owner),
+          burnSlipstreamTx(positionManager, snapshot.ref.tokenId),
+        ]
     : [decreaseCalldata(snapshot, 100, owner, 150, Math.floor(PLAN_TTL_MS / 1_000), true)];
   appendFeeTransfers(transactions, snapshot, treasury, fee0, fee1);
   if (swap) {
@@ -516,6 +529,22 @@ export function buildRebalancePositionActionPlan(
       deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
       chainId: snapshot.ref.chainId,
     }));
+  } else if (aerodrome) {
+    if (add0 > 0n) transactions.push(erc20ApproveTx(snapshot.token0.address, positionManager, add0 + 1n));
+    if (add1 > 0n) transactions.push(erc20ApproveTx(snapshot.token1.address, positionManager, add1 + 1n));
+    transactions.push(mintSlipstreamTx({
+      positionManager,
+      token0: snapshot.token0.address,
+      token1: snapshot.token1.address,
+      tickSpacing: snapshot.tickSpacing,
+      tickLower: range.tickLower,
+      tickUpper: range.tickUpper,
+      amount0: add0,
+      amount1: add1,
+      recipient: owner,
+      slippageBps: 150,
+      deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+    }));
   } else {
     if (add0 > 0n) transactions.push(erc20ApproveTx(snapshot.token0.address, positionManager, add0));
     if (add1 > 0n) transactions.push(erc20ApproveTx(snapshot.token1.address, positionManager, add1));
@@ -561,7 +590,7 @@ export function buildRebalancePositionActionPlan(
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString(),
     notices: [
-      `Your current ${snapshot.ref.protocol} position closes and a new same-width range opens around the live price through wallet-confirmed steps.`,
+      `Your current ${aerodrome ? "Aerodrome Slipstream" : snapshot.ref.protocol} position closes and a new same-width range opens around the live price through wallet-confirmed steps.`,
       "Every completed step settles to your wallet. If a later step fails, Wizzy never holds the recovered pool assets.",
       "Wizzy swaps only when an out-of-range position cannot fund the new range. Any amount that does not fit remains in your wallet.",
     ],

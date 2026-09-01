@@ -1079,7 +1079,7 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
   onClose: () => void;
 }) {
   const canCollect = position.protocol !== "V2" && hasCollectibleFees(position) && !position.closed;
-  const canRebalance = (position.protocol === "V3" || position.protocol === "V4") && !position.inRange && position.chain !== "solana" && position.venue !== "aerodrome-slipstream" && !position.closed;
+  const canRebalance = (position.protocol === "V3" || position.protocol === "V4") && !position.inRange && position.chain !== "solana" && !position.closed;
   const { share0, share1 } = compositionShares(position);
   return <div className="position-manager-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="position-manager" role="dialog" aria-modal="true" aria-labelledby="position-manager-title">

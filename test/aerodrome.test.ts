@@ -3,7 +3,7 @@ import { getAddress } from "viem";
 import { AERODROME_DEPLOYMENTS } from "../src/aerodrome/deployments.js";
 import { exactInSlipstreamTx, mintSlipstreamTx } from "../src/aerodrome/calldata.js";
 import { activeMarkets } from "../src/markets/catalog.js";
-import { buildPositionActionPlan } from "../src/portfolio/position-actions.js";
+import { buildPositionActionPlan, buildRebalancePositionActionPlan } from "../src/portfolio/position-actions.js";
 import { TREASURY } from "../src/constants.js";
 import type { PositionSnapshot } from "../src/types.js";
 import { AerodromeSlipstreamAdapter } from "../src/aerodrome/positions.js";
@@ -78,6 +78,38 @@ describe("Aerodrome Slipstream", () => {
     ]);
     expect(withdraw.transactions[0]?.to).toBe(deployment.positionManager);
     expect(withdraw.transactions.at(-1)?.to).toBe(deployment.positionManager);
+  });
+
+  it("recentres an out-of-range Slipstream position through the reviewed Aerodrome router", () => {
+    const position = {
+      ...snapshot(),
+      tickCurrent: 600,
+      amount0: 0n,
+      inRange: false,
+      percentThroughRange: 100,
+    };
+    const plan = buildRebalancePositionActionPlan(position, owner, "base", TREASURY, {
+      venue: "aerodrome-slipstream",
+      router: deployment.swapRouter,
+      tokenIn: position.token1.address,
+      tokenOut: position.token0.address,
+      amountIn: 900_000n,
+      minimumAmountOut: 400_000n,
+      tickSpacing: brett.tickSpacing,
+    });
+
+    expect(plan.range).toEqual({ tickLower: 200, tickUpper: 1000 });
+    expect(plan.transactions.slice(0, 3).map((tx) => tx.description)).toEqual([
+      "Aerodrome decreaseLiquidity 100%",
+      "Aerodrome collect",
+      "Aerodrome burn empty position",
+    ]);
+    expect(plan.transactions.some((tx) => tx.to === deployment.swapRouter && tx.description.includes("Aerodrome exact-in"))).toBe(true);
+    expect(plan.transactions.at(-1)?.description).toBe("Aerodrome Slipstream mint");
+    expect(plan.transactions.at(-1)?.to).toBe(deployment.positionManager);
+    expect(plan.allowedTargets).toContain(deployment.swapRouter);
+    expect(plan.transactions.every((tx) => plan.allowedTargets.includes(tx.to))).toBe(true);
+    expect(plan.notices[0]).toContain("Aerodrome Slipstream");
   });
 
   it("discovers and values a self-custodied Slipstream NFT", async () => {

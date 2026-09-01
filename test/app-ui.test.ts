@@ -27,6 +27,7 @@ const positionActionRoute = readFileSync("app/api/portfolio/action/route.ts", "u
 const achievementCenter = readFileSync("app/achievement-center.tsx", "utf8");
 const achievementsRoute = readFileSync("app/api/achievements/route.ts", "utf8");
 const telemetry = readFileSync("app/lib/telemetry.ts", "utf8");
+const shotFixture = readFileSync("app/lib/shot-fixture.ts", "utf8");
 
 describe("meme market maker UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
@@ -404,10 +405,12 @@ describe("meme market maker UI", () => {
   it("matches live position artwork by pool and offers an out-of-range rebalance", () => {
     expect(portfolio).toContain("positionTokenImage(position, markets, stats)");
     expect(portfolio).toContain("market.pool.toLowerCase() === position.pool.toLowerCase()");
-    expect(portfolio).toContain('const canRebalance = (position.protocol === "V3" || position.protocol === "V4") && !position.inRange');
+    expect(portfolio).toContain('const canRebalance = (position.protocol === "V3" || position.protocol === "V4") && !position.inRange && position.chain !== "solana" && !position.closed');
     expect(positionActionRoute).toContain('z.enum(["collect", "compound", "rebalance", "withdraw"])');
     expect(portfolio).toContain('role="dialog" aria-modal="true" aria-labelledby="position-manager-title"');
     expect(portfolio).toContain('onAction(position, "collect")');
+    expect(shotFixture).toContain('fee: 2111');
+    expect(shotFixture).toContain('feeLabel: "0.21%"');
   });
 
   it("keeps withdrawal confirmation concise and removes the fee from success rows", () => {

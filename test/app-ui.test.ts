@@ -43,7 +43,7 @@ describe("meme market maker UI", () => {
     expect(portfolio).toContain("Pick a market. Add ETH. Own the position.");
     expect(portfolio).toContain("Wizzy handles the swap and liquidity range.");
     expect(portfolio).toContain("Make market");
-    expect(portfolio).toContain("Fee APR");
+    expect(portfolio).not.toContain("<th>Fee APR</th>");
     expect(portfolio).not.toContain("Based on 24h fees");
     expect(portfolio).toContain("Meme markets");
     expect(portfolio).toContain("Reviewed every six hours.");
@@ -52,7 +52,8 @@ describe("meme market maker UI", () => {
     expect(portfolio).toContain('id="positions"');
     expect(portfolio).toContain("Make market");
     expect(portfolio).toContain('aria-label="ETH amount"');
-    expect(portfolio).toContain("Need {chainLabel(chain)} ETH?");
+    expect(portfolio).toContain("Get {chainLabel(chain)} ETH");
+    expect(portfolio).toContain("hasInsufficientBalance(amount, balance)");
     expect(portfolio).toContain("https://relay.link/bridge/base");
     expect(portfolio).toContain("https://relay.link/bridge/robinhood");
     expect(portfolio).not.toContain('name="sourceChain"');
@@ -81,9 +82,9 @@ describe("meme market maker UI", () => {
 
   it("uses deliberate mobile layouts instead of shrinking desktop rows", () => {
     expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
-    expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))");
     expect(css).toContain(".position-list article { grid-template-columns: repeat(2, minmax(0, 1fr)) auto");
-    expect(css).toContain(".zap-backdrop { align-items: end;");
+    expect(css).toContain(".zap-dialog { width: min(100%, 328px);");
     expect(css).toContain(".portfolio-empty .empty-symbol { display: none; }");
     expect(css).toContain(".market-link-label { display: none; }");
     expect(portfolio).toContain("New positions appear here after they are confirmed.");
@@ -212,10 +213,11 @@ describe("meme market maker UI", () => {
     expect(portfolio).toContain("Reviewed every six hours.");
     expect(portfolio).toContain('src={BRAND_ASSETS.robinhood}');
     expect(portfolio).toContain("Your wallet holds every position. Wizzy never takes custody.");
-    expect(portfolio).toContain("Your wallet owns the position");
     expect(portfolio).not.toContain("Wizzy prepares the swap and range.");
     expect(portfolio).toContain("Your wallet holds every position. Wizzy never takes custody.");
+    expect(portfolio).not.toContain("Your wallet owns the position</span>");
     expect(portfolio).toContain("Wizzy fee");
+    expect(portfolio.match(/<dt>Wizzy fee<\/dt>/g)).toHaveLength(1);
     expect(portfolio).toContain('aria-label="Pool version"');
     expect(portfolio).toContain('protocol: zapProtocol');
     expect(portfolio).toContain("planMarket.quoteSymbol");

@@ -868,16 +868,15 @@ function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapProtoc
           {(["all", "base", "robinhood"] as const).map((chain) => <button key={chain} type="button" className={chainFilter === chain ? "is-active" : ""} aria-pressed={chainFilter === chain} onClick={() => setChainFilter(chain)}>{chain === "all" ? "All markets" : chainLabel(chain)}</button>)}
         </div>
         <table className="market-table">
-          <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>Liquidity</th><th>Action</th></tr></thead>
+          <thead><tr><th>Market</th><th>24h volume</th><th>Liquidity</th><th>Action</th></tr></thead>
           <tbody>
-            {state === "loading" ? Array.from({ length: MARKET_SKELETON_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={5}><i /></td></tr>) : null}
-            {state === "error" ? <tr><td colSpan={5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
+            {state === "loading" ? Array.from({ length: MARKET_SKELETON_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={4}><i /></td></tr>) : null}
+            {state === "error" ? <tr><td colSpan={4} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
             {state === "ready" ? visibleMarkets.map(({ market, chain }) => {
               const row = stats.get(market.id);
               const zappable = chain === "base" || chain === "robinhood";
               return <tr key={market.id}>
                 <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/WETH</b><VenueTrail chain={chain} protocol={market.protocol} /></span></span></td>
-                <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b></td>
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
@@ -935,12 +934,13 @@ function ZapPanel({ market, chain, amount, protocol, plan, state, onAmount, onPr
 }) {
   const planMarket = plan?.markets[0];
   const busy = state.kind === "signing" || state.kind === "waiting";
+  const needsFunding = hasInsufficientBalance(amount, balance);
   return <div className="zap-panel" aria-label={`Make the ${market.symbol}/WETH market`}>
     <div className="zap-controls">
       {market.liquidityVenues?.length ? <div className="zap-protocol" aria-label="Pool version">
         {(["V2", "V3", "V4"] as const).filter((candidate) => candidate === "V3" || market.liquidityVenues?.some((venue) => venue.protocol === candidate)).map((candidate) => <button key={candidate} type="button" className={protocol === candidate ? "is-active" : ""} aria-pressed={protocol === candidate} onClick={() => onProtocol(candidate)}>{candidate}</button>)}
       </div> : null}
-      <span className="zap-balance">Amount {balance ? <small role="status">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></small> : null}</span>
+      <span className="zap-balance"><span>Amount</span>{balance ? <span className="zap-balance-meta"><small role="status">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></small>{needsFunding ? <button type="button" onClick={onFund}>Get {chainLabel(chain)} ETH</button> : null}</span> : null}</span>
       <label className="zap-amount">
         <input autoFocus inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
         <b>ETH</b>
@@ -956,11 +956,10 @@ function ZapPanel({ market, chain, amount, protocol, plan, state, onAmount, onPr
       )}
     </div>
     {plan && planMarket ? <dl className="zap-preview">
-      <div><dt>Position</dt><dd>{formatWalletBalance(planMarket.mintQuote)} {planMarket.quoteSymbol} + {compactAmount(planMarket.mintMeme, 18)} {market.symbol}</dd></div>
+      <div><dt>You add</dt><dd>{formatWalletBalance(planMarket.mintQuote)} {planMarket.quoteSymbol} + {compactAmount(planMarket.mintMeme, 18)} {market.symbol}</dd></div>
       <div><dt>Wizzy fee</dt><dd>{formatWalletBalance(plan.serviceFeeWei)} ETH</dd></div>
     </dl> : null}
     {state.kind === "submitted" || state.kind === "error" ? <p className={`funding-status is-${state.kind === "submitted" ? "submitted" : "error"}`} aria-live="polite">{state.message}</p> : null}
-    <footer><span>Your wallet owns the position</span><button type="button" onClick={onFund}>Need {chainLabel(chain)} ETH?</button></footer>
   </div>;
 }
 
@@ -1295,6 +1294,15 @@ function ethValue(value: number): string {
 function compactMoney(value?: number | null): string {
   if (value == null) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function hasInsufficientBalance(amount: string, balance: BalanceState | null): boolean {
+  if (balance?.kind !== "ready" || balance.balanceWei === undefined) return false;
+  try {
+    return parseEther(amount || "0") > BigInt(balance.balanceWei);
+  } catch {
+    return false;
+  }
 }
 
 function formatFeeApr(value?: number | null): string {

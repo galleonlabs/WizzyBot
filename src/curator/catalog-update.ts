@@ -65,7 +65,7 @@ export function planCentralizedCatalogUpdate(input: {
     const candidate = candidates.get(review.candidateId);
     if (!candidate) throw new Error(`Research reviewed unknown candidate ${review.candidateId}`);
     if (review.identity === "reviewed") {
-      assertResearchEvidence(review.sources);
+      assertResearchEvidence(review.sources, candidate.chain);
       const evaluation = evaluations.get(review.candidateId);
       if (!evaluation || evaluation.incumbent) throw new Error(`Research is missing candidate evidence for ${review.candidateId}`);
     }
@@ -83,26 +83,27 @@ export function planCentralizedCatalogUpdate(input: {
   let appliedReplacement: CentralizedCatalogUpdate["appliedReplacement"] = null;
   if (decision.replacement) {
     const replacement = input.report.replacements.find((proposal) =>
-      proposal.chain === "robinhood"
-      && proposal.incumbentMarketId === decision.replacement!.fromMarketId
+      proposal.incumbentMarketId === decision.replacement!.fromMarketId
       && proposal.candidateMarketId === decision.replacement!.toMarketId
     );
     if (!replacement) throw new Error("Agent replacement is not authorized by the deterministic curator report");
     const candidate = input.curatorConfig.candidates.find((row) => row.id === replacement.candidateMarketId);
-    if (!candidate || candidate.chain !== "robinhood" || candidate.identity !== "reviewed") {
+    if (!candidate || candidate.chain !== replacement.chain || candidate.identity !== "reviewed") {
       throw new Error("Replacement candidate was not reviewed before this curator run");
     }
+    if (candidate.chain === "solana") throw new Error("Solana candidates cannot be added to the EVM market catalog");
     const candidateEvaluation = evaluations.get(candidate.id);
     if (candidateEvaluation?.recommendation !== "eligible") throw new Error("Replacement candidate is not policy-eligible");
 
-    const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood");
-    if (!robinhood) throw new Error("Robinhood catalog is missing");
-    const outgoing = robinhood.markets.find((market) => market.id === replacement.incumbentMarketId);
+    const chain = catalog.chains.find((row) => row.slug === replacement.chain);
+    if (!chain) throw new Error(`${replacement.chain} catalog is missing`);
+    const outgoing = chain.markets.find((market) => market.id === replacement.incumbentMarketId);
     if (!outgoing || outgoing.status !== "active") throw new Error("Replacement incumbent is not active");
-    if (robinhood.markets.some((market) => market.id === candidate.id)) throw new Error("Replacement candidate already exists in the catalog");
-    const tickSpacing = tickSpacingFor(candidate.feePips);
+    if (chain.markets.some((market) => market.id === candidate.id)) throw new Error("Replacement candidate already exists in the catalog");
+    const tickSpacing = candidate.protocol === "AERODROME_SLIPSTREAM" ? candidate.tickSpacing : tickSpacingFor(candidate.feePips);
+    if (!tickSpacing) throw new Error(`${candidate.id} is missing tick spacing`);
     outgoing.status = "paused";
-    robinhood.markets.push({
+    chain.markets.push({
       id: candidate.id,
       name: candidate.name,
       symbol: candidate.symbol,
@@ -111,7 +112,8 @@ export function planCentralizedCatalogUpdate(input: {
       quoteToken: outgoing.quoteToken,
       quoteSymbol: outgoing.quoteSymbol,
       quoteDecimals: outgoing.quoteDecimals,
-      protocol: "V3",
+      protocol: candidate.protocol,
+      ...(candidate.protocol === "AERODROME_SLIPSTREAM" ? { aerodromeDeployment: candidate.aerodromeDeployment } : {}),
       pool: candidate.pool,
       fee: candidate.feePips,
       tickSpacing,
@@ -149,18 +151,26 @@ export function planCentralizedCatalogUpdate(input: {
   return { curatorConfig, catalog, changedFiles, appliedReviews, appliedReplacement, appliedPauses };
 }
 
-function assertResearchEvidence(sources: CuratorResearchDecision["candidateReviews"][number]["sources"]): void {
+function assertResearchEvidence(
+  sources: CuratorResearchDecision["candidateReviews"][number]["sources"],
+  chain: CuratorConfig["candidates"][number]["chain"],
+): void {
   if (sources.length < 3) throw new Error("A reviewed identity requires at least three cited sources");
   const hosts = new Set(sources.map((source) => new URL(source.url).hostname.toLowerCase().replace(/^www\./, "")));
   if (hosts.size < 2) throw new Error("A reviewed identity requires evidence from at least two independent hosts");
-  if (![...hosts].some((host) => host === "geckoterminal.com" || host === "robinhoodchain.blockscout.com")) {
-    throw new Error("A reviewed identity requires GeckoTerminal or Robinhood Blockscout evidence");
+  const requiredEvidenceHosts: Record<typeof chain, Set<string>> = {
+    base: new Set(["geckoterminal.com", "basescan.org", "base.blockscout.com"]),
+    robinhood: new Set(["geckoterminal.com", "robinhoodchain.blockscout.com"]),
+    solana: new Set(["geckoterminal.com", "solscan.io", "explorer.solana.com"]),
+  };
+  if (![...hosts].some((host) => requiredEvidenceHosts[chain].has(host))) {
+    throw new Error(`A reviewed ${chain} identity requires chain-specific explorer or GeckoTerminal evidence`);
   }
 }
 
 function tickSpacingFor(fee: number): number {
   const spacing = new Map([[100, 1], [500, 10], [3_000, 60], [10_000, 200]]).get(fee);
-  if (!spacing) throw new Error(`Unsupported Robinhood fee tier ${fee}`);
+  if (!spacing) throw new Error(`Unsupported Uniswap V3 fee tier ${fee}`);
   return spacing;
 }
 

@@ -56,6 +56,13 @@ export type PositionView = {
   holdNote?: string;
 };
 
+export type PositionRangeGeometry = {
+  rangeStartPct: number;
+  rangeEndPct: number;
+  currentPct: number;
+  currentState: "below" | "inside" | "above";
+};
+
 export type ConfirmView = {
   action: string;
   protocol: Protocol;
@@ -232,4 +239,24 @@ export function compositionShares(view: PositionView): { share0: number; share1:
   const total = a + b;
   if (total <= 0) return { share0: 50, share1: 50 };
   return { share0: (a / total) * 100, share1: (b / total) * 100 };
+}
+
+/** Maps the position and current tick onto one honest logarithmic price axis. */
+export function positionRangeGeometry(view: Pick<PositionView, "fullRange" | "tickLower" | "tickUpper" | "tickCurrent">): PositionRangeGeometry {
+  if (view.fullRange) {
+    return { rangeStartPct: 4, rangeEndPct: 96, currentPct: 50, currentState: "inside" };
+  }
+  const lower = Math.min(view.tickLower, view.tickUpper);
+  const upper = Math.max(view.tickLower, view.tickUpper);
+  const span = Math.max(1, upper - lower);
+  const padding = span * 0.25;
+  const domainMin = Math.min(lower, view.tickCurrent) - padding;
+  const domainMax = Math.max(upper, view.tickCurrent) + padding;
+  const toPercent = (tick: number) => Math.max(0, Math.min(100, (tick - domainMin) / (domainMax - domainMin) * 100));
+  return {
+    rangeStartPct: toPercent(lower),
+    rangeEndPct: toPercent(upper),
+    currentPct: toPercent(view.tickCurrent),
+    currentState: view.tickCurrent < lower ? "below" : view.tickCurrent > upper ? "above" : "inside",
+  };
 }

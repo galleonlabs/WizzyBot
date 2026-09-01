@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { useAccount, useConfig, useConnect, useDisconnect, type Connector } from "wagmi";
 import { createPortal } from "react-dom";
 import { formatEther, parseEther } from "viem";
-import { compositionShares, lightRowToView, priceLabel, type PositionView } from "./lib/cards";
+import { compositionShares, lightRowToView, positionRangeGeometry, priceLabel, type PositionView } from "./lib/cards";
 import { readJsonPayload } from "./lib/api-payload";
 import { positionFeesEth, positionValueEth, positionValueUsd } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
@@ -1094,9 +1094,9 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
           <span className={`range-status is-${position.status}`}>{position.status === "in-range" ? "In range" : position.status === "oor" ? "Out of range" : "Closed"}</span>
         </section>
         <PositionRangeChart position={position} />
-        <dl className="position-manager-stats">
+        <dl className="position-manager-stats" aria-label="Position performance">
           <div><dt>Fees ready</dt><dd className={hasCollectibleFees(position) ? "positive" : ""}>{positionFeesLabel(position)}</dd></div>
-          <div><dt>Fee APR</dt><dd>{formatFeeAprFraction(position.feeApr ?? null)}</dd></div>
+          <div><dt>Position fee APR</dt><dd>{formatFeeAprFraction(position.feeApr ?? null)}</dd></div>
         </dl>
         <section className="position-composition" aria-label="Position composition">
           <header><b>Position</b><small>Current token mix</small></header>
@@ -1107,9 +1107,9 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
       </div>
       <footer className="position-manager-actions">
         {position.protocol === "V2" ? <p>V2 fees stay invested in the LP token automatically.</p> : null}
-        {canCollect ? <button className="position-primary-action" type="button" onClick={() => onAction(position, "collect")}>Collect fees</button> : null}
+        {canCollect ? <button className={canRebalance ? "" : "position-primary-action"} type="button" onClick={() => onAction(position, "collect")}>Collect fees</button> : null}
         {position.protocol !== "V2" && !position.closed ? <button type="button" onClick={() => onAction(position, "compound")} disabled={!hasCollectibleFees(position)}>Compound</button> : null}
-        {canRebalance ? <button type="button" onClick={() => onAction(position, "rebalance")}>Rebalance</button> : null}
+        {canRebalance ? <button className="position-primary-action" type="button" onClick={() => onAction(position, "rebalance")}>Rebalance range</button> : null}
         <button className="position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button>
       </footer>
     </section>
@@ -1117,12 +1117,37 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
 }
 
 function PositionRangeChart({ position }: { position: PositionView }) {
-  const positionPct = rangePositionPercent(position);
+  const geometry = positionRangeGeometry(position);
   const status = position.status === "in-range" ? "In range" : position.status === "oor" ? "Out of range" : "Closed";
-  return <section className={`position-range-chart is-${position.status} ${position.fullRange ? "is-full-range" : ""}`} style={{ "--range-position": `${positionPct}%` } as CSSProperties} aria-label={`${status}. Current price ${priceLabel(position.price)}.`}>
-    <header><div><b>{position.fullRange ? "Full range" : "Your price range"}</b><small>{position.fullRange ? "Always active while the pool trades" : `${priceLabel(position.priceMin)} – ${priceLabel(position.priceMax, position.priceMax === null)}`}</small></div><strong>{priceLabel(position.price)}</strong></header>
-    <div className="range-chart-canvas" aria-hidden="true"><span className="range-chart-area" /><span className="range-chart-current"><i /></span></div>
-    <footer><small>{position.fullRange ? "0" : priceLabel(position.priceMin)}</small><b>Current price</b><small>{position.fullRange ? "∞" : priceLabel(position.priceMax, position.priceMax === null)}</small></footer>
+  const narrative = position.fullRange
+    ? "Active at every price"
+    : position.closed
+      ? "This position is closed"
+      : geometry.currentState === "inside"
+        ? `${Math.round(position.percentThroughRange)}% through your range`
+        : `Price is ${geometry.currentState} your range`;
+  return <section
+    className={`position-range-chart is-${position.status} ${position.fullRange ? "is-full-range" : ""}`}
+    style={{
+      "--range-start": `${geometry.rangeStartPct}%`,
+      "--range-end": `${geometry.rangeEndPct}%`,
+      "--range-width": `${geometry.rangeEndPct - geometry.rangeStartPct}%`,
+      "--range-position": `${geometry.currentPct}%`,
+    } as CSSProperties}
+    aria-label={`${status}. Current price ${priceLabel(position.price)}. ${narrative}.`}
+  >
+    <header><div><b>{position.fullRange ? "Full range" : "Price range"}</b><small>{narrative}</small></div><div className="range-chart-price"><small>Current</small><strong>{priceLabel(position.price)}</strong></div></header>
+    <div className="range-chart-canvas" aria-hidden="true">
+      <span className="range-chart-axis" />
+      <span className="range-chart-window" />
+      <span className="range-chart-bound is-start" />
+      <span className="range-chart-bound is-end" />
+      <span className="range-chart-current"><i /></span>
+    </div>
+    <footer aria-hidden="true">
+      <span className="range-chart-bound-label is-start"><small>Min</small><b>{position.fullRange ? "0" : priceLabel(position.priceMin)}</b></span>
+      <span className="range-chart-bound-label is-end"><small>Max</small><b>{position.fullRange ? "∞" : priceLabel(position.priceMax, position.priceMax === null)}</b></span>
+    </footer>
   </section>;
 }
 
@@ -1138,13 +1163,6 @@ function positionKey(position: PositionView): string {
 function hasCollectibleFees(position: PositionView): boolean {
   if ((position.feesUsd ?? 0) > 0) return true;
   return [position.uncollected0, position.uncollected1].some((amount) => Number(amount.replaceAll(",", "")) > 0);
-}
-
-function rangePositionPercent(position: PositionView): number {
-  if (position.fullRange || position.closed) return 50;
-  if (position.tickCurrent < position.tickLower) return 0;
-  if (position.tickCurrent > position.tickUpper) return 100;
-  return Math.max(0, Math.min(100, position.percentThroughRange));
 }
 
 function positionSettlesToEth(position: PositionView): boolean {

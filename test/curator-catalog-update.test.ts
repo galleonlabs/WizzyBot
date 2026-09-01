@@ -5,9 +5,9 @@ import type { MarketEvaluation } from "../src/curator/policy.js";
 import type { CuratorReport } from "../src/curator/run.js";
 import { getMarketCatalog, parseMarketCatalog } from "../src/markets/catalog.js";
 
-function lowestWeightActiveRobinhoodMarket(catalog = getMarketCatalog()): { id: string; symbol: string } {
-  const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood")!;
-  const market = robinhood.markets
+function firstActiveMarket(chainSlug: "base" | "robinhood", catalog = getMarketCatalog()): { id: string; symbol: string } {
+  const chain = catalog.chains.find((row) => row.slug === chainSlug)!;
+  const market = chain.markets
     .filter((row) => row.status === "active")
     .sort((a, b) => a.id.localeCompare(b.id))[0]!;
   return { id: market.id, symbol: market.symbol };
@@ -41,7 +41,7 @@ describe("agentic centralized curator", () => {
     const config = structuredClone(getCuratorConfig());
     const candidate = config.candidates.find((row) => row.id === "robinhood-gg")!;
     candidate.identity = "reviewed";
-    const incumbent = lowestWeightActiveRobinhoodMarket();
+    const incumbent = firstActiveMarket("robinhood");
     const proposal = {
       chain: "robinhood" as const,
       candidateMarketId: candidate.id,
@@ -73,9 +73,88 @@ describe("agentic centralized curator", () => {
     expect(result.appliedReplacement).toEqual({ fromMarketId: outgoing.id, toMarketId: incoming.id });
   });
 
-  it("pauses an incumbent the deterministic report calls pause and redistributes its weight", () => {
+  it("applies an exact deterministic Base Aerodrome replacement", () => {
     const config = structuredClone(getCuratorConfig());
-    const incumbent = lowestWeightActiveRobinhoodMarket();
+    const candidate = {
+      id: "base-test-meme",
+      name: "Base Test Meme",
+      symbol: "BTM",
+      feePips: 2_111,
+      risk: "emerging" as const,
+      identity: "reviewed" as const,
+      chain: "base" as const,
+      token: "0x1111111111111111111111111111111111111111" as const,
+      pool: "0x2222222222222222222222222222222222222222" as const,
+      protocol: "AERODROME_SLIPSTREAM" as const,
+      aerodromeDeployment: "legacy" as const,
+      tickSpacing: 200,
+    };
+    config.candidates.push(candidate);
+    const incumbent = firstActiveMarket("base");
+    const proposal = {
+      chain: "base" as const,
+      candidateMarketId: candidate.id,
+      candidateSymbol: candidate.symbol,
+      incumbentMarketId: incumbent.id,
+      incumbentSymbol: incumbent.symbol,
+      candidateFeeAprPct: 450,
+      incumbentFeeAprPct: 100,
+      aprMultiple: 4.5,
+    };
+    const result = planCentralizedCatalogUpdate({
+      report: { ...report([evaluation(candidate.id, "eligible", false, "base")]), replacements: [proposal] },
+      decision: decision({
+        verdict: "replace",
+        replacement: { fromMarketId: incumbent.id, toMarketId: candidate.id, rationale: ["policy proposal survived research"] },
+      }),
+      curatorConfig: config,
+      catalog: structuredClone(getMarketCatalog()),
+      today: "2026-09-01",
+    });
+    const base = parseMarketCatalog(result.catalog).chains.find((chain) => chain.slug === "base")!;
+    expect(base.markets.find((market) => market.id === incumbent.id)!.status).toBe("paused");
+    expect(base.markets.find((market) => market.id === candidate.id)).toMatchObject({
+      status: "active",
+      protocol: "AERODROME_SLIPSTREAM",
+      aerodromeDeployment: "legacy",
+      pool: candidate.pool,
+    });
+    expect(result.appliedReplacement).toEqual({ fromMarketId: incumbent.id, toMarketId: candidate.id });
+  });
+
+  it("accepts Base explorer evidence for a reviewed Base candidate", () => {
+    const config = structuredClone(getCuratorConfig());
+    const candidate = {
+      id: "base-researched-meme",
+      name: "Base Researched Meme",
+      symbol: "BRM",
+      feePips: 3_000,
+      risk: "experimental" as const,
+      identity: "watch" as const,
+      chain: "base" as const,
+      token: "0x3333333333333333333333333333333333333333" as const,
+      pool: "0x4444444444444444444444444444444444444444" as const,
+      protocol: "V3" as const,
+    };
+    config.candidates.push(candidate);
+    const baseSources = [
+      { url: "https://www.geckoterminal.com/base/pools/example", title: "Pool", finding: "Pool identity and liquidity" },
+      { url: "https://basescan.org/token/example", title: "Contract", finding: "Verified token address" },
+      { url: "https://example.com/project", title: "Project", finding: "Official project identity" },
+    ];
+    const result = planCentralizedCatalogUpdate({
+      report: report([evaluation(candidate.id, "observe", false, "base")]),
+      decision: decision({ candidateReviews: [{ candidateId: candidate.id, identity: "reviewed", rationale: ["identity matched"], sources: baseSources }] }),
+      curatorConfig: config,
+      catalog: structuredClone(getMarketCatalog()),
+      today: "2026-09-01",
+    });
+    expect(result.appliedReviews).toEqual([`${candidate.id}:reviewed`]);
+  });
+
+  it("pauses an incumbent the deterministic report calls pause", () => {
+    const config = structuredClone(getCuratorConfig());
+    const incumbent = firstActiveMarket("robinhood");
     const pauseEvaluation = {
       ...evaluation(incumbent.id, "pause", true),
       reasons: ["pool liquidity fell 64% in 24h", "median pool liquidity is below $75,000"],
@@ -98,7 +177,7 @@ describe("agentic centralized curator", () => {
 
   it("does not pause on a non-incumbent or non-pause call", () => {
     const config = structuredClone(getCuratorConfig());
-    const incumbent = lowestWeightActiveRobinhoodMarket();
+    const incumbent = firstActiveMarket("robinhood");
     const result = planCentralizedCatalogUpdate({
       report: report([evaluation(incumbent.id, "review", true), evaluation("robinhood-gg", "pause", false)]),
       decision: decision(),
@@ -117,7 +196,7 @@ describe("agentic centralized curator", () => {
       report: report([evaluation("robinhood-gg", "eligible", false)]),
       decision: decision({
         verdict: "replace",
-        replacement: { fromMarketId: lowestWeightActiveRobinhoodMarket().id, toMarketId: "robinhood-gg", rationale: ["unsupported"] },
+        replacement: { fromMarketId: firstActiveMarket("robinhood").id, toMarketId: "robinhood-gg", rationale: ["unsupported"] },
       }),
       curatorConfig: config,
       catalog: structuredClone(getMarketCatalog()),
@@ -138,10 +217,15 @@ function report(evaluations: MarketEvaluation[]): CuratorReport {
   };
 }
 
-function evaluation(marketId: string, recommendation: MarketEvaluation["recommendation"], incumbent: boolean): MarketEvaluation {
+function evaluation(
+  marketId: string,
+  recommendation: MarketEvaluation["recommendation"],
+  incumbent: boolean,
+  chain: MarketEvaluation["chain"] = "robinhood",
+): MarketEvaluation {
   return {
     marketId,
-    chain: "robinhood",
+    chain,
     symbol: marketId,
     risk: "experimental",
     incumbent,

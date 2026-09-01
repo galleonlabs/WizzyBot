@@ -33,6 +33,8 @@ const CandidateSchema = z.discriminatedUnion("chain", [
     token: EvmAddress,
     pool: EvmAddress,
     protocol: z.enum(["V3", "AERODROME_SLIPSTREAM"]),
+    aerodromeDeployment: z.enum(["legacy", "min-unstake"]).optional(),
+    tickSpacing: z.number().int().positive().optional(),
   }),
   CandidateBase.extend({
     chain: z.literal("robinhood"),
@@ -61,6 +63,15 @@ const CuratorConfigSchema = z.object({
   for (const [index, candidate] of config.candidates.entries()) {
     if (ids.has(candidate.id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["candidates", index, "id"], message: `duplicate candidate ${candidate.id}` });
     ids.add(candidate.id);
+    if (candidate.chain === "base" && candidate.protocol === "AERODROME_SLIPSTREAM" && !candidate.aerodromeDeployment) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["candidates", index, "aerodromeDeployment"], message: `${candidate.id} requires an Aerodrome deployment` });
+    }
+    if (candidate.chain === "base" && candidate.protocol === "AERODROME_SLIPSTREAM" && !candidate.tickSpacing) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["candidates", index, "tickSpacing"], message: `${candidate.id} requires Aerodrome tick spacing` });
+    }
+    if (candidate.chain === "base" && candidate.protocol === "V3" && (candidate.aerodromeDeployment || candidate.tickSpacing)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["candidates", index], message: `${candidate.id} has unused Aerodrome settings` });
+    }
   }
 });
 

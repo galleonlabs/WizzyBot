@@ -15,6 +15,7 @@ import { type ChainSlug } from "./lib/chains";
 import {
   type CuratedMarket,
   type AllocationMarketPlan,
+  type AllocationPlan,
   type MarketsPayload,
   type MarketStats,
   type PoolActivityItem,
@@ -133,6 +134,10 @@ export function PortfolioApp() {
   const [actionState, setActionState] = useState<PlanState>({ kind: "idle" });
   const [migrationPlan, setMigrationPlan] = useState<IndexMigrationPlan | null>(null);
   const [migrationState, setMigrationState] = useState<PlanState>({ kind: "idle" });
+  const [zapMarketId, setZapMarketId] = useState<string | null>(null);
+  const [zapAmount, setZapAmount] = useState("0.05");
+  const [zapPlan, setZapPlan] = useState<AllocationPlan | null>(null);
+  const [zapState, setZapState] = useState<PlanState>({ kind: "idle" });
   const [sendOpen, setSendOpen] = useState(false);
   const positionsRequestRef = useRef(0);
   const balanceRequestRef = useRef(0);
@@ -673,6 +678,69 @@ export function PortfolioApp() {
     }
   }
 
+  function openZap(marketId: string) {
+    if (!authenticated) {
+      startLogin("markets");
+      return;
+    }
+    setZapMarketId((current) => current === marketId ? null : marketId);
+    setZapPlan(null);
+    setZapState({ kind: "idle" });
+    trackProductEvent("Zap Opened", { marketId });
+  }
+
+  async function prepareZap(marketId: string) {
+    if (!address) return;
+    let amountWei: bigint;
+    try {
+      amountWei = parseEther(zapAmount || "0");
+    } catch {
+      setZapState({ kind: "error", message: "Enter a valid ETH amount." });
+      return;
+    }
+    setZapState({ kind: "planning", message: "Quoting the pool…" });
+    setZapPlan(null);
+    try {
+      const response = await fetch("/api/portfolio/allocate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ owner: address, chain: "robinhood", amountWei: amountWei.toString(), marketIds: [marketId] }),
+      });
+      const payload = await readJsonPayload(response) as { plan?: AllocationPlan; error?: string };
+      if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not quote this market");
+      setZapPlan(payload.plan);
+      setZapState({ kind: "ready", message: "Review the position, then confirm in your wallet." });
+      trackProductEvent("Zap Quote Ready", { marketId });
+    } catch (error) {
+      setZapState({ kind: "error", message: error instanceof Error ? error.message : "Could not quote this market" });
+      reportClientError("index-plan", error);
+    }
+  }
+
+  async function executeZap() {
+    if (!zapPlan || !address) return;
+    if (Date.now() >= Date.parse(zapPlan.expiresAt)) {
+      setZapState({ kind: "error", message: "This quote expired. Quote it again." });
+      return;
+    }
+    try {
+      setZapState({ kind: "signing", message: "Approve the market in your wallet." });
+      await sendEvmBatch({
+        owner: zapPlan.owner,
+        chainId: zapPlan.chainId,
+        transactions: zapPlan.transactions,
+        onSubmitted: () => setZapState({ kind: "waiting", message: "Robinhood is confirming your market…" }),
+      });
+      await loadPositions();
+      setZapState({ kind: "submitted", message: "Market made. Your position NFT is in your wallet." });
+      setZapPlan(null);
+      trackProductEvent("Zap Confirmed", { marketId: zapMarketId });
+    } catch (error) {
+      setZapState({ kind: "error", message: error instanceof Error ? error.message : "The market could not be made" });
+      reportClientError("index-submit", error);
+    }
+  }
+
   const positionLedger = (
     <PositionLedger
       authenticated={hasPortfolioAccess}
@@ -700,7 +768,21 @@ export function PortfolioApp() {
       <header className="section-title">
         <div><h2>Robinhood Wizzy Index</h2><p>Actively curated as meme markets change.</p></div>
       </header>
-      <MarketLedger markets={activeMarkets} stats={stats} state={marketsState} policy={markets.index} />
+      <MarketLedger
+        markets={activeMarkets}
+        stats={stats}
+        state={marketsState}
+        policy={markets.index}
+        zapMarketId={zapMarketId}
+        zapAmount={zapAmount}
+        zapPlan={zapPlan}
+        zapState={zapState}
+        onOpenZap={openZap}
+        onZapAmount={(next) => { setZapAmount(next); setZapPlan(null); if (zapState.kind !== "idle") setZapState({ kind: "idle" }); }}
+        onPrepareZap={(id) => void prepareZap(id)}
+        onExecuteZap={() => void executeZap()}
+        onCloseZap={() => { setZapMarketId(null); setZapPlan(null); setZapState({ kind: "idle" }); }}
+      />
     </section>
   );
 
@@ -1050,7 +1132,21 @@ function SuccessCelebration({ label }: { label: string }) {
   </div>;
 }
 
-function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error"; policy: RobinhoodIndexBreadthPolicy }) {
+function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap }: {
+  markets: IndexMarket[];
+  stats: Map<string, MarketStats>;
+  state: "loading" | "ready" | "error";
+  policy: RobinhoodIndexBreadthPolicy;
+  zapMarketId: string | null;
+  zapAmount: string;
+  zapPlan: AllocationPlan | null;
+  zapState: PlanState;
+  onOpenZap: (marketId: string) => void;
+  onZapAmount: (next: string) => void;
+  onPrepareZap: (marketId: string) => void;
+  onExecuteZap: () => void;
+  onCloseZap: () => void;
+}) {
   const orderedMarkets = [...markets].sort(
     (a, b) => marketTierIndex(policy, a.market.id) - marketTierIndex(policy, b.market.id) || b.indexWeightBps - a.indexWeightBps,
   );
@@ -1063,24 +1159,85 @@ function MarketLedger({ markets, stats, state, policy }: { markets: IndexMarket[
           <tbody>
             {state === "loading" ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={5}><i /></td></tr>) : null}
             {state === "error" ? <tr><td colSpan={5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
-            {state === "ready" ? orderedMarkets.map(({ market, chain }) => {
+            {state === "ready" ? orderedMarkets.flatMap(({ market, chain }) => {
               const row = stats.get(market.id);
-              return <tr key={market.id}>
+              const zappable = chain === "robinhood";
+              const isOpen = zappable && zapMarketId === market.id;
+              const rows = [<tr key={market.id} className={isOpen ? "is-zapping" : ""}>
                 <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/WETH</b><VenueTrail chain={chain} /></span></span></td>
                 <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b><small className="cell-note">Based on 24h fees</small></td>
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
+                  {zappable ? <button className="market-link zap-link" type="button" aria-expanded={isOpen} onClick={() => onOpenZap(market.id)} aria-label={`Make the ${market.symbol}/WETH market`}><span className="market-link-label">{isOpen ? "Close" : "Make market"}</span></button> : null}
                   <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
                   <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a>
                 </span></td>
-              </tr>;
+              </tr>];
+              if (isOpen) rows.push(<tr className="zap-row" key={`${market.id}-zap`}><td colSpan={5}>
+                <ZapPanel
+                  market={market as CuratedMarket}
+                  feeAprPct={row?.trailingFeeAprPct ?? null}
+                  amount={zapAmount}
+                  plan={zapPlan}
+                  state={zapState}
+                  onAmount={onZapAmount}
+                  onPrepare={() => onPrepareZap(market.id)}
+                  onExecute={onExecuteZap}
+                  onClose={onCloseZap}
+                />
+              </td></tr>);
+              return rows;
             }) : null}
           </tbody>
         </table>
       </div>
     </section>
   );
+}
+
+function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare, onExecute, onClose }: {
+  market: CuratedMarket;
+  feeAprPct: number | null;
+  amount: string;
+  plan: AllocationPlan | null;
+  state: PlanState;
+  onAmount: (next: string) => void;
+  onPrepare: () => void;
+  onExecute: () => void;
+  onClose: () => void;
+}) {
+  const planMarket = plan?.markets[0];
+  const busy = state.kind === "signing" || state.kind === "waiting";
+  return <div className="zap-panel" aria-label={`Make the ${market.symbol}/WETH market`}>
+    <div className="zap-head">
+      <span><b>Make the {market.symbol}/WETH market</b><small>One amount. Wizzy swaps, ranges, and mints your position in a single confirmation.</small></span>
+      <span className="zap-range"><small>Range</small><b>±{market.rangeWidthPct.toFixed(0)}%</b></span>
+      {feeAprPct !== null ? <span className="zap-range"><small>Fee APR</small><b>{formatFeeApr(feeAprPct)}</b></span> : null}
+    </div>
+    <div className="zap-controls">
+      <label className="zap-amount">
+        <input inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
+        <b>ETH</b>
+      </label>
+      {plan && (state.kind === "ready" || busy) ? (
+        <button className="fund-button zap-cta" type="button" disabled={busy} onClick={onExecute}>
+          {busy ? state.message : `Mint ${market.symbol} position`}
+        </button>
+      ) : (
+        <button className="fund-button zap-cta" type="button" disabled={state.kind === "planning"} onClick={onPrepare}>
+          {state.kind === "planning" ? "Quoting…" : "Review"}
+        </button>
+      )}
+      <button className="zap-close" type="button" onClick={onClose} aria-label="Close">Cancel</button>
+    </div>
+    {plan && planMarket ? <div className="zap-preview">
+      <span><small>Position</small><b>{formatWalletBalance(planMarket.mintWeth)} WETH + {compactAmount(planMarket.mintMeme, 18)} {market.symbol}</b></span>
+      <span><small>Service fee</small><b>{formatWalletBalance(plan.serviceFeeWei)} ETH</b></span>
+      <span><small>Ticks</small><b>{planMarket.tickLower} → {planMarket.tickUpper}</b></span>
+    </div> : null}
+    {state.kind === "submitted" || state.kind === "error" ? <p className={`funding-status is-${state.kind === "submitted" ? "submitted" : "error"}`} aria-live="polite">{state.message}</p> : null}
+  </div>;
 }
 
 function IndexSnapshot({ markets, stats, state }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error" }) {
@@ -1386,6 +1543,12 @@ function trimEth(value: bigint): string {
   const formatted = formatEther(value);
   const [whole, fraction = ""] = formatted.split(".");
   return fraction ? `${whole}.${fraction.slice(0, 6).replace(/0+$/, "") || "0"}` : whole!;
+}
+
+function compactAmount(rawUnits: string, decimals: number): string {
+  const value = Number(rawUnits) / 10 ** decimals;
+  if (!Number.isFinite(value)) return "0";
+  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
 function formatWalletBalance(balanceWei: string): string {

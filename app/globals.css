@@ -1382,3 +1382,31 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
   .position-list article { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .position-list article > span:nth-child(4) { grid-column: 1 / -1; }
 }
+
+/* Zap panel */
+.market-table tr.is-zapping td { background: var(--row-hover); border-bottom: 0; }
+.zap-row td { padding: 0 18px 16px; border-top: 0 !important; background: var(--row-hover); }
+.zap-panel { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.zap-head { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.zap-head > span:first-child { display: grid; flex: 1; min-width: 220px; gap: 2px; }
+.zap-head b { font-size: 13px; }
+.zap-head small { color: var(--muted); font-size: 11px; }
+.zap-range { display: grid; gap: 1px; text-align: right; }
+.zap-range small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.zap-range b { font-size: 13px; }
+.zap-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.zap-amount { display: flex; flex: 1; min-width: 160px; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.zap-amount input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font-family: var(--font-display); font-size: 18px; outline: none; }
+.zap-amount b { color: var(--muted); font-size: 12px; }
+.zap-cta { flex: 0 0 auto; min-width: 180px; margin-top: 0 !important; }
+.zap-close { padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
+.zap-link .market-link-label { color: var(--coral-ink); }
+.market-link.zap-link { border: 0; background: var(--coral); cursor: pointer; }
+.zap-preview { display: flex; flex-wrap: wrap; gap: 18px; padding-top: 4px; }
+.zap-preview span { display: grid; gap: 1px; }
+.zap-preview small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.zap-preview b { font-size: 12px; }
+@media (max-width: 640px) {
+  .zap-controls { flex-direction: column; align-items: stretch; }
+  .zap-cta { min-width: 0; }
+}

@@ -7,8 +7,10 @@ import {
   burnSlipstreamTx,
   collectSlipstreamTx,
   decreaseSlipstreamTx,
+  exactInSlipstreamTx,
   increaseSlipstreamTx,
 } from "../aerodrome/calldata.js";
+import { slipstreamQuoterV2Abi } from "../aerodrome/abi.js";
 import { loadEnv } from "../config/env.js";
 import { bpsOf } from "../core/fees.js";
 import { recenterSameWidth } from "../core/ticks.js";
@@ -25,10 +27,11 @@ import {
   mintCalldata,
   nativeTransferTx,
   unwrapEthTx,
+  wrapEthTx,
 } from "../uniswap/calldata.js";
 import { exactInV3Tx } from "../uniswap/router.js";
 import { v2ApprovePairTx, v2RemoveFromPosition } from "../uniswap/v2-calldata.js";
-import { permit2ApproveTx, v4BurnTx, v4ClaimFeesTx, v4IncreaseTx } from "../uniswap/v4-calldata.js";
+import { permit2ApproveTx, poolKeyFromPosition, v4BurnTx, v4ClaimFeesTx, v4Currency, v4IncreaseTx, v4MintTx } from "../uniswap/v4-calldata.js";
 import { quoterV2Abi } from "../chain/abi.js";
 import { liquidityForAmounts } from "../core/hydrate.js";
 import type { SerializableTx } from "./allocation.js";
@@ -45,8 +48,8 @@ export type PositionActionPlan = {
   chainId: number;
   tokenId: string;
   pair: string;
-  execution: "wallet_sendCalls";
-  atomic: true;
+  execution: "wallet_transactions";
+  atomic: false;
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: Address; symbol: string; amount: string }>;
@@ -97,7 +100,6 @@ export async function planPositionAction(input: {
   if (!configured) throw new Error("position pool is not in Wizzy's curated market catalog");
   if (input.action === "rebalance") {
     if (snapshot.ref.protocol === "V2") throw new Error("Uniswap V2 positions are already full range");
-    if (snapshot.ref.protocol === "V4") throw new Error("Uniswap V4 rebalancing is not available yet");
     if (snapshot.inRange) throw new Error("position is already in range");
     if (snapshot.venue === "aerodrome-slipstream") throw new Error("Aerodrome rebalancing is not available yet");
     const feeBps = getMarketCatalog().fees.rebalanceBps;
@@ -105,9 +107,9 @@ export async function planPositionAction(input: {
     const available1 = ((snapshot.amount1 + snapshot.uncollected1) * WITHDRAW_FEE_SAFETY_BPS) / BPS - bpsOf(snapshot.amount1, feeBps);
     let swap: RebalanceSwap | undefined;
     if (snapshot.amount0 === 0n && available1 > 1n) {
-      swap = await quoteRebalanceSwap(client, input.chain, snapshot.token1.address, snapshot.token0.address, available1 / 2n, snapshot.fee);
+      swap = await quoteRebalanceSwap(client, input.chain, configured, snapshot.token1.address, snapshot.token0.address, available1 / 2n);
     } else if (snapshot.amount1 === 0n && available0 > 1n) {
-      swap = await quoteRebalanceSwap(client, input.chain, snapshot.token0.address, snapshot.token1.address, available0 / 2n, snapshot.fee);
+      swap = await quoteRebalanceSwap(client, input.chain, configured, snapshot.token0.address, snapshot.token1.address, available0 / 2n);
     }
     return buildRebalancePositionActionPlan(snapshot, owner, input.chain, env.treasury, swap);
   }
@@ -177,8 +179,8 @@ async function addRobinhoodEthSettlement(
     allowedTargets,
     settlement: { asset: "ETH", minimumAmountWei: minimumEth.toString(), marketSymbol: market.symbol },
     notices: [
-      `Your ${market.symbol} position closes and converts to native ETH in one atomic wallet approval.`,
-      "If any step fails, the entire withdrawal reverts and your LP position remains yours.",
+      `Your ${market.symbol} position closes and converts to native ETH through wallet-confirmed steps.`,
+      "Each confirmed step settles to your wallet. If a later step fails, Wizzy never holds the remaining assets.",
       "The quote includes 1.5% swap protection. Small execution surplus or token dust remains in your wallet.",
     ],
   };
@@ -238,8 +240,8 @@ export function buildPositionActionPlan(
     chainId: snapshot.ref.chainId,
     tokenId: snapshot.ref.tokenId.toString(),
     pair: `${snapshot.token0.symbol}/${snapshot.token1.symbol}`,
-    execution: "wallet_sendCalls",
-    atomic: true,
+    execution: "wallet_transactions",
+    atomic: false,
     expectedConfirmations: 1,
     serviceFeeBps: feeBps,
     serviceFee: feeBps > 0 ? [
@@ -363,30 +365,65 @@ function feeTransferTx(
   return erc20TransferTx(token.address, treasury, amount);
 }
 
-type RebalanceSwap = {
+type RebalanceSwapBase = {
   tokenIn: Address;
   tokenOut: Address;
   amountIn: bigint;
   minimumAmountOut: bigint;
 };
 
+type RebalanceSwap = RebalanceSwapBase & (
+  | { venue: "uniswap-v3"; router: Address; fee: number }
+  | { venue: "aerodrome-slipstream"; router: Address; tickSpacing: number }
+);
+
 async function quoteRebalanceSwap(
   client: PublicClient,
   chain: ChainSlug,
+  market: CuratedMarket,
   tokenIn: Address,
   tokenOut: Address,
   amountIn: bigint,
-  fee: number,
 ): Promise<RebalanceSwap> {
+  const addresses = addressesFor(chain);
+  if (market.protocol === "AERODROME_SLIPSTREAM") {
+    if (chain !== "base" || !market.aerodromeDeployment) throw new Error("This Aerodrome market has no supported rebalance route");
+    const deployment = aerodromeDeployment(market.aerodromeDeployment);
+    const quote = await client.simulateContract({
+      address: deployment.quoter,
+      abi: slipstreamQuoterV2Abi,
+      functionName: "quoteExactInputSingle",
+      args: [{ tokenIn, tokenOut, amountIn, tickSpacing: market.tickSpacing, sqrtPriceLimitX96: 0n }],
+    });
+    const minimumAmountOut = (quote.result[0] * (BPS - WITHDRAW_SWAP_SLIPPAGE_BPS)) / BPS;
+    if (minimumAmountOut <= 0n) throw new Error("The pool returned no usable rebalance quote");
+    return {
+      venue: "aerodrome-slipstream",
+      router: deployment.swapRouter,
+      tokenIn,
+      tokenOut,
+      amountIn,
+      minimumAmountOut,
+      tickSpacing: market.tickSpacing,
+    };
+  }
   const quote = await client.simulateContract({
-    address: addressesFor(chain).quoterV2,
+    address: addresses.quoterV2,
     abi: quoterV2Abi,
     functionName: "quoteExactInputSingle",
-    args: [{ tokenIn, tokenOut, amountIn, fee, sqrtPriceLimitX96: 0n }],
+    args: [{ tokenIn, tokenOut, amountIn, fee: market.fee, sqrtPriceLimitX96: 0n }],
   });
   const minimumAmountOut = (quote.result[0] * (BPS - WITHDRAW_SWAP_SLIPPAGE_BPS)) / BPS;
   if (minimumAmountOut <= 0n) throw new Error("The pool returned no usable rebalance quote");
-  return { tokenIn, tokenOut, amountIn, minimumAmountOut };
+  return {
+    venue: "uniswap-v3",
+    router: addresses.swapRouter02,
+    tokenIn,
+    tokenOut,
+    amountIn,
+    minimumAmountOut,
+    fee: market.fee,
+  };
 }
 
 export function buildRebalancePositionActionPlan(
@@ -421,34 +458,86 @@ export function buildRebalancePositionActionPlan(
   }
   const range = recenterSameWidth(snapshot.tickLower, snapshot.tickUpper, snapshot.tickCurrent, snapshot.tickSpacing);
   const positionManager = managerFor(snapshot, chain);
-  const transactions: PlannedTx[] = [decreaseCalldata(snapshot, 100, owner, 150, Math.floor(PLAN_TTL_MS / 1_000), true)];
-  if (fee0 > 0n) transactions.push(erc20TransferTx(snapshot.token0.address, treasury, fee0));
-  if (fee1 > 0n) transactions.push(erc20TransferTx(snapshot.token1.address, treasury, fee1));
-  if (swap) transactions.push(
-    erc20ApproveTx(swap.tokenIn, addressesFor(chain).swapRouter02, swap.amountIn),
-    exactInV3Tx({
-      tokenIn: swap.tokenIn,
-      tokenOut: swap.tokenOut,
-      fee: snapshot.fee,
-      amountIn: swap.amountIn,
-      amountOutMin: swap.minimumAmountOut,
+  const addresses = addressesFor(chain);
+  const transactions: PlannedTx[] = snapshot.ref.protocol === "V4"
+    ? [v4BurnTx(snapshot, owner, 150)]
+    : [decreaseCalldata(snapshot, 100, owner, 150, Math.floor(PLAN_TTL_MS / 1_000), true)];
+  appendFeeTransfers(transactions, snapshot, treasury, fee0, fee1);
+  if (swap) {
+    const inputToken = swap.tokenIn.toLowerCase() === snapshot.token0.address.toLowerCase() ? snapshot.token0 : snapshot.token1;
+    const outputToken = swap.tokenOut.toLowerCase() === snapshot.token0.address.toLowerCase() ? snapshot.token0 : snapshot.token1;
+    if (snapshot.ref.protocol === "V4" && v4Currency(inputToken, snapshot.ref.chainId).toLowerCase() === addresses.nativeEth.toLowerCase()) {
+      transactions.push(wrapEthTx(swap.amountIn, snapshot.ref.chainId));
+    }
+    transactions.push(erc20ApproveTx(swap.tokenIn, swap.router, swap.amountIn));
+    transactions.push(swap.venue === "aerodrome-slipstream"
+      ? exactInSlipstreamTx({
+          router: swap.router,
+          tokenIn: swap.tokenIn,
+          tokenOut: swap.tokenOut,
+          tickSpacing: swap.tickSpacing,
+          amountIn: swap.amountIn,
+          amountOutMin: swap.minimumAmountOut,
+          recipient: owner,
+          deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+        })
+      : exactInV3Tx({
+        tokenIn: swap.tokenIn,
+        tokenOut: swap.tokenOut,
+        fee: swap.fee,
+        amountIn: swap.amountIn,
+        amountOutMin: swap.minimumAmountOut,
+        recipient: owner,
+        chainId: snapshot.ref.chainId,
+      }));
+    if (snapshot.ref.protocol === "V4" && v4Currency(outputToken, snapshot.ref.chainId).toLowerCase() === addresses.nativeEth.toLowerCase()) {
+      transactions.push(unwrapEthTx(swap.minimumAmountOut, snapshot.ref.chainId));
+    }
+  }
+  if (snapshot.ref.protocol === "V4") {
+    const liquidity = liquidityForAmounts(snapshot, add0, add1, range.tickLower, range.tickUpper);
+    if (liquidity <= 0n) throw new Error("The rebalance quote cannot open usable V4 liquidity");
+    for (const [token, amount] of [[snapshot.token0, add0], [snapshot.token1, add1]] as const) {
+      if (amount <= 0n || v4Currency(token, snapshot.ref.chainId).toLowerCase() === addresses.nativeEth.toLowerCase()) continue;
+      transactions.push(
+        erc20ApproveTx(token.address, addresses.permit2, amount),
+        permit2ApproveTx(token.address, addresses.v4PositionManager, amount, undefined, snapshot.ref.chainId),
+      );
+    }
+    transactions.push(v4MintTx({
+      poolKey: poolKeyFromPosition(snapshot),
+      tickLower: range.tickLower,
+      tickUpper: range.tickUpper,
+      liquidity,
+      amount0: add0,
+      amount1: add1,
       recipient: owner,
+      slippageBps: 150,
+      deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
       chainId: snapshot.ref.chainId,
-    }),
-  );
-  if (add0 > 0n) transactions.push(erc20ApproveTx(snapshot.token0.address, positionManager, add0));
-  if (add1 > 0n) transactions.push(erc20ApproveTx(snapshot.token1.address, positionManager, add1));
-  transactions.push(mintCalldata({
-    position: snapshot,
-    tickLower: range.tickLower,
-    tickUpper: range.tickUpper,
-    amount0: add0,
-    amount1: add1,
-    recipient: owner,
-    slippageBps: 150,
-    deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
-  }));
-  const allowedTargets = uniqueAddresses([positionManager, snapshot.token0.address, snapshot.token1.address, treasury, ...(swap ? [addressesFor(chain).swapRouter02] : [])]);
+    }));
+  } else {
+    if (add0 > 0n) transactions.push(erc20ApproveTx(snapshot.token0.address, positionManager, add0));
+    if (add1 > 0n) transactions.push(erc20ApproveTx(snapshot.token1.address, positionManager, add1));
+    transactions.push(mintCalldata({
+      position: snapshot,
+      tickLower: range.tickLower,
+      tickUpper: range.tickUpper,
+      amount0: add0,
+      amount1: add1,
+      recipient: owner,
+      slippageBps: 150,
+      deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+    }));
+  }
+  const allowedTargets = uniqueAddresses([
+    positionManager,
+    snapshot.token0.address,
+    snapshot.token1.address,
+    treasury,
+    ...(snapshot.ref.protocol === "V4" ? [addresses.permit2] : []),
+    ...(swap ? [swap.router] : []),
+  ]);
   assertAllowed(transactions, allowedTargets);
   const now = new Date();
   return {
@@ -458,8 +547,8 @@ export function buildRebalancePositionActionPlan(
     chainId: snapshot.ref.chainId,
     tokenId: snapshot.ref.tokenId.toString(),
     pair: `${snapshot.token0.symbol}/${snapshot.token1.symbol}`,
-    execution: "wallet_sendCalls",
-    atomic: true,
+    execution: "wallet_transactions",
+    atomic: false,
     expectedConfirmations: 1,
     serviceFeeBps: feeBps,
     serviceFee: [
@@ -472,9 +561,9 @@ export function buildRebalancePositionActionPlan(
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString(),
     notices: [
-      "Your current position closes and a new same-width range opens around the live price in one atomic wallet approval.",
-      "If any step fails, the entire rebalance reverts and your original position remains yours.",
-      "Wizzy swaps only when an out-of-range position is entirely one token. Any amount that does not fit the new range remains in your wallet.",
+      `Your current ${snapshot.ref.protocol} position closes and a new same-width range opens around the live price through wallet-confirmed steps.`,
+      "Every completed step settles to your wallet. If a later step fails, Wizzy never holds the recovered pool assets.",
+      "Wizzy swaps only when an out-of-range position cannot fund the new range. Any amount that does not fit remains in your wallet.",
     ],
   };
 }
@@ -545,6 +634,7 @@ function managerFor(snapshot: PositionSnapshot, chain?: ChainSlug): Address {
     return snapshot.positionManager;
   }
   const slug = chain ?? (snapshot.ref.chainId === 4663 ? "robinhood" : "base");
+  if (snapshot.ref.protocol === "V4") return addressesFor(slug).v4PositionManager;
   return addressesFor(slug).nfpm;
 }
 

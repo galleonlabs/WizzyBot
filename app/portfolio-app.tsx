@@ -55,11 +55,14 @@ const PREVIEW_WITHDRAWAL_PLAN: PositionActionPlan = {
   chainId: 4663,
   tokenId: "941",
   pair: "CASHCAT/WETH",
+  execution: "wallet_transactions",
+  atomic: false,
   expectedConfirmations: 1,
   serviceFeeBps: 15,
   serviceFee: [],
   settlement: { asset: "ETH", minimumAmountWei: "19118000000000000", marketSymbol: "CASHCAT" },
   transactions: [],
+  allowedTargets: [],
   createdAt: "2026-08-30T00:00:00.000Z",
   expiresAt: "2099-08-30T00:00:00.000Z",
   notices: [],
@@ -1076,7 +1079,7 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
   onClose: () => void;
 }) {
   const canCollect = position.protocol !== "V2" && hasCollectibleFees(position) && !position.closed;
-  const canRebalance = position.protocol === "V3" && !position.inRange && position.chain !== "solana" && position.venue !== "aerodrome-slipstream" && !position.closed;
+  const canRebalance = (position.protocol === "V3" || position.protocol === "V4") && !position.inRange && position.chain !== "solana" && position.venue !== "aerodrome-slipstream" && !position.closed;
   const { share0, share1 } = compositionShares(position);
   return <div className="position-manager-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="position-manager" role="dialog" aria-modal="true" aria-labelledby="position-manager-title">

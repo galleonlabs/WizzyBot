@@ -273,12 +273,15 @@ export type PositionActionPlan = {
   chainId: number;
   tokenId: string;
   pair: string;
+  execution: "wallet_transactions";
+  atomic: false;
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: `0x${string}`; symbol: string; amount: string }>;
   range?: { tickLower: number; tickUpper: number };
   settlement?: { asset: "ETH"; minimumAmountWei: string; marketSymbol: string };
   transactions: WalletTransaction[];
+  allowedTargets: `0x${string}`[];
   createdAt: string;
   expiresAt: string;
   notices: string[];

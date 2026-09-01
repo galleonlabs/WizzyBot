@@ -404,7 +404,7 @@ describe("meme market maker UI", () => {
   it("matches live position artwork by pool and offers an out-of-range rebalance", () => {
     expect(portfolio).toContain("positionTokenImage(position, markets, stats)");
     expect(portfolio).toContain("market.pool.toLowerCase() === position.pool.toLowerCase()");
-    expect(portfolio).toContain('const canRebalance = position.protocol === "V3" && !position.inRange');
+    expect(portfolio).toContain('const canRebalance = (position.protocol === "V3" || position.protocol === "V4") && !position.inRange');
     expect(positionActionRoute).toContain('z.enum(["collect", "compound", "rebalance", "withdraw"])');
     expect(portfolio).toContain('role="dialog" aria-modal="true" aria-labelledby="position-manager-title"');
     expect(portfolio).toContain('onAction(position, "collect")');

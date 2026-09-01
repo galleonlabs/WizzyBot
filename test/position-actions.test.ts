@@ -50,13 +50,16 @@ describe("self-custodial position actions", () => {
     expect(positionPoolIsConfigured({ ...position, pool: replacement.pool }, [replacement])).toBe(true);
   });
 
-  it("recentres an out-of-range V3 position in one non-empty atomic batch", () => {
+  it("recentres an out-of-range V3 position through a non-empty wallet plan", () => {
     const position = snapshot({ tickCurrent: 600, sqrtPriceX96: BigInt(TickMath.getSqrtRatioAtTick(600).toString()), amount0: 0n, inRange: false, percentThroughRange: 100 });
     const plan = buildRebalancePositionActionPlan(position, owner, "base", TREASURY, {
+      venue: "uniswap-v3",
+      router: addressesFor("base").swapRouter02,
       tokenIn: position.token1.address,
       tokenOut: position.token0.address,
       amountIn: 900_000n,
       minimumAmountOut: 400_000n,
+      fee: position.fee,
     });
 
     expect(plan.kind).toBe("rebalance");
@@ -67,6 +70,7 @@ describe("self-custodial position actions", () => {
     expect(plan.transactions.some((transaction) => transaction.to === addressesFor("base").swapRouter02)).toBe(true);
     expect(plan.transactions.at(-1)?.description).toBe("NFPM.mint");
     expect(plan.transactions.every((transaction) => transaction.data !== "0x")).toBe(true);
+    expect(plan.atomic).toBe(false);
   });
 
   it("does not rebalance a position that is already earning", () => {
@@ -104,6 +108,73 @@ describe("self-custodial position actions", () => {
     expect(plan.transactions.at(-1)?.to).toBe(addresses.v4PositionManager);
     expect(plan.transactions.at(-1)?.description).toContain("increase");
     expect(plan.transactions.every((tx) => tx.data !== "0x")).toBe(true);
+  });
+
+  it("burns, swaps, unwraps, and recentres an out-of-range Base V4 position", () => {
+    const addresses = addressesFor("base");
+    const position = snapshot({
+      ref: { protocol: "V4", chainId: 8453, tokenId: 93n },
+      token0: { address: addresses.weth, symbol: "ETH", decimals: 18 },
+      tickCurrent: 600,
+      sqrtPriceX96: BigInt(TickMath.getSqrtRatioAtTick(600).toString()),
+      amount0: 0n,
+      amount1: 2_000_000n,
+      inRange: false,
+      percentThroughRange: 100,
+    });
+    const plan = buildRebalancePositionActionPlan(position, owner, "base", TREASURY, {
+      venue: "aerodrome-slipstream",
+      router: "0x698Cb2b6dd822994581fEa6eA4Fc755d1363A92F",
+      tokenIn: position.token1.address,
+      tokenOut: position.token0.address,
+      amountIn: 900_000n,
+      minimumAmountOut: 400_000n,
+      tickSpacing: 200,
+    });
+
+    expect(plan.kind).toBe("rebalance");
+    expect(plan.atomic).toBe(false);
+    expect(plan.range).toEqual({ tickLower: 400, tickUpper: 800 });
+    expect(plan.transactions[0]?.to).toBe(addresses.v4PositionManager);
+    expect(plan.transactions[0]?.description).toContain("burn");
+    expect(plan.transactions.some((transaction) => transaction.description.includes("exact-in"))).toBe(true);
+    expect(plan.transactions.some((transaction) => transaction.description.includes("Aerodrome"))).toBe(true);
+    expect(plan.transactions.some((transaction) => transaction.description.startsWith("WETH.withdraw"))).toBe(true);
+    expect(plan.transactions.filter((transaction) => transaction.to === addresses.permit2)).toHaveLength(1);
+    expect(plan.transactions.at(-1)?.description).toContain("mint");
+    expect(BigInt(plan.transactions.at(-1)?.value ?? "0")).toBeGreaterThan(0n);
+    expect(plan.transactions.every((transaction) => transaction.data !== "0x")).toBe(true);
+  });
+
+  it("wraps native ETH before recentring a Robinhood V4 position", () => {
+    const addresses = addressesFor("robinhood");
+    const market = activeMarkets("robinhood").find((candidate) => candidate.protocol === "V3")!;
+    const position = snapshot({
+      ref: { protocol: "V4", chainId: 4663, tokenId: 94n },
+      token0: { address: addresses.weth, symbol: "ETH", decimals: 18 },
+      token1: { address: market.token, symbol: market.symbol, decimals: market.tokenDecimals },
+      tickCurrent: -600,
+      sqrtPriceX96: BigInt(TickMath.getSqrtRatioAtTick(-600).toString()),
+      amount0: 2_000_000n,
+      amount1: 0n,
+      inRange: false,
+      percentThroughRange: 0,
+      pool: addresses.v4PoolManager,
+    });
+    const plan = buildRebalancePositionActionPlan(position, owner, "robinhood", TREASURY, {
+      venue: "uniswap-v3",
+      router: addresses.swapRouter02,
+      tokenIn: position.token0.address,
+      tokenOut: position.token1.address,
+      amountIn: 900_000n,
+      minimumAmountOut: 400_000n,
+      fee: market.fee,
+    });
+
+    expect(plan.transactions.some((transaction) => transaction.description.startsWith("WETH.deposit"))).toBe(true);
+    expect(plan.transactions.at(-1)?.to).toBe(addresses.v4PositionManager);
+    expect(plan.allowedTargets).toContain(addresses.permit2);
+    expect(plan.transactions.every((transaction) => plan.allowedTargets.includes(transaction.to))).toBe(true);
   });
 
   it("collects V4 fees without increasing or charging the position", () => {

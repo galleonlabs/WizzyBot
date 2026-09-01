@@ -108,6 +108,7 @@ export function PortfolioApp() {
   const [actionState, setActionState] = useState<PlanState>({ kind: "idle" });
   const [zapMarketId, setZapMarketId] = useState<string | null>(null);
   const [zapAmount, setZapAmount] = useState("0.05");
+  const [zapProtocol, setZapProtocol] = useState<"V2" | "V3" | "V4">("V3");
   const [zapPlan, setZapPlan] = useState<AllocationPlan | null>(null);
   const [zapState, setZapState] = useState<PlanState>({ kind: "idle" });
   const [sendOpen, setSendOpen] = useState(false);
@@ -404,6 +405,7 @@ export function PortfolioApp() {
 
   function openZap(marketId: string) {
     setZapMarketId((current) => current === marketId ? null : marketId);
+    setZapProtocol("V3");
     setZapPlan(null);
     setZapState({ kind: "idle" });
     trackProductEvent("Zap Opened", { marketId });
@@ -432,7 +434,13 @@ export function PortfolioApp() {
       const response = await fetch("/api/portfolio/allocate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ owner: address, chain: selected.chain, amountWei: amountWei.toString(), marketIds: [marketId] }),
+        body: JSON.stringify({
+          owner: address,
+          chain: selected.chain,
+          amountWei: amountWei.toString(),
+          marketIds: [marketId],
+          ...(zapProtocol === "V3" ? {} : { protocol: zapProtocol }),
+        }),
       });
       const payload = await readJsonPayload(response) as { plan?: AllocationPlan; error?: string };
       if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not quote this market");
@@ -501,13 +509,15 @@ export function PortfolioApp() {
         state={marketsState}
         zapMarketId={zapMarketId}
         zapAmount={zapAmount}
+        zapProtocol={zapProtocol}
         zapPlan={zapPlan}
         zapState={zapState}
         onOpenZap={openZap}
         onZapAmount={(next) => { setZapAmount(next); setZapPlan(null); if (zapState.kind !== "idle") setZapState({ kind: "idle" }); }}
+        onZapProtocol={(next) => { setZapProtocol(next); setZapPlan(null); setZapState({ kind: "idle" }); }}
         onPrepareZap={(id) => void prepareZap(id)}
         onExecuteZap={() => void executeZap()}
-        onCloseZap={() => { setZapMarketId(null); setZapPlan(null); setZapState({ kind: "idle" }); }}
+        onCloseZap={() => { setZapMarketId(null); setZapProtocol("V3"); setZapPlan(null); setZapState({ kind: "idle" }); }}
         balances={authenticated ? balances : null}
         onFund={fundChain}
       />
@@ -808,16 +818,18 @@ function SuccessCelebration({ label }: { label: string }) {
   </div>;
 }
 
-function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balances, onFund }: {
+function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapProtocol, zapPlan, zapState, onOpenZap, onZapAmount, onZapProtocol, onPrepareZap, onExecuteZap, onCloseZap, balances, onFund }: {
   markets: MarketEntry[];
   stats: Map<string, MarketStats>;
   state: "loading" | "ready" | "error";
   zapMarketId: string | null;
   zapAmount: string;
+  zapProtocol: "V2" | "V3" | "V4";
   zapPlan: AllocationPlan | null;
   zapState: PlanState;
   onOpenZap: (marketId: string) => void;
   onZapAmount: (next: string) => void;
+  onZapProtocol: (next: "V2" | "V3" | "V4") => void;
   onPrepareZap: (marketId: string) => void;
   onExecuteZap: () => void;
   onCloseZap: () => void;
@@ -876,16 +888,18 @@ function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapPlan, 
       <div className="zap-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onCloseZap(); }}>
         <section className="zap-dialog" role="dialog" aria-modal="true" aria-labelledby="zap-dialog-title">
           <header>
-            <span><TokenIcon symbol={selected.market.symbol} src={stats.get(selected.market.id)?.tokenImageUrl} color={selected.market.color} /><span><b id="zap-dialog-title">{selected.market.symbol}/WETH</b><small>{chainLabel(selected.chain)} · {selected.market.protocol === "AERODROME_SLIPSTREAM" ? "Aerodrome" : "Uniswap V3"} · ±{selected.market.rangeWidthPct.toFixed(0)}% range</small></span></span>
+            <span><TokenIcon symbol={selected.market.symbol} src={stats.get(selected.market.id)?.tokenImageUrl} color={selected.market.color} /><span><b id="zap-dialog-title">{selected.market.symbol}/{zapProtocol === "V4" ? "ETH" : "WETH"}</b><small>{chainLabel(selected.chain)} · {zapProtocol === "V2" ? "Uniswap V2" : zapProtocol === "V4" ? "Uniswap V4" : selected.market.protocol === "AERODROME_SLIPSTREAM" ? "Aerodrome V3" : "Uniswap V3"}{zapProtocol === "V2" ? "" : ` · ±${selected.market.rangeWidthPct.toFixed(0)}% range`}</small></span></span>
             <button type="button" onClick={onCloseZap} aria-label="Close"><CloseIcon /></button>
           </header>
           <ZapPanel
             market={selected.market}
             chain={selected.chain as ChainSlug}
             amount={zapAmount}
+            protocol={zapProtocol}
             plan={zapPlan}
             state={zapState}
             onAmount={onZapAmount}
+            onProtocol={onZapProtocol}
             onPrepare={() => onPrepareZap(selected.market.id)}
             onExecute={onExecuteZap}
             balance={balances?.[selected.chain as ChainSlug] ?? null}
@@ -898,13 +912,15 @@ function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapPlan, 
   </>;
 }
 
-function ZapPanel({ market, chain, amount, plan, state, onAmount, onPrepare, onExecute, balance, onFund }: {
+function ZapPanel({ market, chain, amount, protocol, plan, state, onAmount, onProtocol, onPrepare, onExecute, balance, onFund }: {
   market: CuratedMarket;
   chain: ChainSlug;
   amount: string;
+  protocol: "V2" | "V3" | "V4";
   plan: AllocationPlan | null;
   state: PlanState;
   onAmount: (next: string) => void;
+  onProtocol: (next: "V2" | "V3" | "V4") => void;
   onPrepare: () => void;
   onExecute: () => void;
   balance: BalanceState | null;
@@ -914,6 +930,9 @@ function ZapPanel({ market, chain, amount, plan, state, onAmount, onPrepare, onE
   const busy = state.kind === "signing" || state.kind === "waiting";
   return <div className="zap-panel" aria-label={`Make the ${market.symbol}/WETH market`}>
     <div className="zap-controls">
+      {market.liquidityVenues?.length ? <div className="zap-protocol" aria-label="Pool version">
+        {(["V2", "V3", "V4"] as const).filter((candidate) => candidate === "V3" || market.liquidityVenues?.some((venue) => venue.protocol === candidate)).map((candidate) => <button key={candidate} type="button" className={protocol === candidate ? "is-active" : ""} aria-pressed={protocol === candidate} onClick={() => onProtocol(candidate)}>{candidate}</button>)}
+      </div> : null}
       <span className="zap-balance">Amount {balance ? <small role="status">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></small> : null}</span>
       <label className="zap-amount">
         <input autoFocus inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
@@ -930,7 +949,7 @@ function ZapPanel({ market, chain, amount, plan, state, onAmount, onPrepare, onE
       )}
     </div>
     {plan && planMarket ? <dl className="zap-preview">
-      <div><dt>Position</dt><dd>{formatWalletBalance(planMarket.mintWeth)} WETH + {compactAmount(planMarket.mintMeme, 18)} {market.symbol}</dd></div>
+      <div><dt>Position</dt><dd>{formatWalletBalance(planMarket.mintQuote)} {planMarket.quoteSymbol} + {compactAmount(planMarket.mintMeme, 18)} {market.symbol}</dd></div>
       <div><dt>Wizzy fee</dt><dd>{formatWalletBalance(plan.serviceFeeWei)} ETH</dd></div>
     </dl> : null}
     {state.kind === "submitted" || state.kind === "error" ? <p className={`funding-status is-${state.kind === "submitted" ? "submitted" : "error"}`} aria-live="polite">{state.message}</p> : null}

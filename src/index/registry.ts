@@ -288,6 +288,7 @@ function registryMetadata(): Map<string, CuratedMarket> {
       status: "watch",
       risk: candidate.risk,
       color: palette[colorIndex]!,
+      liquidityVenues: [],
     });
   }
   return known;

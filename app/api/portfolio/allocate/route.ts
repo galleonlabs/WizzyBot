@@ -13,11 +13,13 @@ const Body = z.object({
   marketIds: z.array(z.string()).max(12).optional(),
   baseMarketIds: z.array(z.string()).max(12).optional(),
   robinhoodMarketIds: z.array(z.string()).max(12).optional(),
+  protocol: z.enum(["V2", "V3", "V4"]).optional(),
 });
 
 export async function POST(request: Request) {
   try {
     const body = Body.parse(await readApiJson(request));
+    if (body.chain === "both" && body.protocol) throw new Error("Choose one chain before selecting a pool version");
     const amountWei = BigInt(body.amountWei);
     const plan = body.chain === "both"
       ? await planDualChainAllocation({
@@ -32,6 +34,7 @@ export async function POST(request: Request) {
           chain: body.chain,
           amountWei,
           marketIds: body.marketIds,
+          protocol: body.protocol,
         });
     return NextResponse.json({ plan });
   } catch (error) {

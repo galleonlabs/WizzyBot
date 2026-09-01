@@ -10,7 +10,8 @@ import { poolAbi, quoterV2Abi } from "../chain/abi.js";
 import { loadEnv } from "../config/env.js";
 import { TREASURY } from "../constants.js";
 import { bpsOf } from "../core/fees.js";
-import { quoteMintFromPool, snapshotFromQuote } from "../core/mint.js";
+import { loadV2Pair, planMint, quoteMintFromPool, quoteMintV2, snapshotFromQuote } from "../core/mint.js";
+import { loadV4Pool } from "../chain/v4.js";
 import { makePublicClient } from "../signer/broadcast.js";
 import type { PlannedTx, TokenRef } from "../types.js";
 import { erc20ApproveTx, mintCalldata, nativeTransferTx, wrapEthTx } from "../uniswap/calldata.js";
@@ -35,19 +36,21 @@ export type SerializableTx = {
 export type AllocationMarketPlan = {
   marketId: string;
   symbol: string;
-  pool: Address;
-  venue: "uniswap-v3" | "aerodrome-slipstream";
-  positionManager: Address;
+  protocol: "V2" | "V3" | "V4";
+  pool: Hex;
+  venue: "uniswap-v2" | "uniswap-v3" | "uniswap-v4" | "aerodrome-slipstream";
+  liquidityTarget: Address;
+  quoteSymbol: "ETH" | "WETH";
   weightBps: number;
   budgetWei: string;
   swapInWei: string;
   quotedMemeOut: string;
   minimumMemeOut: string;
-  mintWeth: string;
+  mintQuote: string;
   mintMeme: string;
   tickLower: number;
   tickUpper: number;
-  leftoverWeth: string;
+  leftoverQuote: string;
   leftoverMeme: string;
 };
 
@@ -89,6 +92,8 @@ export async function planAllocation(input: {
   marketIds?: readonly string[];
   markets?: readonly CuratedMarket[];
   serviceFeeBps?: number;
+  protocol?: "V2" | "V3" | "V4";
+  client?: PublicClient;
 }): Promise<AllocationPlan> {
   if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
   const owner = getAddress(input.owner);
@@ -108,7 +113,25 @@ export async function planAllocation(input: {
   if (net <= 0n) throw new Error("allocation is too small after fees");
 
   const env = loadEnv();
-  const client = makePublicClient(env.rpcByChain[input.chain], chain.viem);
+  const client = input.client ?? makePublicClient(env.rpcByChain[input.chain], chain.viem);
+  if (input.protocol && markets.length !== 1) throw new Error("Choose one market before selecting a pool version");
+  if (input.protocol === "V2" || input.protocol === "V4") {
+    const market = markets[0];
+    if (!market) throw new Error("Choose a market");
+    return planAlternativeAllocation({
+      owner,
+      chain: input.chain,
+      chainId: chain.id,
+      market,
+      amountWei: input.amountWei,
+      net,
+      serviceFee,
+      feeBps,
+      protocol: input.protocol,
+      client,
+      treasury: env.treasury ?? TREASURY,
+    });
+  }
   const budgets = weightedBudgets(net, sleeveAwareWeights(markets));
   const quotes: MarketQuote[] = [];
   for (const [index, market] of markets.entries()) {
@@ -181,6 +204,185 @@ export async function planAllocation(input: {
       "Quoted outputs and ranges expire. Re-plan instead of signing an expired batch.",
       "Wizzy selects the reviewed Uniswap or Aerodrome venue for each market; there is no pool builder to configure.",
       "Any unused WETH or meme tokens remain in your wallet.",
+    ],
+  };
+}
+
+type AlternativeProtocol = "V2" | "V4";
+
+export function liquidityVenueFor(market: CuratedMarket, protocol: AlternativeProtocol) {
+  const venue = market.liquidityVenues.find((candidate) => candidate.protocol === protocol);
+  if (!venue) throw new Error(`${market.symbol} has no reviewed Uniswap ${protocol} pool`);
+  return venue;
+}
+
+async function planAlternativeAllocation(input: {
+  owner: Address;
+  chain: ChainSlug;
+  chainId: number;
+  market: CuratedMarket;
+  amountWei: bigint;
+  net: bigint;
+  serviceFee: bigint;
+  feeBps: number;
+  protocol: AlternativeProtocol;
+  client: PublicClient;
+  treasury: Address;
+}): Promise<AllocationPlan> {
+  const venue = liquidityVenueFor(input.market, input.protocol);
+  const addresses = addressesFor(input.chain);
+  const acquisition = await quoteMarket(input.client, input.owner, input.chainId, input.market, input.net);
+  const swapIn = BigInt(acquisition.marketPlan.swapInWei);
+  const memeFloor = BigInt(acquisition.marketPlan.minimumMemeOut);
+  const quoteForMint = input.net - swapIn;
+  const quoteToken: TokenRef = { address: input.market.quoteToken, symbol: "WETH", decimals: input.market.quoteDecimals };
+  const memeToken: TokenRef = { address: input.market.token, symbol: input.market.symbol, decimals: input.market.tokenDecimals };
+
+  let marketPlan: AllocationMarketPlan;
+  let mintTransactions: PlannedTx[];
+  let wrapAmount: bigint;
+  let liquidityTargets: Address[];
+  let custodyNotice: string;
+
+  if (venue.protocol === "V2") {
+    const pair = await loadV2Pair(input.client, input.market.quoteToken, input.market.token);
+    if (pair.pool.toLowerCase() !== venue.pool.toLowerCase()) throw new Error(`${input.market.symbol} V2 pool no longer matches the reviewed pair`);
+    const pairTokens = new Set([pair.token0.toLowerCase(), pair.token1.toLowerCase()]);
+    if (!pairTokens.has(input.market.quoteToken.toLowerCase()) || !pairTokens.has(input.market.token.toLowerCase())) {
+      throw new Error(`${input.market.symbol} V2 pool tokens do not match the reviewed pair`);
+    }
+    const quoteIsToken0 = pair.token0.toLowerCase() === input.market.quoteToken.toLowerCase();
+    const mintQuote = quoteMintV2({
+      chainId: input.chainId,
+      token0: quoteIsToken0 ? quoteToken : memeToken,
+      token1: quoteIsToken0 ? memeToken : quoteToken,
+      reserve0: pair.reserve0,
+      reserve1: pair.reserve1,
+      pool: pair.pool,
+      amount0Desired: quoteIsToken0 ? quoteForMint : memeFloor,
+      amount1Desired: quoteIsToken0 ? memeFloor : quoteForMint,
+    });
+    const mintQuoteAmount = quoteIsToken0 ? mintQuote.amount0 : mintQuote.amount1;
+    const mintMeme = quoteIsToken0 ? mintQuote.amount1 : mintQuote.amount0;
+    mintTransactions = planMint(mintQuote, input.owner, false).txs;
+    wrapAmount = input.net;
+    liquidityTargets = [addresses.v2Router];
+    custodyNotice = "The Uniswap V2 LP token is sent directly to your wallet.";
+    marketPlan = {
+      marketId: input.market.id,
+      symbol: input.market.symbol,
+      protocol: "V2",
+      pool: pair.pool,
+      venue: "uniswap-v2",
+      liquidityTarget: addresses.v2Router,
+      quoteSymbol: "WETH",
+      weightBps: input.market.weightBps,
+      budgetWei: input.net.toString(),
+      swapInWei: swapIn.toString(),
+      quotedMemeOut: acquisition.marketPlan.quotedMemeOut,
+      minimumMemeOut: acquisition.marketPlan.minimumMemeOut,
+      mintQuote: mintQuoteAmount.toString(),
+      mintMeme: mintMeme.toString(),
+      tickLower: 0,
+      tickUpper: 0,
+      leftoverQuote: (quoteForMint - mintQuoteAmount).toString(),
+      leftoverMeme: (memeFloor - mintMeme).toString(),
+    };
+  } else {
+    const live = await loadV4Pool(input.client, addresses.nativeEth, input.market.token, venue.fee, venue.hooks);
+    if (live.poolId.toLowerCase() !== venue.poolId.toLowerCase()) throw new Error(`${input.market.symbol} V4 pool no longer matches the reviewed pool`);
+    if (live.key.tickSpacing !== venue.tickSpacing || live.liquidity <= 0n) throw new Error(`${input.market.symbol} V4 pool is not currently usable`);
+    // v4 mints encode a small maximum around each quoted token amount. Leave
+    // that headroom inside the user's stated budget instead of asking the
+    // wallet for more ETH than the plan declares.
+    const maxSafe = (amount: bigint) => (amount * 10_000n) / 10_050n;
+    const nativeDesired = maxSafe(quoteForMint);
+    const memeDesired = maxSafe(memeFloor);
+    const nativeToken: TokenRef = { address: addresses.nativeEth, symbol: "ETH", decimals: 18 };
+    const mintQuote = {
+      ...quoteMintFromPool({
+        chainId: input.chainId,
+        protocol: "V4",
+        token0: nativeToken,
+        token1: memeToken,
+        fee: live.key.fee,
+        tickSpacing: live.key.tickSpacing,
+        sqrtPriceX96: live.sqrtPriceX96,
+        tickCurrent: live.tick,
+        pool: addresses.v4PoolManager,
+        widthPct: input.market.rangeWidthPct,
+        amount0Desired: nativeDesired,
+        amount1Desired: memeDesired,
+        useNative: true,
+        nativeIsToken0: true,
+      }),
+      poolId: live.poolId,
+      hooks: live.key.hooks,
+    };
+    mintTransactions = planMint(mintQuote, input.owner, false).txs;
+    wrapAmount = swapIn;
+    liquidityTargets = [addresses.v4PositionManager, addresses.permit2];
+    custodyNotice = "The Uniswap V4 position NFT is minted directly to your wallet.";
+    marketPlan = {
+      marketId: input.market.id,
+      symbol: input.market.symbol,
+      protocol: "V4",
+      pool: live.poolId,
+      venue: "uniswap-v4",
+      liquidityTarget: addresses.v4PositionManager,
+      quoteSymbol: "ETH",
+      weightBps: input.market.weightBps,
+      budgetWei: input.net.toString(),
+      swapInWei: swapIn.toString(),
+      quotedMemeOut: acquisition.marketPlan.quotedMemeOut,
+      minimumMemeOut: acquisition.marketPlan.minimumMemeOut,
+      mintQuote: mintQuote.amount0.toString(),
+      mintMeme: mintQuote.amount1.toString(),
+      tickLower: mintQuote.tickLower,
+      tickUpper: mintQuote.tickUpper,
+      leftoverQuote: (quoteForMint - mintQuote.amount0).toString(),
+      leftoverMeme: (memeFloor - mintQuote.amount1).toString(),
+    };
+  }
+
+  const transactions: PlannedTx[] = [
+    wrapEthTx(wrapAmount, input.chainId),
+    erc20ApproveTx(addresses.weth, acquisition.swapSpender, swapIn),
+    acquisition.swap,
+    ...mintTransactions,
+  ];
+  if (input.serviceFee > 0n) transactions.push(nativeTransferTx(input.treasury, input.serviceFee));
+  const allowedTargets = uniqueAddresses([
+    addresses.weth,
+    input.market.token,
+    acquisition.swapSpender,
+    ...liquidityTargets,
+    input.treasury,
+  ]);
+  assertAllowedTransactions(transactions, allowedTargets);
+  const now = new Date();
+  return {
+    kind: "allocate",
+    owner: input.owner,
+    chain: input.chain,
+    chainId: input.chainId,
+    amountWei: input.amountWei.toString(),
+    serviceFeeBps: input.feeBps,
+    serviceFeeWei: input.serviceFee.toString(),
+    netAllocationWei: input.net.toString(),
+    expectedConfirmations: 1,
+    execution: "wallet_sendCalls",
+    atomic: true,
+    createdAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + PLAN_TTL_MS).toISOString(),
+    markets: [marketPlan],
+    transactions: transactions.map(serializeTx),
+    allowedTargets,
+    notices: [
+      custodyNotice,
+      "One atomic wallet batch is requested; if any call fails, the entire batch reverts.",
+      "Quoted outputs and ranges expire. Re-plan instead of signing an expired batch.",
+      "Any unused ETH, WETH, or meme tokens remain in your wallet.",
     ],
   };
 }
@@ -324,19 +526,21 @@ async function quoteUniswapMarket(
     marketPlan: {
       marketId: market.id,
       symbol: market.symbol,
+      protocol: "V3",
       pool: market.pool,
       venue: "uniswap-v3",
-      positionManager: addressesFor(chainId === 4663 ? "robinhood" : "base").nfpm,
+      liquidityTarget: addressesFor(chainId === 4663 ? "robinhood" : "base").nfpm,
+      quoteSymbol: "WETH",
       weightBps: market.weightBps,
       budgetWei: budget.toString(),
       swapInWei: swapIn.toString(),
       quotedMemeOut: quotedMemeOut.toString(),
       minimumMemeOut: minimumMemeOut.toString(),
-      mintWeth: mintWeth.toString(),
+      mintQuote: mintWeth.toString(),
       mintMeme: mintMeme.toString(),
       tickLower: mintQuote.tickLower,
       tickUpper: mintQuote.tickUpper,
-      leftoverWeth: (wethForMint - mintWeth).toString(),
+      leftoverQuote: (wethForMint - mintWeth).toString(),
       leftoverMeme: (minimumMemeOut - mintMeme).toString(),
     },
     swap,
@@ -442,19 +646,21 @@ async function quoteAerodromeMarket(
     marketPlan: {
       marketId: market.id,
       symbol: market.symbol,
+      protocol: "V3",
       pool: market.pool,
       venue: "aerodrome-slipstream",
-      positionManager: deployment.positionManager,
+      liquidityTarget: deployment.positionManager,
+      quoteSymbol: "WETH",
       weightBps: market.weightBps,
       budgetWei: budget.toString(),
       swapInWei: swapIn.toString(),
       quotedMemeOut: quotedMemeOut.toString(),
       minimumMemeOut: minimumMemeOut.toString(),
-      mintWeth: mintWeth.toString(),
+      mintQuote: mintWeth.toString(),
       mintMeme: mintMeme.toString(),
       tickLower: mintQuote.tickLower,
       tickUpper: mintQuote.tickUpper,
-      leftoverWeth: (wethForMint - mintWeth).toString(),
+      leftoverQuote: (wethForMint - mintWeth).toString(),
       leftoverMeme: (minimumMemeOut - mintMeme).toString(),
     },
     swap,

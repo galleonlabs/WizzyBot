@@ -31,6 +31,7 @@ type HostedPortfolioSurface = {
     chain: "base" | "robinhood";
     amountWei: bigint;
     marketIds?: readonly string[];
+    protocol?: "V2" | "V3" | "V4";
   }) => Promise<unknown>;
   planDualChainAllocation: (input: {
     owner: string;

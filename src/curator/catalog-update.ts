@@ -134,6 +134,7 @@ export function planCentralizedCatalogUpdate(input: {
       status: "active",
       risk: candidate.risk,
       color: colorFor(candidate.id),
+      liquidityVenues: [],
     });
     const nextVersion = catalog.version + 1;
     catalog.migrations.push({

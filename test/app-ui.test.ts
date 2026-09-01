@@ -208,6 +208,10 @@ describe("meme market maker UI", () => {
     expect(portfolio).not.toContain("Wizzy prepares the swap and range.");
     expect(portfolio).toContain("Your wallet holds every position. Wizzy never takes custody.");
     expect(portfolio).toContain("Wizzy fee");
+    expect(portfolio).toContain('aria-label="Pool version"');
+    expect(portfolio).toContain('protocol: zapProtocol');
+    expect(portfolio).toContain("planMarket.quoteSymbol");
+    expect(css).toContain(".zap-protocol");
     expect(portfolio).not.toContain("Service fee");
     expect(portfolio).toContain('useState("0.05")');
     expect(portfolio).not.toContain("v{markets.catalog.version}");

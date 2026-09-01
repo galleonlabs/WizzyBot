@@ -342,7 +342,7 @@ function planMintV4(quote: MintQuote, owner: Address, dryRun: boolean): ActionRe
         currency0: c0,
         currency1: c1,
         fee: quote.fee,
-        tickSpacing: tickSpacingForFee(quote.fee),
+        tickSpacing: quote.tickSpacing ?? tickSpacingForFee(quote.fee),
         hooks,
       },
       tickLower: quote.tickLower,

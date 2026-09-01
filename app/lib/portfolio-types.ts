@@ -21,6 +21,10 @@ export type CuratedMarket = {
   risk: MarketRisk;
   imageUrl?: string;
   color: string;
+  liquidityVenues?: Array<
+    | { protocol: "V2"; pool: `0x${string}` }
+    | { protocol: "V4"; poolId: `0x${string}`; quoteSymbol: "ETH"; fee: number; tickSpacing: number; hooks: `0x${string}` }
+  >;
 };
 
 export type CuratedChain = {
@@ -169,18 +173,20 @@ export type AllocationMarketPlan = {
   marketId: string;
   symbol: string;
   pool: `0x${string}`;
-  venue: "uniswap-v3" | "aerodrome-slipstream";
-  positionManager: `0x${string}`;
+  protocol: "V2" | "V3" | "V4";
+  venue: "uniswap-v2" | "uniswap-v3" | "uniswap-v4" | "aerodrome-slipstream";
+  liquidityTarget: `0x${string}`;
+  quoteSymbol: "ETH" | "WETH";
   weightBps: number;
   budgetWei: string;
   swapInWei: string;
   quotedMemeOut: string;
   minimumMemeOut: string;
-  mintWeth: string;
+  mintQuote: string;
   mintMeme: string;
   tickLower: number;
   tickUpper: number;
-  leftoverWeth: string;
+  leftoverQuote: string;
   leftoverMeme: string;
 };
 

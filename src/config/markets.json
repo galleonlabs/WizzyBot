@@ -34,7 +34,11 @@
           "status": "paused",
           "risk": "established",
           "coingeckoId": "toshi",
-          "color": "#76e7cf"
+          "color": "#76e7cf",
+          "liquidityVenues": [
+            { "protocol": "V2", "pool": "0xF641ff99d18bAbd6fFa38FA5cBc09dD7DaB385C4" },
+            { "protocol": "V4", "poolId": "0x060eea2f3f474c5a9a53e8b806e180b7f770b305e332f008aefae77030fe8955", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+          ]
         },
         {
           "id": "base-brett",
@@ -55,7 +59,11 @@
           "status": "active",
           "risk": "established",
           "coingeckoId": "based-brett",
-          "color": "#6f96ff"
+          "color": "#6f96ff",
+          "liquidityVenues": [
+            { "protocol": "V2", "pool": "0xb34380BA6a17B022782c7FC91e319C10c168FB98" },
+            { "protocol": "V4", "poolId": "0x27402edf3c6a6d6b5a279dfc7a2c8cbacebbfdfc3559f7c03d6971b09126a9f3", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+          ]
         },
         {
           "id": "base-degen",
@@ -75,7 +83,11 @@
           "status": "paused",
           "risk": "established",
           "coingeckoId": "degen-base",
-          "color": "#b99aff"
+          "color": "#b99aff",
+          "liquidityVenues": [
+            { "protocol": "V2", "pool": "0x7C327d692B72f60b28AecEDbcC1BA784712fE7b2" },
+            { "protocol": "V4", "poolId": "0xee381526b93d418077a9d1b9c9b495a3d135410af9a58bc2a5f512fb7b61cbf7", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+          ]
         },
         {
           "id": "base-basecat",
@@ -95,7 +107,8 @@
           "status": "active",
           "risk": "emerging",
           "coingeckoId": "basecat",
-          "color": "#ff8f6b"
+          "color": "#ff8f6b",
+          "liquidityVenues": []
         }
       ]
     },
@@ -124,7 +137,11 @@
           "status": "active",
           "risk": "established",
           "coingeckoId": "cash-cat",
-          "color": "#5ef0b6"
+          "color": "#5ef0b6",
+          "liquidityVenues": [
+            { "protocol": "V2", "pool": "0x0579fA41416101b66e202F66bF3B0de5101F5b9F" },
+            { "protocol": "V4", "poolId": "0x74739c7ee5dda3695d01575c32371eff16e7b831e37517d1a99b568749143e7a", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+          ]
         },
         {
           "id": "robinhood-pons",
@@ -144,7 +161,11 @@
           "status": "active",
           "risk": "established",
           "coingeckoId": "pons",
-          "color": "#f4c851"
+          "color": "#f4c851",
+          "liquidityVenues": [
+            { "protocol": "V2", "pool": "0x8018Ee3ad3c0321bE0e69536733CD28e29564dD4" },
+            { "protocol": "V4", "poolId": "0x6073975413484a350101c0c5d592a91ceb6c3ee881ad359613a08359fd1495a0", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+          ]
         },
         {
           "id": "robinhood-ai",
@@ -163,7 +184,10 @@
           "weightBps": 1790,
           "status": "active",
           "risk": "emerging",
-          "color": "#8ba8ff"
+          "color": "#8ba8ff",
+          "liquidityVenues": [
+            { "protocol": "V2", "pool": "0xd0C29C64b039200C5Ec23be929665c092e2d39Fb" }
+          ]
         },
         {
           "id": "robinhood-chump",
@@ -183,7 +207,8 @@
           "status": "active",
           "risk": "emerging",
           "coingeckoId": "chump-coin",
-          "color": "#ff8a62"
+          "color": "#ff8a62",
+          "liquidityVenues": []
         },
         {
           "id": "robinhood-stonkbroker",
@@ -203,7 +228,11 @@
           "status": "active",
           "risk": "emerging",
           "coingeckoId": "stonkbroker",
-          "color": "#d39aff"
+          "color": "#d39aff",
+          "liquidityVenues": [
+            { "protocol": "V2", "pool": "0x49E7df6887615F18d83c4C93871B0fefC9C2CC61" },
+            { "protocol": "V4", "poolId": "0xd33c8fd38b06e989cdbd4dffdefab71c4bdd415b24964c8d69e38ff35b068f92", "quoteSymbol": "ETH", "fee": 10000, "tickSpacing": 200, "hooks": "0x0000000000000000000000000000000000000000" }
+          ]
         },
         {
           "id": "robinhood-ponsguy",
@@ -223,7 +252,8 @@
           "status": "paused",
           "risk": "emerging",
           "imageUrl": "https://cdn.dexscreener.com/cms/images/VZsOJtVF3nDles33?width=800&height=800&quality=95&format=auto",
-          "color": "#ff6f83"
+          "color": "#ff6f83",
+          "liquidityVenues": []
         }
       ]
     }

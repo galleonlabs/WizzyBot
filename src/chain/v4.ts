@@ -87,7 +87,7 @@ export async function loadV4Pool(
     }),
   ]);
   if (slot0[0] === 0n) {
-    throw new Error(`no v4 pool for ${c0}/${c1} fee=${fee} hooks=${hooks} on Base`);
+    throw new Error(`no v4 pool for ${c0}/${c1} fee=${fee} hooks=${hooks} on ${slugOfClient(client)}`);
   }
   return { poolId, key, sqrtPriceX96: slot0[0], tick: slot0[1], liquidity };
 }

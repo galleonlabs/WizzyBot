@@ -4,6 +4,22 @@ import rawCatalog from "../config/markets.json" with { type: "json" };
 import type { ChainSlug } from "../chains.js";
 
 const AddressSchema = z.string().refine(isAddress, "invalid EVM address").transform((value) => getAddress(value));
+const PoolIdSchema = z.string().regex(/^0x[0-9a-fA-F]{64}$/, "invalid v4 pool id");
+
+const LiquidityVenueSchema = z.discriminatedUnion("protocol", [
+  z.object({
+    protocol: z.literal("V2"),
+    pool: AddressSchema,
+  }),
+  z.object({
+    protocol: z.literal("V4"),
+    poolId: PoolIdSchema,
+    quoteSymbol: z.literal("ETH"),
+    fee: z.number().int().positive(),
+    tickSpacing: z.number().int().positive(),
+    hooks: AddressSchema,
+  }),
+]);
 
 const MarketSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -27,6 +43,7 @@ const MarketSchema = z.object({
   coingeckoId: z.string().min(1).optional(),
   imageUrl: z.string().url().optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  liquidityVenues: z.array(LiquidityVenueSchema).max(2).default([]),
 });
 
 const ChainMarketSchema = z.object({
@@ -83,6 +100,10 @@ const CatalogSchema = z.object({
       }
       if (market.protocol === "V3" && market.aerodromeDeployment) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} has an unused Aerodrome deployment` });
+      }
+      const alternativeProtocols = market.liquidityVenues.map((venue) => venue.protocol);
+      if (new Set(alternativeProtocols).size !== alternativeProtocols.length) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chains", chainIndex, "markets"], message: `${market.id} has duplicate alternative protocols` });
       }
     }
     const sleeves = chain.markets.filter((market) => market.sleeve);

@@ -1283,6 +1283,11 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
 .zap-panel > * { min-width: 0; }
 .zap-controls { display: grid; gap: 8px; }
 .zap-controls > * { width: 100%; max-width: 100%; min-width: 0; }
+.zap-protocol { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; gap: 2px; padding: 3px; border-radius: 10px; background: var(--surface-2); }
+.zap-protocol button { min-height: 32px; border-radius: 7px; color: var(--muted); font-size: 10px; font-weight: 800; }
+.zap-protocol button:hover { color: var(--ink); }
+.zap-protocol button.is-active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px rgba(0, 0, 0, .14); }
+.zap-protocol button:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; }
 .zap-balance { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink-soft); font-size: 10px; font-weight: 750; }
 .zap-balance small { color: var(--muted); font-size: 9px; font-weight: 650; }
 .zap-balance small b { color: var(--ink-soft); }

@@ -3,7 +3,7 @@ import { activeMarkets, chainCatalog, getMarketCatalog, parseMarketCatalog } fro
 import { deriveGeckoMarketStats, deriveMarketStats } from "../src/markets/stats.js";
 import { activeSolanaMarkets, getSolanaMarketCatalog } from "../src/markets/solana-catalog.js";
 import { deriveSolanaMarketStats } from "../src/markets/solana-stats.js";
-import { weightedBudgets } from "../src/portfolio/allocation.js";
+import { liquidityVenueFor, weightedBudgets } from "../src/portfolio/allocation.js";
 
 describe("curated meme markets", () => {
   it("keeps every active chain portfolio at 100%", () => {
@@ -24,6 +24,17 @@ describe("curated meme markets", () => {
     const amounts = weightedBudgets(101n, [3_000, 3_000, 2_500, 1_500]);
     expect(amounts).toEqual([30n, 30n, 25n, 16n]);
     expect(amounts.reduce((sum, amount) => sum + amount, 0n)).toBe(101n);
+  });
+
+  it("offers only reviewed per-market V2 and V4 alternatives", () => {
+    const brett = activeMarkets("base").find((market) => market.symbol === "BRETT")!;
+    const basecat = activeMarkets("base").find((market) => market.symbol === "BASECAT")!;
+    const cashcat = activeMarkets("robinhood").find((market) => market.symbol === "CASHCAT")!;
+    expect(brett.liquidityVenues.map((venue) => venue.protocol)).toEqual(["V2", "V4"]);
+    expect(cashcat.liquidityVenues.map((venue) => venue.protocol)).toEqual(["V2", "V4"]);
+    expect(basecat.liquidityVenues).toEqual([]);
+    expect(liquidityVenueFor(brett, "V2")).toMatchObject({ protocol: "V2", pool: "0xb34380BA6a17B022782c7FC91e319C10c168FB98" });
+    expect(() => liquidityVenueFor(basecat, "V4")).toThrow("no reviewed Uniswap V4 pool");
   });
 
   it("only accepts curator migrations that preserve the outgoing index slot", () => {

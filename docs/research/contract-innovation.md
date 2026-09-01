@@ -1,45 +1,43 @@
-# Contract-level innovation for Wizzy (exercise, 2026-09-01)
+# Contract-level innovation for Wizzy — open-source survey (2026-09-01, v2)
 
-What could Wizzy build at the contract layer that a UI-over-Morpho cannot claim? Constraint: fork only bases with clean security records, and innovate where our actual differentiator lives — the agent curator loop.
+Exercise: what could Wizzy build at the contract layer that a UI-over-Morpho cannot claim? This version is grounded in a survey of the actual open-source landscape rather than memory. The survey changed the recommendation.
 
-## Security records, honestly
+## 1. Security records, honestly
 
-Worth naming plainly because the reference point in the prompt cuts the other way: **Harvest Finance lost ~$24M in October 2020** to a flash-loan curve-price manipulation of its fUSDT/fUSDC vaults. Other famous stumbles: Yearn v1 DAI vault (~$11M, 2021), Compound's COMP distribution bug (~$80M+, 2021), Euler (~$197M, 2023, later recovered), Curve's Vyper reentrancy (2023), Balancer (repeatedly). The clean-core shortlist relevant to us:
+The prompt's reference point cuts the other way: **Harvest Finance lost ~$24M in October 2020** to a flash-loan curve-price manipulation of its stablecoin vaults. Yearn v1's DAI vault (~$11M, 2021), Compound's distribution bug (~$80M, 2021), Euler v1 (~$197M, 2023, recovered), and Curve's Vyper reentrancy (2023) round out the lesson: **strategy zoos and complex cores are the attack surface; tiny immutable cores (Uniswap, Morpho Blue, Maker's savings core) are the clean ones.**
 
-| Base | Record | Why it matters to us |
-| --- | --- | --- |
-| **Morpho Blue + MetaMorpho** | Clean; minimal immutable core, formally verified | Already our substrate; MetaMorpho is the closest fork base (roles, caps, timelocks exist) |
-| **Yearn V3 TokenizedStrategy** | Clean V3 record; explicitly designed as a fork/build framework | Modular 4626 strategy pattern, battle-tested periphery |
-| **Uniswap core** | The cleanest record in DeFi | Ethos proof: tiny immutable cores survive |
-| **Maker/Sky savings (sUSDS/DSR)** | Clean core since 2019 | The yield-wrapper pattern users trust |
-| **Pendle core** | Strong record | The fixed-rate/yield-splitting frontier if we ever go there |
-| **ERC-4626 / ERC-7540** | Standards, not protocols | Composability for free |
+## 2. The vault-framework landscape (verified)
 
-License check is a real step before any fork (MetaMorpho is GPL-family, Yearn V3 AGPL, Blue's core has BUSL history — verify current terms per repo).
+| Framework | License | What it is | Relevant facts |
+| --- | --- | --- | --- |
+| **Morpho Vaults V2** ([repo](https://github.com/morpho-org/vaults-v2)) | GPL-2.0-or-later | Curated 4626 meta-vault | Roles: owner / curator / allocator / **sentinel** (rapid de-risk). **Id-based absolute + relative caps**, timelockable config, **in-kind redemptions + permissionless `forceDeallocate`**, adapters including a **Morpho Vault V1 adapter** — i.e. it can allocate across the exact four vaults our index holds today. Audits in-repo. |
+| **BoringVault / Veda** ([Se7en-Seas repo](https://github.com/Se7en-Seas/boring-vault), [architecture](https://docs.veda.tech/architecture-and-flow-of-funds)) | check repo (unstated in docs) | The ether.fi Liquid stack; widely forked (Paxos et al.) | **ManagerWithMerkleVerification**: every action a strategist may take is a leaf in a merkle tree (target, selector, sanitized args). Call-space whitelisting — the strategist literally cannot construct an unapproved call. Teller/Accountant split for deposits and share pricing. |
+| **Yearn V3 Tokenized Strategy** ([repo](https://github.com/yearn/tokenized-strategy), [docs](https://docs.yearn.fi/developers/v3/overview)) | AGPL-3.0 | Single-strategy 4626 framework via immutable proxy | Purpose-built for third parties to ship strategies; clean V3 record; AGPL is viral for closed forks. |
+| **Lagoon (Hopper Labs)** ([repo](https://github.com/hopperlabsxyz/lagoon-v0), [Nethermind review](https://www.nethermind.io/blog/securing-lagoons-asynchronous-erc-7540-vaults-as-the-protocol-scaled-from-v1-to-v5)) | check repo | ERC-7540 async vault infra for curators | ~$129M TVL across 120+ vaults, 18+ chains; curator-approved NAV settlement; the institutional async pattern. |
+| **Euler Vault Kit** ([docs](https://docs.euler.finance/creator-tools/vaults/evk/introduction/), [OZ audit](https://www.openzeppelin.com/news/euler-vault-kit-evk-audit)) | see repo | Credit-vault construction kit | For building lending markets — adjacent, not our lane. |
+| **Brahma ConsoleKit** ([repo](https://github.com/Brahma-fi/console-kit)) | open SDK | Agent execution platform on Safe sub-accounts | Modular **policy engine at the smart-account level**: each sub-account governed by a policy defining permitted actions; orchestration/simulation offchain. |
 
-## The innovation thesis: put the agent's leash onchain
+## 3. The agent-yield wave (what we would be differentiating against)
 
-Every agent-managed vault today asks users to trust the operator's offchain judgment. Our curator loop already runs deterministic policy gates — TVL floors, collapse triggers, timelock minimums — but they live in TypeScript on dappnode. The contract-level innovation is to make the **policy the contract and the agent merely a proposer within it**:
+Per the [Cambrian Q1 2026 agentic-finance landscape](https://www.cambrian.org/blog/agentic-finance-landscape-q1-2026): **20+ yield agents live**, mostly rule-based, per-user smart accounts, guardrails asserted offchain. [Giza's ARMA](https://finbold.com/gizas-autonomous-yield-optimization-agent-arma-goes-live-on-the-base-network/) optimizes $30M+ of stablecoins on Base across lending venues; [Axal ships "Autopilot Yield + Guardrails"](https://axal.substack.com/p/introducing-autopilot-yield-guardrails); Kamino, Lulo, Superform automate adjacent lanes. Two consistent gaps in the reporting: **guardrails are marketing language, not verifiable contract invariants**, and institutional writers ([RockawayX 2026 vault guide](https://www.rockawayx.com/insights/defi-vaults-explained-2026-guide)) name auditability as the adoption blocker. The market pull for a *verifiable* leash is real.
 
-### 1. The policy-enforced agent vault (flagship)
+## 4. Honest revision: most of the "policy leash" already exists
 
-A minimal 4626 meta-vault (fork base: MetaMorpho's role architecture, stripped) where:
+The first draft of this document proposed a policy-enforced vault with caps, drift limits, and timelocks. The survey shows **Morpho Vaults V2 already ships most of that**: absolute/relative caps, timelocked config, a sentinel role for rapid de-risk, and forced deallocation for exits. BoringVault solves the call-space version. Brahma solves the account-level version. Forking any of them to rebuild caps would be redundant work with a worse security story.
 
-- **The venue universe is immutable or timelocked-tight**: the allowlist of underlying blue-chip 4626 vaults is set at deploy (or additions sit behind a long timelock + guardian veto). The agent can never introduce a venue.
-- **Policy invariants are enforced in Solidity, not prose**: per-venue allocation caps, max reallocation drift per 24h, minimum venue count (forced diversification), and an oracle-checked **depeg/TVL circuit breaker** that blocks new allocation into a venue breaching thresholds.
-- **The agent is only the allocator**: a bounded key (dappnode) that proposes weight shifts inside those invariants. Every gate it passes is verifiable by anyone reading the chain.
-- **Dead-man's switch**: if the allocator stops heartbeating for N days, the vault auto-derisks to its designated safest venue and opens permissionless `derisk()`. An abandoned agent cannot strand funds in a decaying venue.
+What genuinely does not exist anywhere in the survey:
 
-Pitch in one line: *the first vault where you can verify what the AI is allowed to do.* Nobody in the agent-vault wave (and there is a wave) has made the leash itself the product. It is also small enough to be genuinely auditable — the Uniswap/Blue lesson is that tiny immutable cores are the ones with clean records.
+1. **A deterministic sentinel.** In every framework the sentinel/guardian is a trusted human or multisig. Nobody has shipped a sentinel whose alarm conditions are *code*: permissionless `derisk()` callable by anyone when an onchain-checkable predicate holds — venue TVL collapse (checkpointed `totalAssets` deltas), underlying depeg (oracle bound), cap breach persistence.
+2. **An allocator dead-man's switch.** No framework distinguishes "the agent chose this allocation" from "the agent stopped showing up." A heartbeat the allocator must refresh, with expiry making de-risk permissionless, converts agent liveness into a verifiable property.
+3. **Rate-limited allocation drift.** V2 caps bound *where* funds sit, not *how fast* they move. A max-drift-per-epoch wrapper bounds a compromised or hallucinating agent's damage radius.
 
-### 2. Deposit-seconds: an onchain loyalty primitive (small, sharp)
+## 5. Revised recommendation: don't fork a vault — build the missing roles
 
-A non-custodial periphery contract that accrues **deposit-seconds** (balance × time) per address from the vault's own share accounting. It replaces trust-me points programs with a verifiable primitive: the XP/quest system reads it, a future token allocates against it, and third parties can compose with it ("proof of patience"). Zero custody risk — it only reads share balances and checkpoints. This is the contract half of the token flywheel already sketched in [morpho-curator-and-token.md](morpho-curator-and-token.md).
+Deploy a standard **Morpho Vaults V2** vault (GPL, audited, adapters already reach our four venues) and write two small original contracts that hold its roles:
 
-### 3. Rate-smoothed share price (nice-to-have, later)
+- **PolicySentinel** — holds the sentinel role. Encodes the dappnode curator's gates (TVL floor, collapse rate, depeg bound, heartbeat expiry) as onchain predicates with permissionless triggers. *Anyone can pull the alarm; the alarm conditions are law.* This is the leash-made-visible, in a few hundred auditable lines.
+- **PolicyAllocator** — holds the allocator role, wraps the dappnode agent key with per-epoch drift limits and the heartbeat the sentinel watches.
 
-A smoothing buffer that drips realized yield into the share price over a window (sDAI-style), making the APY line users see boring in the best way. Small mechanism, real UX differentiation for a "stable" product. Adds accounting complexity — only after 1 and 2.
+The dappnode curator loop stays exactly what it is — but its gates compile into contract predicates, and its authority becomes inspectable. The pitch survives from v1, sharpened: *the first vault where the AI's leash is not a promise but a predicate.* Deposit-seconds (the loyalty primitive feeding the [token flywheel](morpho-curator-and-token.md)) survives unchanged as the second, weekend-sized build.
 
-### Ranked verdict
-
-Build order if this graduates from exercise to plan: **1** (the moat — policy-enforced agent vault, ~2–4 weeks of contract work + audit), **2** (a weekend of Solidity, immediately useful to quests/token), **3** (later). Not worth doing: forking a strategy-zoo aggregator (the Harvest/Yearn-v1 lesson — every strategy is attack surface), fixed-rate tranching (Pendle already owns it), or any custody-touching novelty. The differentiator isn't a new yield source; it's **verifiable agent governance over boring, proven yield sources** — which is exactly the product's story told in Solidity.
+Effort estimate: PolicySentinel + PolicyAllocator ≈ 300–600 lines of Solidity total plus tests and one audit pass — an order of magnitude smaller than any vault fork, on top of the most-audited curated-vault core in the category.

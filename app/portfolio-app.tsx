@@ -1,12 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useAddFunds, useAuthorizationSignature, usePrivy, useWallets } from "@privy-io/react-auth";
-import {
-  useSignTransaction,
-  useWallets as useSolanaWallets,
-  type ConnectedStandardSolanaWallet,
-} from "@privy-io/react-auth/solana";
+import { useAccount, useConfig, useConnect, useDisconnect, type Connector } from "wagmi";
+import { createPortal } from "react-dom";
 import { formatEther, parseEther } from "viem";
 import { lightRowToView, priceLabel, type PositionView } from "./lib/cards";
 import { readJsonPayload } from "./lib/api-payload";
@@ -25,12 +21,9 @@ import {
   type RobinhoodIndexPlan,
   type IndexMigrationPlan,
   type PositionActionPlan,
-  type SolanaCuratedMarket,
 } from "./lib/portfolio-types";
-import { type SolanaPositionActionPlan } from "./lib/solana-position-server";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
-import { confirmedTransactionHashes, sendPrivyWalletCallsAndWait, sendWalletCallsAndWait, type ConnectedEvmWallet, type ConfirmedCallsSubmission, type WalletTransaction } from "./lib/wallet-calls";
-import { PRIVY_APP_ID } from "./lib/privy-config";
+import { sendPlanTransactions, type PlanSubmission, type WalletTransaction } from "./lib/wallet-calls";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 import { AchievementCenter } from "./achievement-center";
 import { SendEthDialog } from "./send-eth-dialog";
@@ -40,11 +33,11 @@ type ViewTab = "overview" | "markets";
 type ThemePreference = "system" | "light" | "dark";
 type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" | "submitted" | "error"; message?: string };
 type BalanceState = { kind: "idle" | "loading" | "ready" | "error"; balanceWei?: string };
-type AnyPositionActionPlan = PositionActionPlan | SolanaPositionActionPlan;
+type AnyPositionActionPlan = PositionActionPlan;
 type PositionActionKind = "compound" | "rebalance" | "withdraw";
 type IndexChain = ChainSlug | "solana";
 type IndexMarket = {
-  market: CuratedMarket | SolanaCuratedMarket;
+  market: CuratedMarket;
   chain: IndexChain;
   indexWeightBps: number;
 };
@@ -56,7 +49,7 @@ type AvailableIndexUpdate = {
 };
 const INDEX_MARKET_COUNT = 6;
 const FOMO_URL = "https://fomo.family/r/makemememarkets";
-const ROBINHOOD_NATIVE_ETH = "0x0000000000000000000000000000000000000000";
+const ROBINHOOD_BRIDGE_URL = "https://relay.link/bridge/robinhood";
 const POOL_ACTIVITY_REFRESH_MS = 60_000;
 const PREVIEW_POOL_ACTIVITY: PoolActivityItem[] = [
   { id: "preview-1", kind: "added", marketId: "robinhood-pons", symbol: "PONS", pair: "PONS/WETH", wethAmount: "9.34", transactionHash: "0xpreview", transactionUrl: "#", blockNumber: "3" },
@@ -112,15 +105,14 @@ const EMPTY_MARKETS: MarketsPayload = {
 };
 
 export function PortfolioApp() {
-  const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
-  const { addFunds } = useAddFunds();
-  const { generateAuthorizationSignature } = useAuthorizationSignature();
-  const { wallets } = useWallets();
-  const { ready: solanaReady, wallets: solanaWallets } = useSolanaWallets();
-  const { signTransaction } = useSignTransaction();
+  const wagmiConfig = useConfig();
+  const { address, status: accountStatus } = useAccount();
+  const { connect, connectors, error: connectError, isPending: connectPending, reset: resetConnect } = useConnect();
+  const { disconnect } = useDisconnect();
+  const ready = accountStatus !== "reconnecting";
+  const authenticated = accountStatus === "connected";
   const [tab, setTab] = useState<ViewTab>("overview");
   const [theme, setTheme] = useState<ThemePreference>("dark");
-  const [fundingState, setFundingState] = useState<PlanState>({ kind: "idle" });
   const [balanceState, setBalanceState] = useState<BalanceState>({ kind: "idle" });
   const [markets, setMarkets] = useState<MarketsPayload>(EMPTY_MARKETS);
   const [marketsState, setMarketsState] = useState<"loading" | "ready" | "error">("loading");
@@ -136,58 +128,26 @@ export function PortfolioApp() {
   const [zapPlan, setZapPlan] = useState<AllocationPlan | null>(null);
   const [zapState, setZapState] = useState<PlanState>({ kind: "idle" });
   const [sendOpen, setSendOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
   const positionsRequestRef = useRef(0);
   const balanceRequestRef = useRef(0);
   const authStateRef = useRef<"loading" | "signed-in" | "signed-out">("loading");
   const achievementActionRef = useRef<((evidence: AchievementActionEvidence) => Promise<void>) | null>(null);
 
-  const wallet = useMemo(() => {
-    const preferred = user?.wallet?.address?.toLowerCase();
-    return wallets.find((candidate) => candidate.address.toLowerCase() === preferred) ?? wallets[0];
-  }, [user?.wallet?.address, wallets]);
-  const solanaWallet = useMemo(() => solanaWallets.find((candidate) => candidate.standardWallet.name.toLowerCase().includes("privy")) ?? solanaWallets[0], [solanaWallets]);
-  const address = wallet?.address ?? user?.wallet?.address;
-  const solanaAddress = solanaWallet?.address;
-  const privyWalletId = useMemo(() => {
-    if (!address) return null;
-    const accounts = [user?.wallet, ...(user?.linkedAccounts ?? [])] as unknown[];
-    for (const account of accounts) {
-      if (!account || typeof account !== "object") continue;
-      const record = account as Record<string, unknown>;
-      if (typeof record.address !== "string" || record.address.toLowerCase() !== address.toLowerCase()) continue;
-      if (typeof record.id === "string" && record.id.length >= 8) return record.id;
-    }
-    return null;
-  }, [address, user?.linkedAccounts, user?.wallet]);
-
   async function sendEvmBatch(input: {
     owner: string;
     chainId: number;
     transactions: readonly WalletTransaction[];
-    intent?: "send-eth";
-    onSubmitted?: () => void;
-  }) {
-    if (!wallet) throw new Error("Your wallet is not ready");
-    if (input.chainId === 4663) {
-      if (!privyWalletId) throw new Error("Your Privy wallet is still initializing. Refresh once, then try again.");
-      return sendPrivyWalletCallsAndWait({
-        walletId: privyWalletId,
-        appId: PRIVY_APP_ID,
-        owner: input.owner,
-        walletAddress: wallet.address,
-        chainId: 4663,
-        transactions: input.transactions,
-        intent: input.intent,
-        generateAuthorizationSignature,
-        onSubmitted: input.onSubmitted,
-      });
-    }
-    return sendWalletCallsAndWait({
-      wallet: wallet as unknown as ConnectedEvmWallet,
+    onStep?: (message: string) => void;
+  }): Promise<PlanSubmission> {
+    return sendPlanTransactions({
+      config: wagmiConfig,
       owner: input.owner,
       chainId: input.chainId,
       transactions: input.transactions,
-      onSubmitted: input.onSubmitted,
+      onProgress: ({ step, total, description }) => {
+        input.onStep?.(total > 1 ? `${description} · ${step} of ${total}` : description);
+      },
     });
   }
 
@@ -218,11 +178,10 @@ export function PortfolioApp() {
       const confirmed = await sendEvmBatch({
         owner: address,
         chainId: 4663,
-        intent: "send-eth",
         transactions: [{ to: recipient, data: "0x", value: amountWei, description: "Send ETH on Robinhood Chain" }],
-        onSubmitted,
+        onStep: () => onSubmitted(),
       });
-      const transactionHash = confirmedTransactionHashes(confirmed.status)[0] ?? null;
+      const transactionHash = confirmed.transactionHashes[0] ?? null;
       await loadRobinhoodBalance();
       trackProductEvent("ETH Send Confirmed", { chainId: 4663, transactionHash });
       return transactionHash;
@@ -247,12 +206,6 @@ export function PortfolioApp() {
         if (!response.ok || payload.error) throw new Error(payload.error ?? `Could not load ${chain} positions`);
         return payload.positions ?? [];
       });
-      if (solanaReady && solanaAddress) requests.push((async () => {
-        const response = await fetch(`/api/portfolio/solana/positions?owner=${encodeURIComponent(solanaAddress)}`);
-        const payload = await readJsonPayload(response) as { positions?: unknown[]; error?: string };
-        if (!response.ok || payload.error) throw new Error(payload.error ?? "Could not load Solana positions");
-        return payload.positions ?? [];
-      })());
       const payloads = await Promise.all(requests);
       if (requestId !== positionsRequestRef.current) return;
       const next = payloads.flat().map((row) => row && typeof row === "object" ? lightRowToView(row as Record<string, unknown>) : null)
@@ -265,7 +218,7 @@ export function PortfolioApp() {
       setPositionsState("error");
       reportClientError("positions", error);
     }
-  }, [address, authenticated, solanaAddress, solanaReady]);
+  }, [address, authenticated]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("wizzy-theme") ?? window.localStorage.getItem("una-theme");
@@ -330,7 +283,6 @@ export function PortfolioApp() {
     setActionState({ kind: "idle" });
     setMigrationPlan(null);
     setMigrationState({ kind: "idle" });
-    setFundingState({ kind: "idle" });
   }, [address, authenticated, previewMode]);
 
   const activeMarkets = useMemo<IndexMarket[]>(() => {
@@ -388,44 +340,17 @@ export function PortfolioApp() {
 
   function startLogin(source: "header" | "make-markets" | "markets") {
     trackProductEvent("Login Started", { source });
-    try {
-      login();
-    } catch (error) {
-      reportClientError("auth", error);
-    }
+    resetConnect();
+    setConnectOpen(true);
   }
 
-  async function fundRobinhood() {
+  function fundRobinhood() {
     if (!authenticated || !address) {
       startLogin("make-markets");
       return;
     }
-    setFundingState({ kind: "planning", message: "Opening Privy funding…" });
     trackProductEvent("Cross-chain Funding Started", { destinationChainId: 4663 });
-    try {
-      const result = await addFunds({
-        destination: {
-          address,
-          chain: "eip155:4663",
-          asset: ROBINHOOD_NATIVE_ETH,
-        },
-        crypto: { slippageBps: 100 },
-      });
-      if (result.method !== "crypto" || result.status !== "completed") {
-        throw new Error("Privy did not complete the crypto deposit");
-      }
-      setFundingState({ kind: "submitted", message: "ETH arrived on Robinhood Chain. You can make markets now." });
-      trackProductEvent("Cross-chain Funding Completed", { destinationChainId: 4663 });
-      await loadRobinhoodBalance();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not add ETH";
-      if (message.includes("USER_EXITED")) {
-        setFundingState({ kind: "idle" });
-        return;
-      }
-      setFundingState({ kind: "error", message: "Privy could not route that deposit. Try another supported chain or asset." });
-      reportClientError("cross-chain-funding", error);
-    }
+    window.open(`${ROBINHOOD_BRIDGE_URL}?toAddress=${address}`, "_blank", "noopener,noreferrer");
   }
 
   async function preparePositionAction(position: PositionView, action: PositionActionKind) {
@@ -433,18 +358,10 @@ export function PortfolioApp() {
     setActionPlan(null);
     setActionState({ kind: "planning", message: `${action === "compound" ? "Preparing to reinvest" : action === "rebalance" ? "Preparing a new range for" : "Preparing to withdraw"} ${position.pair}…` });
     try {
-      const isSolana = position.chain === "solana";
-      if (isSolana && action === "rebalance") throw new Error("Solana rebalancing is not available yet");
-      if (isSolana && (!solanaWallet || !position.marketId)) throw new Error("Your Solana wallet is not ready");
-      const response = await fetch(isSolana ? "/api/portfolio/solana/action" : "/api/portfolio/action", {
+      const response = await fetch("/api/portfolio/action", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(isSolana ? {
-          owner: solanaWallet!.address,
-          marketId: position.marketId,
-          position: position.tokenId,
-          action,
-        } : {
+        body: JSON.stringify({
           owner: address,
           chain: position.chain,
           tokenId: position.tokenId,
@@ -464,37 +381,19 @@ export function PortfolioApp() {
   }
 
   async function executePositionAction() {
-    if (!actionPlan || !wallet || !address) return;
+    if (!actionPlan || !address) return;
     if (Date.now() >= Date.parse(actionPlan.expiresAt)) {
       setActionState({ kind: "error", message: "This quote expired. Prepare it again." });
       return;
     }
     try {
-      let confirmedEvm: ConfirmedCallsSubmission | null = null;
       setActionState({ kind: "signing", message: "Approve this position update in your wallet." });
-      if (actionPlan.chain === "solana") {
-        if (!solanaWallet) throw new Error("Your Solana wallet is not ready");
-        const { executeSolanaPositionAction } = await import("./lib/solana-wallet");
-        await executeSolanaPositionAction({
-          plan: actionPlan,
-          wallet: solanaWallet as ConnectedStandardSolanaWallet,
-          signTransaction,
-          onProgress: ({ step, total, label }) => setActionState({
-            kind: step === 0 ? "signing" : "waiting",
-            message: step === 0 ? "Approve the Solana position update." : `${label} · ${step} of ${total}`,
-          }),
-        });
-      } else {
-        confirmedEvm = await sendEvmBatch({
-          owner: actionPlan.owner,
-          chainId: actionPlan.chainId,
-          transactions: actionPlan.transactions,
-          onSubmitted: () => setActionState({
-            kind: "waiting",
-            message: actionPlan.kind === "withdraw" ? "Closing the position and returning ETH…" : actionPlan.kind === "rebalance" ? "Moving liquidity into the new range…" : "Reinvesting your fees…",
-          }),
-        });
-      }
+      const confirmedEvm = await sendEvmBatch({
+        owner: actionPlan.owner,
+        chainId: actionPlan.chainId,
+        transactions: actionPlan.transactions,
+        onStep: (message) => setActionState({ kind: "waiting", message }),
+      });
       await Promise.all([loadPositions(), loadRobinhoodBalance()]);
       if (actionPlan.kind === "withdraw") {
         // The exit invalidates the earlier zap celebration. Returning to Make
@@ -507,7 +406,7 @@ export function PortfolioApp() {
         message: actionPlan.kind === "withdraw" ? "Your ETH is back in your wallet." : actionPlan.kind === "rebalance" ? "Your position is earning in its new range." : "Your fees are back at work.",
       });
       if ((actionPlan.kind === "compound" || actionPlan.kind === "rebalance") && actionPlan.chain === "robinhood" && confirmedEvm) {
-        const transactionHashes = confirmedTransactionHashes(confirmedEvm);
+        const transactionHashes = confirmedEvm.transactionHashes;
         if (transactionHashes.length) void achievementActionRef.current?.({
           action: actionPlan.kind,
           chainId: 4663,
@@ -543,7 +442,7 @@ export function PortfolioApp() {
   }
 
   async function executeIndexMigration() {
-    if (!migrationPlan || !wallet || !address) return;
+    if (!migrationPlan || !address) return;
     if (Date.now() >= Date.parse(migrationPlan.expiresAt)) {
       setMigrationState({ kind: "error", message: "This update quote expired. Prepare it again." });
       return;
@@ -554,7 +453,7 @@ export function PortfolioApp() {
         owner: migrationPlan.owner,
         chainId: migrationPlan.chainId,
         transactions: migrationPlan.transactions,
-        onSubmitted: () => setMigrationState({ kind: "waiting", message: "Robinhood is confirming the index update…" }),
+        onStep: (message) => setMigrationState({ kind: "waiting", message }),
       });
       await loadPositions();
       setMigrationState({ kind: "submitted", message: "Your position now matches the latest curated index." });
@@ -604,8 +503,8 @@ export function PortfolioApp() {
   }
 
   async function executeZap() {
-    if (!zapPlan || !address || !wallet) return;
-    if (!sameAddress(zapPlan.owner, address) || !sameAddress(zapPlan.owner, wallet.address)) {
+    if (!zapPlan || !address) return;
+    if (!sameAddress(zapPlan.owner, address)) {
       setZapPlan(null);
       setZapState({ kind: "error", message: "Your wallet changed. Review a fresh quote before continuing." });
       return;
@@ -620,7 +519,7 @@ export function PortfolioApp() {
         owner: zapPlan.owner,
         chainId: zapPlan.chainId,
         transactions: zapPlan.transactions,
-        onSubmitted: () => setZapState({ kind: "waiting", message: "Robinhood is confirming your market…" }),
+        onStep: (message) => setZapState({ kind: "waiting", message }),
       });
       await loadPositions();
       setZapState({ kind: "submitted", message: "Market made. Your position NFT is in your wallet." });
@@ -674,8 +573,7 @@ export function PortfolioApp() {
         onExecuteZap={() => void executeZap()}
         onCloseZap={() => { setZapMarketId(null); setZapPlan(null); setZapState({ kind: "idle" }); }}
         balance={authenticated ? balanceState : null}
-        fundingState={fundingState}
-        onFund={() => void fundRobinhood()}
+        onFund={fundRobinhood}
       />
     </section>
   );
@@ -709,7 +607,6 @@ export function PortfolioApp() {
               address={address}
               authenticated={authenticated}
               positionsState={positionsState}
-              getAccessToken={getAccessToken}
               onConnect={() => startLogin("header")}
               preview={previewMode}
               actionRef={achievementActionRef}
@@ -721,7 +618,7 @@ export function PortfolioApp() {
               <ThemeIcon preference={theme} />
             </button>
             {!ready ? <span className="wallet-skeleton" /> : authenticated ? (
-              <WalletMenu address={address ?? "Wallet"} onSend={() => { setSendOpen(true); void loadRobinhoodBalance(); trackProductEvent("ETH Send Opened", { chainId: 4663 }); }} onDisconnect={() => { trackProductEvent("Logout Started"); void logout(); }} />
+              <WalletMenu address={address ?? "Wallet"} onSend={() => { setSendOpen(true); void loadRobinhoodBalance(); trackProductEvent("ETH Send Opened", { chainId: 4663 }); }} onDisconnect={() => { trackProductEvent("Logout Started"); disconnect(); }} />
             ) : (
               <button className="wallet-button wallet-connect" type="button" onClick={() => startLogin("header")} aria-label="Connect wallet"><WalletIcon /><span>Connect</span></button>
             )}
@@ -758,6 +655,14 @@ export function PortfolioApp() {
           )}
       </div>
       {address ? <SendEthDialog open={sendOpen} owner={address} balanceWei={balanceState.kind === "ready" ? balanceState.balanceWei : undefined} onClose={() => setSendOpen(false)} onSend={sendRobinhoodEth} /> : null}
+      <ConnectWalletDialog
+        open={connectOpen && !authenticated}
+        connectors={connectors}
+        pending={connectPending}
+        error={connectError}
+        onPick={(connector) => connect({ connector }, { onSuccess: () => setConnectOpen(false) })}
+        onClose={() => { setConnectOpen(false); resetConnect(); }}
+      />
     </main>
   );
 }
@@ -852,6 +757,56 @@ function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; st
   </div>;
 }
 
+function ConnectWalletDialog({ open, connectors, pending, error, onPick, onClose }: {
+  open: boolean;
+  connectors: readonly Connector[];
+  pending: boolean;
+  error: Error | null;
+  onPick: (connector: Connector) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+  if (!open || typeof document === "undefined") return null;
+  // EIP-6963 discovery lists each installed wallet with its own icon. The
+  // generic injected fallback only earns a row when nothing was discovered.
+  const discovered = connectors.filter((connector) => connector.id !== "injected");
+  const list = discovered.length ? discovered : connectors;
+  return createPortal(<div className="send-eth-backdrop" onPointerDown={(event) => { if (event.currentTarget === event.target && !pending) onClose(); }}>
+    <section className="send-eth-dialog connect-dialog" role="dialog" aria-modal="true" aria-labelledby="connect-wallet-title" aria-describedby="connect-wallet-description">
+      <header>
+        <span><img src="/brand/wizzy-mascot-32.png" alt="" /><span><small>Wizzy</small><b>Robinhood Chain</b></span></span>
+        <button type="button" onClick={onClose} disabled={pending}>Close</button>
+      </header>
+      <div className="send-eth-body">
+        <div className="send-eth-heading"><h2 id="connect-wallet-title">Connect a wallet</h2><p id="connect-wallet-description">Your wallet holds every position. Wizzy never takes custody.</p></div>
+        {list.length ? <div className="connect-options">
+          {list.map((connector) => (
+            <button key={connector.uid} type="button" disabled={pending} onClick={() => onPick(connector)}>
+              {connector.icon ? <img src={connector.icon} alt="" /> : <WalletIcon />}
+              <b>{connector.name}</b>
+              <ChevronIcon />
+            </button>
+          ))}
+        </div> : <p className="connect-empty">No browser wallet found. Install one — Rabby, MetaMask, or Coinbase Wallet — then reload.</p>}
+        {error ? <p className="send-eth-error" role="alert">{connectErrorMessage(error)}</p> : null}
+      </div>
+    </section>
+  </div>, document.body);
+}
+
+function connectErrorMessage(error: Error): string {
+  const message = error.message;
+  if (/rejected|denied/i.test(message)) return "The connection request was declined in your wallet.";
+  return message.length <= 160 ? message : "The wallet could not connect. Try again.";
+}
+
 function WalletMenu({ address, onSend, onDisconnect }: { address: string; onSend: () => void; onDisconnect: () => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -882,14 +837,14 @@ function WalletMenu({ address, onSend, onDisconnect }: { address: string; onSend
     {open ? <div className="wallet-menu-popover" id="wallet-menu" role="menu" aria-label="Wallet menu" onKeyDown={handleMenuNavigation}>
       <header>
         <img src="/brand/wizzy-mascot-32.png" alt="" />
-        <span><small>Your Wizzy wallet</small><b>{short(address)}</b></span>
+        <span><small>Your wallet</small><b>{short(address)}</b></span>
       </header>
       <div className="wallet-menu-actions">
         <button type="button" role="menuitem" onClick={() => { setOpen(false); onSend(); }}>
           <SendIcon /><span><b>Send ETH</b><small>On Robinhood Chain</small></span>
         </button>
-        <a href="https://home.privy.io/" target="_blank" rel="noreferrer" role="menuitem" onClick={() => setOpen(false)}>
-          <WalletIcon /><span><b>Manage</b><small>Export keys and security</small></span><ExternalLinkIcon />
+        <a href={`https://robinhoodchain.blockscout.com/address/${address}`} target="_blank" rel="noreferrer" role="menuitem" onClick={() => setOpen(false)}>
+          <WalletIcon /><span><b>Explorer</b><small>Your onchain activity</small></span><ExternalLinkIcon />
         </a>
         <button type="button" role="menuitem" onClick={() => { setOpen(false); onDisconnect(); }}>
           <DisconnectIcon /><span><b>Disconnect</b><small>Sign out of Wizzy</small></span>
@@ -917,7 +872,7 @@ function SuccessCelebration({ label }: { label: string }) {
   </div>;
 }
 
-function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balance, fundingState, onFund }: {
+function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balance, onFund }: {
   markets: IndexMarket[];
   stats: Map<string, MarketStats>;
   state: "loading" | "ready" | "error";
@@ -932,7 +887,6 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
   onExecuteZap: () => void;
   onCloseZap: () => void;
   balance: BalanceState | null;
-  fundingState: PlanState;
   onFund: () => void;
 }) {
   const orderedMarkets = [...markets].sort(
@@ -974,7 +928,6 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
                   onExecute={onExecuteZap}
                   onClose={onCloseZap}
                   balance={balance}
-                  fundingState={fundingState}
                   onFund={onFund}
                 />
               </td></tr>);
@@ -987,7 +940,7 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
   );
 }
 
-function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare, onExecute, onClose, balance, fundingState, onFund }: {
+function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare, onExecute, onClose, balance, onFund }: {
   market: CuratedMarket;
   feeAprPct: number | null;
   amount: string;
@@ -998,14 +951,13 @@ function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare,
   onExecute: () => void;
   onClose: () => void;
   balance: BalanceState | null;
-  fundingState: PlanState;
   onFund: () => void;
 }) {
   const planMarket = plan?.markets[0];
   const busy = state.kind === "signing" || state.kind === "waiting";
   return <div className="zap-panel" aria-label={`Make the ${market.symbol}/WETH market`}>
     <div className="zap-head">
-      <span><b>Make the {market.symbol}/WETH market</b><small>One amount. Wizzy swaps, ranges, and mints your position in a single confirmation.</small></span>
+      <span><b>Make the {market.symbol}/WETH market</b><small>One amount. Wizzy quotes the swap, range, and mint. Your wallet approves each step.</small></span>
       <span className="zap-range"><small>Range</small><b>±{market.rangeWidthPct.toFixed(0)}%</b></span>
       {feeAprPct !== null ? <span className="zap-range"><small>Fee APR</small><b>{formatFeeApr(feeAprPct)}</b></span> : null}
     </div>
@@ -1032,12 +984,11 @@ function ZapPanel({ market, feeAprPct, amount, plan, state, onAmount, onPrepare,
       <span><small>Ticks</small><b>{planMarket.tickLower} → {planMarket.tickUpper}</b></span>
     </div> : null}
     <div className="funding-choice">
-      <span><b>ETH on another chain?</b><small>Bridge to your Wizzy account.</small></span>
-      <button className="cross-chain-fund" type="button" disabled={fundingState.kind === "planning"} onClick={onFund}>
-        <EthereumIcon />{fundingState.kind === "planning" ? "Opening Privy…" : "Add ETH"}
+      <span><b>ETH on another chain?</b><small>Bridge to your wallet on Robinhood Chain.</small></span>
+      <button className="cross-chain-fund" type="button" onClick={onFund}>
+        <EthereumIcon />Add ETH<ExternalLinkIcon />
       </button>
     </div>
-    {fundingState.kind === "submitted" || fundingState.kind === "error" ? <p className={`funding-status is-${fundingState.kind}`} aria-live="polite">{fundingState.message}</p> : null}
     {state.kind === "submitted" || state.kind === "error" ? <p className={`funding-status is-${state.kind === "submitted" ? "submitted" : "error"}`} aria-live="polite">{state.message}</p> : null}
     <p className="action-assurance">Robinhood Chain · Self-custodial · The position NFT goes to your wallet</p>
   </div>;

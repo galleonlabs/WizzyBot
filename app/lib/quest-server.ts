@@ -37,35 +37,42 @@ export async function verifyOnchainQuestAction(input: {
     chain: robinhoodChain,
     transport: http(process.env.ROBINHOOD_RPC_URL?.trim() || ROBINHOOD_RPC_DEFAULT),
   });
+  // The plan executes as separate wallet-signed transactions, so the position
+  // effect and Wizzy's fee can land under different hashes. Require every
+  // provided transaction to be the owner's and successful, then judge the
+  // combined logs as one action.
   let verified: { transactionHash: Hex; blockNumber: bigint; positionTokenId: string } | null = null;
-  for (const transactionHash of input.transactionHashes) {
-    try {
-      const receipt = await client.getTransactionReceipt({ hash: transactionHash });
-      const action = verifyQuestActionReceipt({
-        action: input.action,
-        tokenId: input.tokenId,
-        walletAddresses: input.walletAddresses,
-        receipt: {
-          status: receipt.status,
-          from: receipt.from,
-          transactionHash: receipt.transactionHash,
-          logs: receipt.logs.map((log) => ({ address: log.address, data: log.data, topics: log.topics })),
-        },
-      });
-      const status = await fetchPositionStatus(action.positionTokenId, "robinhood") as Record<string, unknown>;
-      const view = status.view && typeof status.view === "object" ? status.view as Record<string, unknown> : {};
-      const pool = typeof view.pool === "string" ? view.pool.toLowerCase() : "";
-      const catalog = getMarketCatalog() as { chains?: Array<{ slug?: string; markets?: Array<{ pool?: string; status?: string }> }> };
-      const activePools = new Set(catalog.chains?.find((chain) => chain.slug === "robinhood")?.markets
-        ?.filter((market) => market.status === "active" && typeof market.pool === "string")
-        .map((market) => market.pool!.toLowerCase()) ?? []);
-      if (!activePools.has(pool)) throw new Error("quest position is not in the curated Robinhood index");
-      verified = { transactionHash: receipt.transactionHash, blockNumber: receipt.blockNumber, positionTokenId: action.positionTokenId };
-      break;
-    } catch {
-      // A wallet batch can expose multiple receipt hashes. Only one must carry
-      // the atomic position-manager effects for this claimed action.
+  try {
+    const receipts = await Promise.all(input.transactionHashes.map((hash) => client.getTransactionReceipt({ hash })));
+    for (const receipt of receipts) {
+      if (receipt.status !== "success") throw new Error("quest transaction reverted");
+      if (!input.walletAddresses.some((address) => address.toLowerCase() === receipt.from.toLowerCase())) {
+        throw new Error("quest transaction was not sent by this wallet");
+      }
     }
+    const anchor = receipts.find((receipt) => receipt.logs.some((log) => log.address.toLowerCase() === "0x73991a25c818bf1f1128deaab1492d45638de0d3")) ?? receipts[0]!;
+    const action = verifyQuestActionReceipt({
+      action: input.action,
+      tokenId: input.tokenId,
+      walletAddresses: input.walletAddresses,
+      receipt: {
+        status: "success",
+        from: anchor.from,
+        transactionHash: anchor.transactionHash,
+        logs: receipts.flatMap((receipt) => receipt.logs.map((log) => ({ address: log.address, data: log.data, topics: log.topics }))),
+      },
+    });
+    const status = await fetchPositionStatus(action.positionTokenId, "robinhood") as Record<string, unknown>;
+    const view = status.view && typeof status.view === "object" ? status.view as Record<string, unknown> : {};
+    const pool = typeof view.pool === "string" ? view.pool.toLowerCase() : "";
+    const catalog = getMarketCatalog() as { chains?: Array<{ slug?: string; markets?: Array<{ pool?: string; status?: string }> }> };
+    const activePools = new Set(catalog.chains?.find((chain) => chain.slug === "robinhood")?.markets
+      ?.filter((market) => market.status === "active" && typeof market.pool === "string")
+      .map((market) => market.pool!.toLowerCase()) ?? []);
+    if (!activePools.has(pool)) throw new Error("quest position is not in the curated Robinhood index");
+    verified = { transactionHash: anchor.transactionHash, blockNumber: anchor.blockNumber, positionTokenId: action.positionTokenId };
+  } catch {
+    verified = null;
   }
   if (!verified) throw new Error("No confirmed transaction proves this quest action");
   const block = await client.getBlock({ blockNumber: verified.blockNumber });

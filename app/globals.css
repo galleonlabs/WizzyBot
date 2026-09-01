@@ -1414,3 +1414,40 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
 /* Market-first home */
 .home-markets { padding-top: 0; }
 .index-shell[data-view="overview"] .index-hero { padding-bottom: 8px; }
+
+/* Connect wallet dialog */
+.connect-dialog { max-width: 400px; }
+.connect-options { display: flex; flex-direction: column; gap: 8px; }
+.connect-options button {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface); color: var(--ink); font: inherit; font-weight: 600;
+  cursor: pointer; text-align: left;
+}
+.connect-options button:hover:not(:disabled) { border-color: var(--coral); }
+.connect-options button:disabled { opacity: 0.55; cursor: default; }
+.connect-options button img { width: 24px; height: 24px; border-radius: 6px; }
+.connect-options button svg:first-child { width: 24px; height: 24px; }
+.connect-options button b { flex: 1; }
+.connect-options button svg:last-child { width: 14px; height: 14px; opacity: 0.5; }
+.connect-empty { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+
+/* Coming soon */
+.coming-soon {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 24px;
+  padding: 24px;
+  text-align: center;
+}
+.coming-soon-mark img { width: 132px; height: auto; }
+.coming-soon p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}

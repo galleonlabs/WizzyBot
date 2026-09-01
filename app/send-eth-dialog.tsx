@@ -110,12 +110,12 @@ export function SendEthDialog({ open, owner, balanceWei, onClose, onSend }: {
   return createPortal(<div className="send-eth-backdrop" onPointerDown={(event) => { if (event.currentTarget === event.target && !busy) onClose(); }}>
     <section ref={dialogRef} className={`send-eth-dialog is-${phase}`} role="dialog" aria-modal="true" aria-labelledby="send-eth-title" aria-describedby="send-eth-description">
       <header>
-        <span><img src="/brand/wizzy-mascot-32.png" alt="" /><span><small>Wizzy wallet</small><b>Robinhood Chain</b></span></span>
+        <span><img src="/brand/wizzy-mascot-32.png" alt="" /><span><small>Your wallet</small><b>Robinhood Chain</b></span></span>
         <button type="button" onClick={onClose} disabled={busy}>Close</button>
       </header>
 
       {phase === "form" ? <div className="send-eth-body">
-        <div className="send-eth-heading"><h2 id="send-eth-title">Send ETH</h2><p id="send-eth-description">Move ETH from your Wizzy wallet to another address.</p></div>
+        <div className="send-eth-heading"><h2 id="send-eth-title">Send ETH</h2><p id="send-eth-description">Move ETH from your wallet to another address.</p></div>
         <label className="send-eth-field">
           <span>Recipient</span>
           <input name="sendRecipient" autoComplete="off" spellCheck={false} value={recipient} placeholder="0x…" onChange={(event) => { setRecipient(event.target.value.trim()); setMessage(null); }} />
@@ -125,7 +125,7 @@ export function SendEthDialog({ open, owner, balanceWei, onClose, onSend }: {
           <span className="send-eth-amount"><input name="sendAmount" inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => { setAmount(event.target.value); setMessage(null); }} /><button type="button" disabled={!balanceWei || BigInt(balanceWei) === 0n} onClick={() => { if (balanceWei) setAmount(formatEther(BigInt(balanceWei))); setMessage(null); }}>Max</button><b>ETH</b></span>
         </label>
         {message ? <p className="send-eth-error" role="alert">{message}</p> : null}
-        <div className="send-eth-network"><img src="https://assets.relay.link/icons/4663/light.png" alt="" /><span><b>Robinhood Chain</b><small>Network fee sponsored by Wizzy</small></span></div>
+        <div className="send-eth-network"><img src="https://assets.relay.link/icons/4663/light.png" alt="" /><span><b>Robinhood Chain</b><small>Network fee paid from your wallet</small></span></div>
         <button className="send-eth-primary" type="button" onClick={review}>Review transfer</button>
       </div> : null}
 

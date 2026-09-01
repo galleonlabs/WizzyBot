@@ -1,25 +1,21 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getAddress, isAddress } from "viem";
 import { apiErrorResponse, ApiRequestError, readApiJson } from "../../lib/api-request-server";
-import {
-  ACHIEVEMENT_METADATA_KEY,
-  emptyAchievementRecord,
-  normalizeAchievementRecord,
-  serializeAchievementRecord,
-  type AchievementRecord,
-} from "../../lib/achievements";
-import { createAppPrivyClient } from "../../lib/privy-server";
+import { normalizeAchievementRecord, type AchievementRecord } from "../../lib/achievements";
 import { synchronizeOnchainQuests, verifyOnchainQuestAction } from "../../lib/quest-server";
-import { evmWalletAddresses } from "../../lib/quest-verification";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const Hash = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
+const Owner = z.string().refine((value) => isAddress(value), "owner must be an Ethereum address");
 const Body = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("sync") }).strict(),
+  z.object({ type: z.literal("sync"), owner: Owner, record: z.unknown() }).strict(),
   z.object({
     type: z.literal("action"),
+    owner: Owner,
+    record: z.unknown(),
     action: z.enum(["compound", "rebalance"]),
     chainId: z.literal(4663),
     tokenId: z.string().regex(/^\d+$/).max(80),
@@ -27,35 +23,30 @@ const Body = z.discriminatedUnion("type", [
   }).strict(),
 ]);
 
-export async function GET(request: Request) {
-  try {
-    const { user } = await authenticatedPrivyUser(request);
-    return privateJson({ record: recordFromMetadata(user.customMetadata) });
-  } catch (error) {
-    return apiErrorResponse(error, "Could not load quests");
-  }
-}
-
+/**
+ * Quests are wallet-native. Progress derives from public onchain state and
+ * per-transaction proofs; the browser keeps the record. This endpoint is a
+ * stateless verifier — it stores nothing and needs no login, so nothing here
+ * can move funds or reveal anything the chain does not already show.
+ */
 export async function POST(request: Request) {
   try {
-    const { client, userId, user } = await authenticatedPrivyUser(request);
-    const body = Body.parse(await readApiJson(request, 4_096));
-    const walletAddresses = evmWalletAddresses(user);
-    if (!walletAddresses.length) throw new ApiRequestError("Connect an Ethereum wallet to track quests", 400);
-    const current = recordFromMetadata(user.customMetadata);
+    const body = Body.parse(await readApiJson(request, 16_384));
+    const owner = getAddress(body.owner);
+    const current = normalizeAchievementRecord(body.record);
     let result: { record: AchievementRecord; newlyUnlocked: readonly string[] };
     if (body.type === "sync") {
-      result = await synchronizeOnchainQuests(current, walletAddresses);
+      result = await synchronizeOnchainQuests(current, [owner]);
     } else {
       try {
         const verified = await verifyOnchainQuestAction({
           record: current,
-          walletAddresses,
+          walletAddresses: [owner],
           action: body.action,
           tokenId: body.tokenId,
           transactionHashes: body.transactionHashes.map((hash) => hash.toLowerCase() as `0x${string}`),
         });
-        const synchronized = await synchronizeOnchainQuests(verified.record, walletAddresses);
+        const synchronized = await synchronizeOnchainQuests(verified.record, [owner]);
         result = {
           record: synchronized.record,
           newlyUnlocked: [...verified.newlyUnlocked, ...synchronized.newlyUnlocked],
@@ -64,40 +55,11 @@ export async function POST(request: Request) {
         throw new ApiRequestError("That transaction does not prove this quest", 422);
       }
     }
-    await client.setCustomMetadata(userId, {
-      ...(user.customMetadata ?? {}),
-      [ACHIEVEMENT_METADATA_KEY]: serializeAchievementRecord(result.record),
-    });
-    return privateJson({ record: result.record, newlyUnlocked: result.newlyUnlocked });
+    return NextResponse.json(
+      { record: result.record, newlyUnlocked: result.newlyUnlocked },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   } catch (error) {
     return apiErrorResponse(error, "Could not update quests");
   }
-}
-
-async function authenticatedPrivyUser(request: Request) {
-  const client = createAppPrivyClient();
-  if (!client) throw new ApiRequestError("quests are temporarily unavailable", 503);
-  const authorization = request.headers.get("authorization");
-  if (!authorization?.startsWith("Bearer ")) throw new ApiRequestError("authentication required", 401);
-  try {
-    const claims = await client.verifyAuthToken(authorization);
-    const user = await client.getUser(claims.userId);
-    return { client, userId: claims.userId, user };
-  } catch {
-    throw new ApiRequestError("authentication required", 401);
-  }
-}
-
-function recordFromMetadata(metadata: Record<string, string | number | boolean> | undefined): AchievementRecord {
-  const stored = metadata?.[ACHIEVEMENT_METADATA_KEY];
-  if (typeof stored !== "string") return emptyAchievementRecord();
-  try {
-    return normalizeAchievementRecord(JSON.parse(stored));
-  } catch {
-    return emptyAchievementRecord();
-  }
-}
-
-function privateJson(body: unknown) {
-  return NextResponse.json(body, { headers: { "Cache-Control": "private, no-store" } });
 }

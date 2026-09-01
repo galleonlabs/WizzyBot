@@ -7,6 +7,7 @@ const sendEthDialog = readFileSync("app/send-eth-dialog.tsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
 const providers = readFileSync("app/providers.tsx", "utf8");
+const wagmiConfig = readFileSync("app/lib/wagmi.ts", "utf8");
 const mascot = readFileSync("public/brand/wizzy-mascot.svg", "utf8");
 const ghostLight = readFileSync("public/brand/wizzy-ghost-light.svg", "utf8");
 const ghostDark = readFileSync("public/brand/wizzy-ghost-dark.svg", "utf8");
@@ -17,8 +18,6 @@ const xProfile = readFileSync("public/brand/x/wizzy-x-profile-400.png");
 const xBanner = readFileSync("public/brand/x/wizzy-x-banner-1500x500.png");
 const xBannerSource = readFileSync("public/brand/x/wizzy-x-banner.svg", "utf8");
 const nextConfig = readFileSync("next.config.ts", "utf8");
-const solanaWallet = readFileSync("app/lib/solana-wallet.ts", "utf8");
-const solanaBroadcast = readFileSync("app/api/portfolio/solana/broadcast/route.ts", "utf8");
 const marketsRoute = readFileSync("app/api/markets/route.ts", "utf8");
 const poolActivityRoute = readFileSync("app/api/pool-activity/route.ts", "utf8");
 const poolActivitySource = readFileSync("src/markets/activity.ts", "utf8");
@@ -31,7 +30,9 @@ const telemetry = readFileSync("app/lib/telemetry.ts", "utf8");
 
 describe("meme index product UI", () => {
   it("leads with one consumer market-making action and honest market evidence", () => {
-    expect(page).toContain("PortfolioApp");
+    expect(page).toContain("coming-soon");
+    expect(page).toContain("Coming soon");
+    expect(page).not.toContain("PortfolioApp");
     expect(portfolio).toContain("Make Meme Markets");
     expect(portfolio).toContain("Pick a meme market. One amount, one confirmation, real LP fees.");
     expect(portfolio).toContain("Curated and watched by agents around the clock.");
@@ -45,9 +46,8 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Make market");
     expect(portfolio).toContain('aria-label="ETH amount"');
     expect(portfolio).toContain("ETH on another chain?");
-    expect(portfolio).toContain("Bridge to your Wizzy account.");
-    expect(portfolio).toContain("useAddFunds");
-    expect(portfolio).toContain('chain: "eip155:4663"');
+    expect(portfolio).toContain("Bridge to your wallet on Robinhood Chain.");
+    expect(portfolio).toContain("https://relay.link/bridge/robinhood");
     expect(portfolio).not.toContain('name="sourceChain"');
     expect(portfolio).toContain('className="pair-cell"');
     expect(portfolio).not.toContain("Choose where your ETH is now");
@@ -193,9 +193,8 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Every pool reviewed by Wizzy agents, every six hours.");
     expect(portfolio).toContain('src={BRAND_ASSETS.robinhood}');
     expect(portfolio).toContain("Self-custodial");
-    expect(portfolio).toContain("Wizzy swaps, ranges, and mints your position in a single confirmation.");
+    expect(portfolio).toContain("Wizzy quotes the swap, range, and mint. Your wallet approves each step.");
     expect(portfolio).toContain('useState("0.05")');
-    expect(portfolio).toContain('chain: "eip155:4663"');
     expect(portfolio).not.toContain("v{markets.catalog.version}");
     expect(portfolio).toContain('state.kind === "planning" ? "Quoting…" : "Review"');
     expect(portfolio).not.toContain("loading ? INDEX_MARKET_COUNT : constituentCount");
@@ -276,27 +275,28 @@ describe("meme index product UI", () => {
     expect(xBannerSource).not.toContain("@WIZZYDOTFUN");
   });
 
-  it("offers wallet-first login and provisions EVM and Solana wallets for every user", () => {
-    expect(providers).toContain('loginMethods: ["wallet", "email"]');
-    expect(providers).toContain('ethereum: { createOnLogin: "all-users" }');
-    expect(providers).toContain('solana: { createOnLogin: "all-users" }');
-    expect(providers).toContain("toSolanaWalletConnectors");
-    expect(providers).toContain("solana: { connectors: solanaConnectors }");
-    expect(providers).toContain("defaultChain: robinhoodChain");
-    expect(providers).not.toContain("NEXT_PUBLIC_SOLANA_RPC_URL");
-    expect(providers).not.toContain("NEXT_PUBLIC_SOLANA_WS_URL");
-    expect(providers).not.toContain("createSolanaRpc");
+  it("connects external wallets only, with no embedded or sponsored path", () => {
+    expect(providers).toContain("WagmiProvider");
+    expect(providers).toContain("QueryClientProvider");
+    expect(wagmiConfig).toContain("injected()");
+    expect(wagmiConfig).toContain("robinhoodChain, base");
+    expect(wagmiConfig).toContain("robinhood-rpc.publicnode.com");
+    expect(portfolio).toContain("Connect a wallet");
+    expect(portfolio).toContain("Wizzy never takes custody.");
+    expect(portfolio).toContain("connector.uid");
+    expect(portfolio).not.toContain("privy");
+    expect(portfolio).not.toContain("Privy");
+    expect(portfolio).not.toContain("sponsor");
   });
 
   it("opens an accessible wallet menu with a native Robinhood ETH send flow", () => {
     expect(portfolio).toContain('aria-haspopup="menu"');
     expect(portfolio).toContain('role="menu"');
     expect(portfolio).toContain('role="menuitem"');
-    expect(portfolio).toContain('href="https://home.privy.io/"');
+    expect(portfolio).toContain("robinhoodchain.blockscout.com/address/");
     expect(portfolio).toContain("Send ETH");
     expect(portfolio).toContain("On Robinhood Chain");
-    expect(portfolio).toContain("Export keys and security");
-    expect(portfolio).toContain('intent: "send-eth"');
+    expect(portfolio).toContain("Your onchain activity");
     expect(portfolio).toContain("Disconnect");
     expect(portfolio).toContain('event.key !== "Escape"');
     expect(portfolio).toContain("handleMenuNavigation");
@@ -304,7 +304,7 @@ describe("meme index product UI", () => {
     expect(sendEthDialog).toContain('role="dialog"');
     expect(sendEthDialog).toContain('aria-modal="true"');
     expect(sendEthDialog).toContain("Review transfer");
-    expect(sendEthDialog).toContain("Network fee sponsored by Wizzy");
+    expect(sendEthDialog).toContain("Network fee paid from your wallet");
     expect(sendEthDialog).toContain(">Max</button>");
     expect(sendEthDialog).toContain("View transaction");
     expect(css).toContain(".send-eth-dialog");
@@ -312,10 +312,6 @@ describe("meme index product UI", () => {
   });
 
   it("keeps custom RPC credentials on the server and caches the public market snapshot", () => {
-    expect(solanaWallet).not.toContain("NEXT_PUBLIC_SOLANA_RPC_URL");
-    expect(solanaWallet).toContain('/api/portfolio/solana/broadcast');
-    expect(solanaBroadcast).toContain("getSolanaConnection");
-    expect(solanaBroadcast).toContain("verifySignatures: true");
     expect(marketsRoute).toContain("unstable_cache");
     expect(marketsRoute).toContain("s-maxage=30, stale-while-revalidate=300");
     expect(poolActivityRoute).toContain("unstable_cache");
@@ -352,7 +348,8 @@ describe("meme index product UI", () => {
     expect(nextConfig).toContain(
       "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
     );
-    expect(nextConfig).toContain("connect-src 'self' https://auth.privy.io");
+    expect(nextConfig).toContain("connect-src 'self' https://rpc.mainnet.chain.robinhood.com");
+    expect(nextConfig).not.toContain("privy");
     expect(nextConfig).toContain("object-src 'none'");
     expect(nextConfig).toContain("frame-ancestors 'none'");
     expect(nextConfig).not.toContain("script-src *");
@@ -387,7 +384,7 @@ describe("meme index product UI", () => {
 
   it("ships wallet-scoped XP and quests tied to confirmed product actions", () => {
     expect(portfolio).toContain("<AchievementCenter");
-    expect(portfolio).toContain("confirmedTransactionHashes(confirmedEvm)");
+    expect(portfolio).toContain("confirmedEvm.transactionHashes");
     expect(portfolio).toContain("transactionHashes,");
     expect(achievementCenter).toContain('trackProductEvent("Quest Completed"');
     expect(achievementCenter).toContain('trackProductEvent("Quest Board Opened"');
@@ -402,11 +399,11 @@ describe("meme index product UI", () => {
     expect(achievementCenter).toContain("createPortal");
     expect(achievementCenter).toContain("(triggerRef.current ?? previouslyFocused)?.focus()");
     expect(achievementCenter).toContain('fetch("/api/achievements"');
-    expect(achievementsRoute).toContain("verifyAuthToken");
-    expect(achievementsRoute).toContain("setCustomMetadata");
     expect(achievementsRoute).toContain("verifyOnchainQuestAction");
-    expect(achievementsRoute).not.toContain('"record" in body');
-    expect(achievementsRoute).not.toContain("userId: body");
+    expect(achievementsRoute).toContain("walletAddresses: [owner]");
+    expect(achievementsRoute).toContain("isAddress(value)");
+    expect(achievementsRoute).not.toContain("verifyAuthToken");
+    expect(achievementsRoute).not.toContain("authorization");
     expect(telemetry).toContain('"achievements"');
   });
 

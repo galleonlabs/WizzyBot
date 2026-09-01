@@ -51,7 +51,6 @@ export function AchievementCenter({
   address,
   authenticated,
   positionsState,
-  getAccessToken,
   onConnect,
   preview,
   actionRef,
@@ -59,12 +58,12 @@ export function AchievementCenter({
   address?: string;
   authenticated: boolean;
   positionsState: PositionState;
-  getAccessToken: () => Promise<string | null>;
   onConnect: () => void;
   preview: boolean;
   actionRef: MutableRefObject<((evidence: AchievementActionEvidence) => Promise<void>) | null>;
 }) {
   const [record, setRecord] = useState<AchievementRecord>(() => emptyAchievementRecord());
+  const recordRef = useRef<AchievementRecord>(record);
   const [open, setOpen] = useState(false);
   const [toastId, setToastId] = useState<AchievementId | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -79,11 +78,12 @@ export function AchievementCenter({
     try {
       window.localStorage.setItem(storageKey(owner), JSON.stringify(next));
     } catch {
-      // Privy remains the durable copy if local storage is unavailable.
+      // The record still lives for this session; the next sync rebuilds it.
     }
   }, [owner]);
 
   const commitRecord = useCallback((next: AchievementRecord, newlyUnlocked: AchievementId[] = []) => {
+    recordRef.current = next;
     setRecord(next);
     persistLocal(next);
     if (!newlyUnlocked.length) return;
@@ -96,12 +96,11 @@ export function AchievementCenter({
   }, [persistLocal]);
 
   const requestAuthoritativeRecord = useCallback(async (body: { type: "sync" } | ({ type: "action" } & AchievementActionEvidence)) => {
-    const token = await getAccessToken();
-    if (!token) throw new Error("Quest authentication is unavailable");
+    if (!owner || owner === "preview") return;
     const response = await fetch("/api/achievements", {
       method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify(body),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...body, owner, record: recordRef.current }),
     });
     const payload = await readJsonPayload(response) as { record?: unknown; newlyUnlocked?: unknown; error?: string };
     if (!response.ok || !payload.record) throw new Error(payload.error ?? `Quest sync failed with ${response.status}`);
@@ -109,13 +108,14 @@ export function AchievementCenter({
       ? payload.newlyUnlocked.filter((id): id is AchievementId => ACHIEVEMENTS.some((quest) => quest.id === id))
       : [];
     commitRecord(normalizeAchievementRecord(payload.record), newlyUnlocked);
-  }, [commitRecord, getAccessToken]);
+  }, [commitRecord, owner]);
 
   useEffect(() => {
     let active = true;
     setToastId(null);
     if (!owner) {
       const empty = emptyAchievementRecord();
+      recordRef.current = empty;
       setRecord(empty);
       return;
     }
@@ -129,26 +129,19 @@ export function AchievementCenter({
       const saved = window.localStorage.getItem(storageKey(owner));
       if (saved) local = normalizeAchievementRecord(JSON.parse(saved));
     } catch {
-      // Continue with the remote copy.
+      // Continue from the onchain sync alone.
     }
+    recordRef.current = local;
     setRecord(local);
     void (async () => {
       try {
-        // Privy issues the access token shortly after login; wait briefly and
-        // skip quietly if it is still warming up. The next action syncs.
-        for (let attempt = 0; attempt < 3 && active; attempt += 1) {
-          if (await getAccessToken()) break;
-          if (attempt === 2) return;
-          await new Promise((resolve) => window.setTimeout(resolve, 1_000));
-        }
-        if (!active) return;
         await requestAuthoritativeRecord({ type: "sync" });
       } catch (error) {
         if (active) reportClientError("achievements", error);
       }
     })();
     return () => { active = false; };
-  }, [owner, getAccessToken, requestAuthoritativeRecord]);
+  }, [owner, requestAuthoritativeRecord]);
 
   const recordAction = useCallback(async (evidence: AchievementActionEvidence) => {
     try {

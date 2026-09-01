@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { encodeAbiParameters, encodeEventTopics, parseAbiItem, zeroAddress, type Hex } from "viem";
 import {
   deriveQuestObservation,
-  evmWalletAddresses,
   ROBINHOOD_POSITION_MANAGER,
   verifyQuestActionReceipt,
   WIZZY_TREASURY,
@@ -38,16 +37,6 @@ describe("authoritative quest verification", () => {
     });
   });
 
-  it("accepts only wallets actually linked to the authenticated Privy user", () => {
-    expect(evmWalletAddresses({
-      wallet: { address: OWNER, chainType: "ethereum" },
-      linkedAccounts: [
-        { type: "wallet", address: OWNER.toUpperCase().replace("0X", "0x"), chainType: "ethereum" },
-        { type: "wallet", address: STRANGER, chainType: "solana" },
-      ],
-    })).toEqual([OWNER]);
-  });
-
   it("proves a compound from a successful IncreaseLiquidity receipt owned by the user", () => {
     expect(() => verifyQuestActionReceipt({
       action: "compound",
@@ -60,7 +49,7 @@ describe("authoritative quest verification", () => {
       tokenId: "941",
       walletAddresses: [OWNER],
       receipt: receipt(STRANGER, [increase(941n), payment(STRANGER)]),
-    })).toThrow(/not sent by this Privy user/);
+    })).toThrow(/not sent by this wallet/);
   });
 
   it("proves a rebalance only when the old NFT decreases and a new NFT is minted", () => {

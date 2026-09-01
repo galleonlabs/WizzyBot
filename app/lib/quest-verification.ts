@@ -65,7 +65,7 @@ export function verifyQuestActionReceipt(input: {
 }): { positionTokenId: string } {
   if (input.receipt.status !== "success") throw new Error("quest transaction reverted");
   if (!isAddress(input.receipt.from) || !input.walletAddresses.some((address) => sameAddress(address, input.receipt.from))) {
-    throw new Error("quest transaction was not sent by this Privy user");
+    throw new Error("quest transaction was not sent by this wallet");
   }
   const expectedTokenId = BigInt(input.tokenId);
   const events = input.receipt.logs.flatMap((log) => {
@@ -109,23 +109,6 @@ export function verifyQuestActionReceipt(input: {
   ));
   if (!decreasedExpected || !mintedToOwner) throw new Error("transaction did not rebalance the claimed position");
   return { positionTokenId: mintedToOwner.args.tokenId.toString() };
-}
-
-export function evmWalletAddresses(user: unknown): `0x${string}`[] {
-  if (!user || typeof user !== "object" || Array.isArray(user)) return [];
-  const source = user as Record<string, unknown>;
-  const candidates: unknown[] = [source.wallet, source.smartWallet];
-  if (Array.isArray(source.linkedAccounts)) candidates.push(...source.linkedAccounts);
-  const addresses = new Map<string, `0x${string}`>();
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
-    const account = candidate as Record<string, unknown>;
-    if (account.chainType !== undefined && account.chainType !== "ethereum") continue;
-    if (typeof account.address !== "string" || !isAddress(account.address)) continue;
-    const address = getAddress(account.address);
-    addresses.set(address.toLowerCase(), address);
-  }
-  return [...addresses.values()];
 }
 
 export function deriveQuestObservation(

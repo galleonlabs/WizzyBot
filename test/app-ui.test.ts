@@ -34,14 +34,15 @@ describe("meme index product UI", () => {
     expect(page).toContain("Coming soon");
     expect(page).not.toContain("PortfolioApp");
     expect(portfolio).toContain("Make Meme Markets");
-    expect(portfolio).toContain("Pick a meme market. One amount, one confirmation, real LP fees.");
-    expect(portfolio).toContain("Curated and watched by agents around the clock.");
-    expect(portfolio).toContain("Make markets");
+    expect(portfolio).toContain("Pick a market. Add ETH. Own the position.");
+    expect(portfolio).toContain("Wizzy handles the swap and liquidity range.");
+    expect(portfolio).toContain("Make market");
     expect(portfolio).toContain("Fee APR");
-    expect(portfolio).toContain("Based on 24h fees");
-    expect(portfolio).toContain("The meme markets");
-    expect(portfolio).toContain("Earning now");
-    expect(portfolio).toContain('{ id: "markets", label: "Portfolio" }');
+    expect(portfolio).not.toContain("Based on 24h fees");
+    expect(portfolio).toContain("Meme markets");
+    expect(portfolio).toContain("Reviewed every six hours.");
+    expect(portfolio).toContain("In range");
+    expect(portfolio).toContain('{ id: "markets", label: "Positions" }');
     expect(portfolio).toContain('id="positions"');
     expect(portfolio).toContain("Make market");
     expect(portfolio).toContain('aria-label="ETH amount"');
@@ -53,11 +54,11 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain('className="pair-cell"');
     expect(portfolio).not.toContain("Choose where your ETH is now");
     expect(portfolio).not.toContain("<select");
-    expect(portfolio).toContain("Reveal your markets");
-    expect(portfolio).toContain("Connect to see position value, fees, range status, and index updates.");
+    expect(portfolio).toContain("See your positions");
+    expect(portfolio).toContain("Connect to view value, fees, ranges, and available actions.");
     expect(portfolio).not.toContain("One wallet. Your markets.");
     expect(portfolio).not.toContain("empty-route");
-    expect(portfolio).not.toContain('label: "Positions"');
+    expect(portfolio).not.toContain('label: "Portfolio"');
     expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain('chain === "base" ? "base" : "robinhood"');
     expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
@@ -75,12 +76,12 @@ describe("meme index product UI", () => {
 
   it("uses deliberate mobile layouts instead of shrinking desktop rows", () => {
     expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
-    expect(css).toContain(".market-output { display: grid");
     expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(css).toContain(".position-list article { grid-template-columns: repeat(3, minmax(0, 1fr))");
+    expect(css).toContain(".zap-backdrop { align-items: end;");
     expect(css).toContain(".portfolio-empty .empty-symbol { display: none; }");
     expect(css).toContain(".market-link-label { display: none; }");
-    expect(portfolio).toContain("Your markets will live here.");
+    expect(portfolio).toContain("New positions appear here after they are confirmed.");
     expect(portfolio).toContain('className="empty-action"');
     expect(css).not.toContain('content: "Explore"');
   });
@@ -165,14 +166,17 @@ describe("meme index product UI", () => {
 
   it("uses one live Markets surface differently before and after wallet connection", () => {
     expect(portfolio).toContain("const hasPortfolioAccess = authenticated || previewMode");
-    expect(portfolio).toContain('hasPortfolioAccess ? "Your markets" : "Your portfolio"');
+    expect(portfolio).toContain("Your positions");
+    expect(portfolio).toContain("Connect your wallet to see positions on Base and Robinhood.");
     expect(portfolio).toContain("{positionLedger}");
-    expect(portfolio).toContain('className="index-snapshot');
+    expect(portfolio).not.toContain('className="index-snapshot');
     expect(portfolio).not.toContain("Index composition");
     expect(portfolio).not.toContain("Curator weights");
-    expect(portfolio).toContain("Across all pools");
+    expect(portfolio).not.toContain("Weighted 24h fee pace");
+    expect(portfolio).not.toContain("Visible markets");
+    expect(portfolio).toContain("Across priced positions");
     expect(portfolio).toContain('action: "Connect wallet"');
-    expect(css).toContain(".composition-track");
+    expect(css).not.toContain(".composition-track");
     expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
   });
 
@@ -181,31 +185,35 @@ describe("meme index product UI", () => {
     expect(portfolio).not.toContain("window.requestAnimationFrame");
     expect(portfolio).toContain("setTab(next)");
     expect(css).toContain("@keyframes view-arrive");
-    expect(css).toContain("@keyframes index-segment-assemble");
+    expect(css).not.toContain("@keyframes index-segment-assemble");
     expect(css).toContain("@keyframes popover-open");
     expect(css).not.toContain("view-transition-name: wizzy-view");
     expect(portfolio).not.toContain('className="review-amount"');
   });
 
   it("supports Base and Robinhood market making while preserving self-custody", () => {
-    expect(portfolio).toContain("The meme markets");
+    expect(portfolio).toContain("Meme markets");
     expect(portfolio).toContain("Built on Base and Robinhood Chain");
-    expect(portfolio).toContain("Base + Robinhood Chain");
+    expect(portfolio).toContain("Base + Robinhood");
     expect(portfolio).toContain('chain === "base" || chain === "robinhood"');
     expect(portfolio).toContain("market-toolbar");
     expect(portfolio).toContain("market.protocol");
     expect(portfolio).toContain('"Aerodrome Slipstream" : "Uniswap v3"');
     expect(portfolio).not.toContain("curated markets");
-    expect(portfolio).toContain("Wizzy agents regularly review which markets qualify.");
-    expect(portfolio).toContain("Every pool reviewed by Wizzy agents, every six hours.");
+    expect(portfolio).toContain("Reviewed every six hours.");
     expect(portfolio).toContain('src={BRAND_ASSETS.robinhood}');
-    expect(portfolio).toContain("Self-custodial");
-    expect(portfolio).toContain("Wizzy quotes the swap, range, and mint. Your wallet approves each step.");
+    expect(portfolio).toContain("Your wallet holds every position. Wizzy never takes custody.");
+    expect(portfolio).toContain("Wizzy prepares the swap and range.");
+    expect(portfolio).toContain("Your wallet holds every position. Wizzy never takes custody.");
+    expect(portfolio).toContain("Wizzy fee");
+    expect(portfolio).not.toContain("Service fee");
     expect(portfolio).toContain('useState("0.05")');
     expect(portfolio).not.toContain("v{markets.catalog.version}");
     expect(portfolio).toContain('state.kind === "planning" ? "Quoting…" : "Review"');
     expect(portfolio).not.toContain("loading ? INDEX_MARKET_COUNT : constituentCount");
-    expect(portfolio).toContain('zapMarketId === market.id');
+    expect(portfolio).toContain("market.id === zapMarketId");
+    expect(portfolio).toContain('aria-modal="true"');
+    expect(portfolio).toContain('aria-haspopup="dialog"');
     expect(portfolio).toContain('state.kind === "submitted" || state.kind === "error"');
     expect(portfolio).toContain("Ready to collect");
     expect(portfolio).toContain('positions.length === 1 ? "position" : "positions"');
@@ -223,14 +231,18 @@ describe("meme index product UI", () => {
     expect(balanceRoute).toContain('parseChainSlug(params.get("chain"))');
     expect(balanceRoute).toContain("base-rpc.publicnode.com");
     expect(balanceRoute).toContain("process.env.ROBINHOOD_RPC_URL");
-    expect(css).toContain(".index-update-panel");
-    expect(portfolio).toContain("Index updated");
-    expect(portfolio).toContain("Update position");
-    expect(portfolio).toContain("/api/portfolio/migrate");
+    expect(css).not.toContain(".index-update-panel");
+    expect(portfolio).not.toContain("Index updated");
+    expect(portfolio).not.toContain("/api/portfolio/migrate");
     expect(portfolio).toContain("sameAddress(zapPlan.owner, address)");
     expect(portfolio).toContain("owner: zapPlan.owner");
     expect(portfolio).toContain("owner: actionPlan.owner");
-    expect(portfolio).toContain("owner: migrationPlan.owner");
+  });
+
+  it("keeps wallet costs and preview data honest", () => {
+    expect(sendEthDialog).toContain("Paid by your wallet");
+    expect(sendEthDialog).not.toContain("Sponsored");
+    expect(readFileSync("app/lib/shot-fixture.ts", "utf8")).not.toContain('chain: "solana"');
   });
 
   it("ships the Wizzy identity and canonical domain without stale public Una assets", () => {

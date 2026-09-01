@@ -4,7 +4,6 @@ export {
   compoundPosition,
   exitPosition,
   jsonSafe,
-  keeperLiveEnabled,
   listPositions,
   mintPosition,
   rangePosition,

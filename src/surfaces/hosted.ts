@@ -24,11 +24,6 @@ import {
   serializeMintView,
   serializeProjectedRange,
 } from "../core/view.js";
-import {
-  getPrivyAccount,
-  loadPrivyEnv,
-  privyConfigured,
-} from "../signer/privy.js";
 import { parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
 import { scoutMarkets as getMarketScout } from "../markets/scout.js";
 import { chainCatalog } from "../markets/catalog.js";
@@ -49,7 +44,7 @@ export async function scoutMarkets(chain?: ChainSlug | string) {
 export function assertWriteAllowed(flags: WriteFlags): boolean {
   const live = Boolean(flags.live);
   if (live && !flags.confirm) {
-    throw new Error("Live writes require confirm=true. Dry-run is the default.");
+    throw new Error("Transaction-plan preparation requires confirm=true. The connected EOA must still approve it in the wallet.");
   }
   return live;
 }
@@ -203,7 +198,7 @@ async function maybeBroadcast(
   owner: Address,
   live: boolean,
   chain: ChainSlug = "base",
-): Promise<ActionReceipt & { hashes?: string[]; stubbed?: boolean }> {
+): Promise<ActionReceipt & { hashes?: string[]; requiresWalletApproval?: boolean }> {
   if (receipt.skipped || !live) {
     return { ...receipt, dryRun: !live };
   }
@@ -212,8 +207,8 @@ async function maybeBroadcast(
   return {
     ...filled,
     dryRun: true,
-    reason: "Prepared for the connected user wallet. Hosted chat never signs consumer transactions.",
-    stubbed: true,
+    reason: "Prepared for the connected EOA. Hosted services never sign consumer transactions.",
+    requiresWalletApproval: true,
   };
 }
 
@@ -362,7 +357,7 @@ export async function mintPosition(input: {
       confirm: confirmFromMint(result.quote, result.receipt),
       usedLpApi: result.usedLpApi,
       simulation: result.simulation,
-      note: "dry-run: no broadcast. Set live=true and confirm=true to mint. NFT stays in your wallet.",
+      note: "Dry-run only. Request a wallet plan to mint; the NFT stays in your EOA.",
     });
   }
   const view = serializeMintView(result.quote);
@@ -374,17 +369,16 @@ export async function mintPosition(input: {
     projection: view,
     chain: slug,
     confirm: confirmFromMint(result.quote, result.receipt),
-    stubbed: true,
-    note: "Prepared for the connected user wallet. Hosted chat never signs consumer transactions.",
+    requiresWalletApproval: true,
+    note: "Prepared for the connected EOA. Hosted services never sign consumer transactions.",
   });
 }
 
-export function keeperLiveEnabled(source: NodeJS.ProcessEnv = process.env): boolean {
-  return source.KEEPER_LIVE === "1" || source.UNABOT_KEEPER_LIVE === "1";
-}
-
 export async function runKeeperScan(input: { owner?: string; live?: boolean; chain?: ChainSlug | string } = {}) {
-  const live = Boolean(input.live) && keeperLiveEnabled();
+  if (input.live) {
+    throw new Error("Hosted keeper execution is disabled. A connected EOA must review and approve every transaction plan.");
+  }
+  const live = false;
   const slug = slugOf(input.chain);
   const { adapter, owner, client, env } = await connectHosted(input.owner, slug);
   const sink = new StdoutSink();
@@ -417,9 +411,10 @@ export async function runKeeperScan(input: { owner?: string; live?: boolean; cha
   return jsonSafe({
     owner,
     chain: slug,
-    live,
-    dryRun: !live,
-    privy: privyConfigured() ? "ready" : "stubbed",
+    live: false,
+    dryRun: true,
+    execution: "observe-only",
+    wallet: "external-eoa",
     decisions: receipts.map((r) => ({
       action: r.action,
       tokenId: r.tokenId !== undefined ? String(r.tokenId) : undefined,
@@ -431,4 +426,4 @@ export async function runKeeperScan(input: { owner?: string; live?: boolean; cha
   });
 }
 
-export { decideForPosition, formatReceipt, getPrivyAccount, loadPrivyEnv };
+export { decideForPosition, formatReceipt };

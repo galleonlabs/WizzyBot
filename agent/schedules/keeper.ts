@@ -1,5 +1,5 @@
 import { defineSchedule } from "eve/schedules";
-import { keeperLiveEnabled, runKeeperScan } from "../lib/hosted.js";
+import { runKeeperScan } from "../lib/hosted.js";
 
 export default defineSchedule({
   cron: "*/15 * * * *",
@@ -11,18 +11,18 @@ export default defineSchedule({
       console.log(JSON.stringify({ schedule: "keeper", skipped: "UNABOT_KEEPER_OWNER is not set" }));
       return;
     }
-    const live = keeperLiveEnabled();
     // Wizzy positions live on Robinhood Chain; Base stays covered for the
-    // legacy portfolio. One chain failing must not block the other's scan.
+    // broader portfolio. Scheduled work is observe-only: a connected EOA
+    // must review and approve every transaction plan.
     for (const chain of ["robinhood", "base"] as const) {
       try {
-        const result = await runKeeperScan({ owner, live, chain });
+        const result = await runKeeperScan({ owner, live: false, chain });
         console.log(
           JSON.stringify({
             schedule: "keeper",
             chain,
-            live,
-            dryRun: !live,
+            live: false,
+            dryRun: true,
             owner: result.owner,
             decisions: result.decisions,
           }),

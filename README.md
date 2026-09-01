@@ -2,13 +2,12 @@
 
 Make Meme Markets.
 
-Deposit ETH into the actively curated Robinhood Wizzy Index. You own every position.
+Make markets on Base and Robinhood Chain. Your EOA owns every position.
 
-- One amount. No pool, range, bridge, or allocation builder.
-- Privy creates the self-custodial wallet under one login.
-- Relay funds Robinhood Chain; Wizzy prepares every pool and range.
-- Pool fees, position value, range health, reinvestment, and withdrawals stay visible in one portfolio.
-- The curator checks the index every six hours; the curator agent applies policy-valid changes to the version-controlled catalog through the tested deployment path.
-- The initial application launches without a Wizzy token. Any token and related-party index sleeve are a separate, gated release.
+- Connect an external wallet. Wizzy never creates or controls one.
+- Choose a reviewed meme market and enter one ETH amount. Wizzy prepares the swap, range, liquidity, and disclosed fee.
+- Pool fees, value, range health, collection, rebalancing, and withdrawal stay in one portfolio.
+- The curator reviews both chains every six hours and ships policy-valid catalog changes through the tested Git path.
+- The application launches without a Wizzy token. Any future token is a separate, gated release.
 
-[Production runbook](docs/RUNBOOK.md) · [Future token and index plan](docs/TOKEN_FLYWHEEL.md) · [Launch privacy](docs/LAUNCH_PRIVACY.md)
+[Production runbook](docs/RUNBOOK.md) · [Future token plan](docs/TOKEN_FLYWHEEL.md) · [Launch privacy](docs/LAUNCH_PRIVACY.md)

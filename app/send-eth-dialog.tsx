@@ -135,7 +135,7 @@ export function SendEthDialog({ open, owner, balanceWei, onClose, onSend }: {
           <div><dt>You send</dt><dd>{amountWei === null ? "—" : displayEth(amountWei)} ETH</dd></div>
           <div><dt>To</dt><dd title={recipient}>{recipient}</dd></div>
           <div><dt>Network</dt><dd>Robinhood Chain</dd></div>
-          <div><dt>Network fee</dt><dd>Sponsored</dd></div>
+          <div><dt>Network fee</dt><dd>Paid by your wallet</dd></div>
         </dl>
         <p className="send-eth-warning">Only send to an address that supports Robinhood Chain.</p>
         <div className="send-eth-buttons"><button type="button" onClick={() => setPhase("form")}>Back</button><button className="send-eth-primary" type="button" onClick={() => void submit()}>Send ETH</button></div>

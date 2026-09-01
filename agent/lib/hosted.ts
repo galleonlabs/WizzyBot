@@ -58,7 +58,6 @@ export type HostedSurface = {
     owner?: unknown;
     decisions?: unknown;
   }>;
-  keeperLiveEnabled: (source?: NodeJS.ProcessEnv) => boolean;
   jsonSafe: <T>(value: T) => T;
   assertWriteAllowed: (flags: { live?: boolean; confirm?: boolean }) => boolean;
 };
@@ -73,6 +72,5 @@ export const rangePosition = hosted.rangePosition;
 export const exitPosition = hosted.exitPosition;
 export const mintPosition = hosted.mintPosition;
 export const runKeeperScan = hosted.runKeeperScan;
-export const keeperLiveEnabled = hosted.keeperLiveEnabled;
 export const jsonSafe = hosted.jsonSafe;
 export const assertWriteAllowed = hosted.assertWriteAllowed;

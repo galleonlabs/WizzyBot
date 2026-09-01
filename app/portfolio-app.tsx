@@ -19,7 +19,6 @@ import {
   type RobinhoodIndexBreadthPolicy,
   type RobinhoodIndexBreadthTier,
   type RobinhoodIndexPlan,
-  type IndexMigrationPlan,
   type PositionActionPlan,
 } from "./lib/portfolio-types";
 import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
@@ -36,19 +35,13 @@ type BalanceState = { kind: "idle" | "loading" | "ready" | "error"; balanceWei?:
 type ChainBalances = Record<ChainSlug, BalanceState>;
 type AnyPositionActionPlan = PositionActionPlan;
 type PositionActionKind = "compound" | "rebalance" | "withdraw";
-type IndexChain = ChainSlug | "solana";
-type IndexMarket = {
+type MarketChain = ChainSlug | "solana";
+type MarketEntry = {
   market: CuratedMarket;
-  chain: IndexChain;
+  chain: MarketChain;
   indexWeightBps: number;
 };
-type AvailableIndexUpdate = {
-  migrationId: string;
-  position: PositionView;
-  fromSymbol: string;
-  toSymbol: string;
-};
-const INDEX_MARKET_COUNT = 6;
+const MARKET_SKELETON_COUNT = 6;
 const FOMO_URL = "https://fomo.family/r/makemememarkets";
 const BRIDGE_URLS: Record<ChainSlug, string> = {
   base: "https://relay.link/bridge/base",
@@ -99,7 +92,7 @@ const EMPTY_MARKETS: MarketsPayload = {
     chain: "robinhood",
     breadthUnitWei: "20000000000000000",
     minimumAmountWei: "20000000000000000",
-    maximumConstituents: INDEX_MARKET_COUNT,
+    maximumConstituents: MARKET_SKELETON_COUNT,
     tiers: [],
     selectionRules: { minimumPoolAgeDays: 30, minimumLiquidityUsd: 75_000, quoteSymbol: "WETH", venue: "Uniswap v3" },
   },
@@ -126,8 +119,6 @@ export function PortfolioApp() {
   const [previewMode, setPreviewMode] = useState(false);
   const [actionPlan, setActionPlan] = useState<AnyPositionActionPlan | null>(null);
   const [actionState, setActionState] = useState<PlanState>({ kind: "idle" });
-  const [migrationPlan, setMigrationPlan] = useState<IndexMigrationPlan | null>(null);
-  const [migrationState, setMigrationState] = useState<PlanState>({ kind: "idle" });
   const [zapMarketId, setZapMarketId] = useState<string | null>(null);
   const [zapAmount, setZapAmount] = useState("0.05");
   const [zapPlan, setZapPlan] = useState<AllocationPlan | null>(null);
@@ -179,7 +170,7 @@ export function PortfolioApp() {
   }, [address, authenticated]);
 
   async function sendRobinhoodEth(recipient: `0x${string}`, amountWei: string, onSubmitted: () => void): Promise<`0x${string}` | null> {
-    if (!address) throw new Error("Your Wizzy wallet is not ready.");
+    if (!address) throw new Error("Connect your wallet first.");
     trackProductEvent("ETH Send Started", { chainId: 4663 });
     try {
       const confirmed = await sendEvmBatch({
@@ -288,31 +279,14 @@ export function PortfolioApp() {
     setZapState({ kind: "idle" });
     setActionPlan(null);
     setActionState({ kind: "idle" });
-    setMigrationPlan(null);
-    setMigrationState({ kind: "idle" });
   }, [address, authenticated, previewMode]);
 
-  const activeMarkets = useMemo<IndexMarket[]>(() => {
+  const activeMarkets = useMemo<MarketEntry[]>(() => {
     return markets.catalog.chains.flatMap((chain) => chain.markets
       .filter((market) => market.status === "active")
       .map((market) => ({ market, chain: chain.slug, indexWeightBps: market.weightBps })));
   }, [markets]);
   const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
-  const availableIndexUpdates = useMemo<AvailableIndexUpdate[]>(() => {
-    const robinhood = markets.catalog.chains.find((chain) => chain.slug === "robinhood");
-    if (!robinhood) return [];
-    const symbols = new Map(robinhood.markets.map((market) => [market.id, market.symbol]));
-    return markets.catalog.migrations
-      .filter((migration) => Date.parse(migration.effectiveAt) <= Date.now())
-      .flatMap((migration) => positions
-      .filter((position) => position.chain === "robinhood" && !position.closed && position.marketId === migration.fromMarketId && position.tokenId)
-      .map((position) => ({
-        migrationId: migration.id,
-        position,
-        fromSymbol: symbols.get(migration.fromMarketId) ?? position.symbol0,
-        toSymbol: symbols.get(migration.toMarketId) ?? "the new market",
-      })));
-  }, [markets.catalog, positions]);
   const hasPortfolioAccess = authenticated || previewMode;
 
   function changeTab(next: ViewTab) {
@@ -428,49 +402,6 @@ export function PortfolioApp() {
     }
   }
 
-  async function prepareIndexMigration(update: AvailableIndexUpdate) {
-    if (!address || !update.position.tokenId) return;
-    setMigrationPlan(null);
-    setMigrationState({ kind: "planning", message: `Quoting ${update.fromSymbol} → ${update.toSymbol}…` });
-    try {
-      const response = await fetch("/api/portfolio/migrate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ owner: address, tokenId: update.position.tokenId, migrationId: update.migrationId }),
-      });
-      const payload = await readJsonPayload(response) as { plan?: IndexMigrationPlan; error?: string };
-      if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not prepare the index update");
-      setMigrationPlan(payload.plan);
-      setMigrationState({ kind: "ready", message: "Review the replacement and fee before updating." });
-    } catch (error) {
-      setMigrationState({ kind: "error", message: error instanceof Error ? error.message : "Could not prepare the index update" });
-      reportClientError("index-migration", error);
-    }
-  }
-
-  async function executeIndexMigration() {
-    if (!migrationPlan || !address) return;
-    if (Date.now() >= Date.parse(migrationPlan.expiresAt)) {
-      setMigrationState({ kind: "error", message: "This update quote expired. Prepare it again." });
-      return;
-    }
-    try {
-      setMigrationState({ kind: "signing", message: "Approve this index update in your wallet." });
-      await sendEvmBatch({
-        owner: migrationPlan.owner,
-        chainId: migrationPlan.chainId,
-        transactions: migrationPlan.transactions,
-        onStep: (message) => setMigrationState({ kind: "waiting", message }),
-      });
-      await loadPositions();
-      setMigrationState({ kind: "submitted", message: "Your position now matches the latest curated index." });
-      trackProductEvent("Index Migration Confirmed", { chainId: migrationPlan.chainId, migrationId: migrationPlan.migrationId });
-    } catch (error) {
-      setMigrationState({ kind: "error", message: error instanceof Error ? error.message : "The index update could not be submitted" });
-      reportClientError("index-migration", error);
-    }
-  }
-
   function openZap(marketId: string) {
     setZapMarketId((current) => current === marketId ? null : marketId);
     setZapPlan(null);
@@ -510,7 +441,7 @@ export function PortfolioApp() {
       trackProductEvent("Zap Quote Ready", { marketId });
     } catch (error) {
       setZapState({ kind: "error", message: error instanceof Error ? error.message : "Could not quote this market" });
-      reportClientError("index-plan", error);
+      reportClientError("market-plan", error);
     }
   }
 
@@ -539,7 +470,7 @@ export function PortfolioApp() {
       trackProductEvent("Zap Confirmed", { marketId: zapMarketId });
     } catch (error) {
       setZapState({ kind: "error", message: error instanceof Error ? error.message : "The market could not be made" });
-      reportClientError("index-submit", error);
+      reportClientError("market-submit", error);
     }
   }
 
@@ -557,18 +488,12 @@ export function PortfolioApp() {
       actionState={actionState}
       onExecute={executePositionAction}
       onCancel={() => { setActionPlan(null); setActionState({ kind: "idle" }); }}
-      updates={availableIndexUpdates}
-      migrationPlan={migrationPlan}
-      migrationState={migrationState}
-      onPrepareMigration={(update) => void prepareIndexMigration(update)}
-      onExecuteMigration={() => void executeIndexMigration()}
-      onCancelMigration={() => { setMigrationPlan(null); setMigrationState({ kind: "idle" }); }}
     />
   );
-  const indexLedger = (
+  const marketLedger = (
     <section className="index-section index-catalog">
       <header className="section-title">
-        <div><h2>The meme markets</h2><p>Every pool reviewed by Wizzy agents, every six hours.</p></div>
+        <div><h2>Meme markets</h2><p>Reviewed every six hours.</p></div>
       </header>
       <MarketLedger
         markets={activeMarkets}
@@ -610,7 +535,7 @@ export function PortfolioApp() {
             <span>Wizzy</span>
           </button>
           <nav aria-label="Primary navigation">
-            {([{ id: "overview", label: "Make" }, { id: "markets", label: "Portfolio" }] as const).map((item) => (
+            {([{ id: "overview", label: "Make" }, { id: "markets", label: "Positions" }] as const).map((item) => (
               <button key={item.id} type="button" className={tab === item.id ? "is-active" : ""} onClick={() => changeTab(item.id)}>{item.label}</button>
             ))}
           </nav>
@@ -647,20 +572,20 @@ export function PortfolioApp() {
                 <div className="hero-stage">
                   <div className="hero-copy">
                     <h1>Make Meme Markets</h1>
-                    <p>Pick a meme market. One amount, one confirmation, real LP fees.<br /><span>Curated and watched by agents around the clock.</span></p>
+                    <p>Pick a market. Add ETH. Own the position.<br /><span>Wizzy handles the swap and liquidity range.</span></p>
                   </div>
-                  <IndexShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
+                  <MarketShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
                 </div>
             </section>
           ) : null}
           {tab === "overview" ? (
             <section className="index-main markets-view home-markets">
-              {indexLedger}
+              {marketLedger}
             </section>
           ) : (
             <section className="index-main markets-view">
               <header className="index-title-row">
-                <div><h1>{hasPortfolioAccess ? "Your markets" : "Your portfolio"}</h1><p>{hasPortfolioAccess ? (positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Your wallet is connected. New positions appear here.") : "Wizzy agents regularly review which markets qualify."}</p></div>
+                <div><h1>Your positions</h1><p>{hasPortfolioAccess ? (positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "New positions appear here after they are confirmed.") : "Connect your wallet to see positions on Base and Robinhood."}</p></div>
               </header>
               {positionLedger}
             </section>
@@ -752,14 +677,14 @@ function PoolActivityGroup({ items, duplicate = false }: { items: PoolActivityIt
   </span>;
 }
 
-function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {
+function MarketShowcase({ markets, stats, loading }: { markets: MarketEntry[]; stats: Map<string, MarketStats>; loading: boolean }) {
   return <div className="index-showcase" aria-label="Base and Robinhood meme markets">
     <div className="network-lockup" aria-label="Built on Base and Robinhood Chain">
       <span className="network-icons" aria-hidden="true"><img src={BRAND_ASSETS.base} alt="" /><img src={BRAND_ASSETS.robinhood} alt="" /></span>
-      <span className="network-name"><small>Built on</small><b>Base + Robinhood Chain</b></span>
+      <span className="network-name"><small>Built on</small><b>Base + Robinhood</b></span>
     </div>
     <div className={`hero-token-field ${loading ? "is-loading" : ""}`}>
-      {(loading ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
+      {(loading ? Array.from({ length: MARKET_SKELETON_COUNT }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
         <span className="hero-token" key={market.id} style={{ "--token-index": index } as CSSProperties}>
           <TokenIcon symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />
           {market.symbol ? <b>{market.symbol}</b> : null}
@@ -806,7 +731,7 @@ function ConnectWalletDialog({ open, connectors, pending, error, onPick, onClose
               <ChevronIcon />
             </button>
           ))}
-        </div> : <p className="connect-empty">No browser wallet found. Install one — Rabby, MetaMask, or Coinbase Wallet — then reload.</p>}
+        </div> : <p className="connect-empty">No browser wallet found. Install Rabby, MetaMask, or Coinbase Wallet, then reload.</p>}
         {error ? <p className="send-eth-error" role="alert">{connectErrorMessage(error)}</p> : null}
       </div>
     </section>
@@ -859,7 +784,7 @@ function WalletMenu({ address, onSend, onDisconnect }: { address: string; onSend
           <WalletIcon /><span><b>Explorer</b><small>Your onchain activity</small></span><ExternalLinkIcon />
         </a>
         <button type="button" role="menuitem" onClick={() => { setOpen(false); onDisconnect(); }}>
-          <DisconnectIcon /><span><b>Disconnect</b><small>Sign out of Wizzy</small></span>
+          <DisconnectIcon /><span><b>Disconnect</b><small>Remove this connection</small></span>
         </button>
       </div>
     </div> : null}
@@ -885,7 +810,7 @@ function SuccessCelebration({ label }: { label: string }) {
 }
 
 function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balances, onFund }: {
-  markets: IndexMarket[];
+  markets: MarketEntry[];
   stats: Map<string, MarketStats>;
   state: "loading" | "ready" | "error";
   policy: RobinhoodIndexBreadthPolicy;
@@ -904,71 +829,89 @@ function MarketLedger({ markets, stats, state, policy, zapMarketId, zapAmount, z
   const [chainFilter, setChainFilter] = useState<"all" | ChainSlug>("all");
   const visibleMarkets = chainFilter === "all" ? markets : markets.filter((entry) => entry.chain === chainFilter);
   const orderedMarkets = [...visibleMarkets].sort(
-    (a, b) => marketTierIndex(policy, a.market.id) - marketTierIndex(policy, b.market.id) || b.indexWeightBps - a.indexWeightBps,
+    (a, b) => marketTierRank(policy, a.market.id) - marketTierRank(policy, b.market.id) || b.indexWeightBps - a.indexWeightBps,
   );
-  return (
+  const selected = markets.find(({ market, chain }) => market.id === zapMarketId && (chain === "base" || chain === "robinhood"));
+
+  useEffect(() => {
+    if (!selected) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseZap();
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onCloseZap, selected]);
+
+  return <>
     <section className="market-ledger">
       <div className="market-table-wrap">
         <div className="market-toolbar" aria-label="Filter markets by chain">
           {(["all", "base", "robinhood"] as const).map((chain) => <button key={chain} type="button" className={chainFilter === chain ? "is-active" : ""} aria-pressed={chainFilter === chain} onClick={() => setChainFilter(chain)}>{chain === "all" ? "All markets" : chainLabel(chain)}</button>)}
         </div>
-        <IndexSnapshot markets={orderedMarkets} stats={stats} state={state} />
         <table className="market-table">
-          <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>Liquidity</th><th>Explore</th></tr></thead>
+          <thead><tr><th>Market</th><th>Fee APR</th><th>24h volume</th><th>Liquidity</th><th>Action</th></tr></thead>
           <tbody>
-            {state === "loading" ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={5}><i /></td></tr>) : null}
+            {state === "loading" ? Array.from({ length: MARKET_SKELETON_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={5}><i /></td></tr>) : null}
             {state === "error" ? <tr><td colSpan={5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
-            {state === "ready" ? orderedMarkets.flatMap(({ market, chain }) => {
+            {state === "ready" ? orderedMarkets.map(({ market, chain }) => {
               const row = stats.get(market.id);
               const zappable = chain === "base" || chain === "robinhood";
-              const isOpen = zappable && zapMarketId === market.id;
-              const rows = [<tr key={market.id} className={isOpen ? "is-zapping" : ""}>
+              return <tr key={market.id}>
                 <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/WETH</b><VenueTrail chain={chain} protocol={market.protocol} /></span></span></td>
-                <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b><small className="cell-note">Based on 24h fees</small></td>
+                <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b></td>
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
-                  {zappable ? <button className="market-link zap-link" type="button" aria-expanded={isOpen} onClick={() => onOpenZap(market.id)} aria-label={`Make the ${market.symbol}/WETH market`}><span className="market-link-label">{isOpen ? "Close" : "Make market"}</span></button> : null}
+                  {zappable ? <button className="market-link zap-link" type="button" aria-haspopup="dialog" onClick={() => onOpenZap(market.id)} aria-label={`Make the ${market.symbol}/WETH market`}><span className="market-link-label">Make market</span></button> : null}
                   <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(chain, market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
                   {chain === "robinhood" ? <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a> : null}
                 </span></td>
-              </tr>];
-              if (isOpen) rows.push(<tr className="zap-row" key={`${market.id}-zap`}><td colSpan={5}>
-                <ZapPanel
-                  market={market as CuratedMarket}
-                  chain={chain as ChainSlug}
-                  feeAprPct={row?.trailingFeeAprPct ?? null}
-                  amount={zapAmount}
-                  plan={zapPlan}
-                  state={zapState}
-                  onAmount={onZapAmount}
-                  onPrepare={() => onPrepareZap(market.id)}
-                  onExecute={onExecuteZap}
-                  onClose={onCloseZap}
-                  balance={balances?.[chain as ChainSlug] ?? null}
-                  onFund={() => onFund(chain as ChainSlug)}
-                />
-              </td></tr>);
-              return rows;
+              </tr>;
             }) : null}
           </tbody>
         </table>
       </div>
     </section>
-  );
+    {selected && typeof document !== "undefined" ? createPortal(
+      <div className="zap-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onCloseZap(); }}>
+        <section className="zap-dialog" role="dialog" aria-modal="true" aria-labelledby="zap-dialog-title">
+          <header>
+            <span><TokenIcon symbol={selected.market.symbol} src={stats.get(selected.market.id)?.tokenImageUrl} color={selected.market.color} /><span><small>{chainLabel(selected.chain)}</small><b id="zap-dialog-title">Make {selected.market.symbol}/WETH</b></span></span>
+            <button type="button" onClick={onCloseZap}>Close</button>
+          </header>
+          <ZapPanel
+            market={selected.market}
+            chain={selected.chain as ChainSlug}
+            amount={zapAmount}
+            plan={zapPlan}
+            state={zapState}
+            onAmount={onZapAmount}
+            onPrepare={() => onPrepareZap(selected.market.id)}
+            onExecute={onExecuteZap}
+            balance={balances?.[selected.chain as ChainSlug] ?? null}
+            onFund={() => onFund(selected.chain as ChainSlug)}
+          />
+        </section>
+      </div>,
+      document.body,
+    ) : null}
+  </>;
 }
 
-function ZapPanel({ market, chain, feeAprPct, amount, plan, state, onAmount, onPrepare, onExecute, onClose, balance, onFund }: {
+function ZapPanel({ market, chain, amount, plan, state, onAmount, onPrepare, onExecute, balance, onFund }: {
   market: CuratedMarket;
   chain: ChainSlug;
-  feeAprPct: number | null;
   amount: string;
   plan: AllocationPlan | null;
   state: PlanState;
   onAmount: (next: string) => void;
   onPrepare: () => void;
   onExecute: () => void;
-  onClose: () => void;
   balance: BalanceState | null;
   onFund: () => void;
 }) {
@@ -976,13 +919,12 @@ function ZapPanel({ market, chain, feeAprPct, amount, plan, state, onAmount, onP
   const busy = state.kind === "signing" || state.kind === "waiting";
   return <div className="zap-panel" aria-label={`Make the ${market.symbol}/WETH market`}>
     <div className="zap-head">
-      <span><b>Make the {market.symbol}/WETH market</b><small>One amount. Wizzy quotes the swap, range, and mint. Your wallet approves each step.</small></span>
+      <span><b>Add liquidity</b><small>Wizzy prepares the swap and range.</small></span>
       <span className="zap-range"><small>Range</small><b>±{market.rangeWidthPct.toFixed(0)}%</b></span>
-      {feeAprPct !== null ? <span className="zap-range"><small>Fee APR</small><b>{formatFeeApr(feeAprPct)}</b></span> : null}
     </div>
     <div className="zap-controls">
       <label className="zap-amount">
-        <input inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
+        <input autoFocus inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
         <b>ETH</b>
       </label>
       {balance ? <span className="wallet-balance" role="status" title={`${chainLabel(chain)} ETH balance`}>Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></span> : null}
@@ -995,12 +937,10 @@ function ZapPanel({ market, chain, feeAprPct, amount, plan, state, onAmount, onP
           {state.kind === "planning" ? "Quoting…" : "Review"}
         </button>
       )}
-      <button className="zap-close" type="button" onClick={onClose} aria-label="Close">Cancel</button>
     </div>
     {plan && planMarket ? <div className="zap-preview">
       <span><small>Position</small><b>{formatWalletBalance(planMarket.mintWeth)} WETH + {compactAmount(planMarket.mintMeme, 18)} {market.symbol}</b></span>
-      <span><small>Service fee</small><b>{formatWalletBalance(plan.serviceFeeWei)} ETH</b></span>
-      <span><small>Ticks</small><b>{planMarket.tickLower} → {planMarket.tickUpper}</b></span>
+      <span><small>Wizzy fee</small><b>{formatWalletBalance(plan.serviceFeeWei)} ETH</b></span>
     </div> : null}
     <div className="funding-choice">
       <span><b>Need ETH on {chainLabel(chain)}?</b><small>Bridge directly to this same wallet.</small></span>
@@ -1009,31 +949,15 @@ function ZapPanel({ market, chain, feeAprPct, amount, plan, state, onAmount, onP
       </button>
     </div>
     {state.kind === "submitted" || state.kind === "error" ? <p className={`funding-status is-${state.kind === "submitted" ? "submitted" : "error"}`} aria-live="polite">{state.message}</p> : null}
-    <p className="action-assurance">{chainLabel(chain)} · Self-custodial · The position goes to your wallet</p>
+    <p className="action-assurance">{chainLabel(chain)} · Your wallet owns the position</p>
   </div>;
 }
 
-function IndexSnapshot({ markets, stats, state }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; state: "loading" | "ready" | "error" }) {
-  const volume = markets.reduce((sum, { market }) => sum + (stats.get(market.id)?.volume24hUsd ?? 0), 0);
-  const liquidity = markets.reduce((sum, { market }) => sum + (stats.get(market.id)?.liquidityUsd ?? 0), 0);
-  const feeApr = weightedFeeApr(markets, stats);
-  return <section className={`index-snapshot is-${state}`} aria-label="Meme market stats">
-    <div className="index-snapshot-top">
-      <span className="snapshot-origin"><span className="network-icons" aria-hidden="true">{markets.some((entry) => entry.chain === "base") ? <img src={BRAND_ASSETS.base} alt="" /> : null}{markets.some((entry) => entry.chain === "robinhood") ? <img src={BRAND_ASSETS.robinhood} alt="" /> : null}</span><span><small>Live on</small><b>{snapshotChainLabel(markets)}</b></span></span>
-      <dl className="index-vitals">
-        <div><dt>Fee APR</dt><dd>{formatFeeApr(feeApr)}</dd><small>Volume-weighted, 24h fees</small></div>
-        <div><dt>24h volume</dt><dd>{state === "ready" ? compactMoney(volume) : "—"}</dd><small>Across all pools</small></div>
-        <div><dt>Liquidity</dt><dd>{state === "ready" ? compactMoney(liquidity) : "—"}</dd><small>Across all pools</small></div>
-      </dl>
-    </div>
-  </section>;
-}
-
-function PositionLedger({ authenticated, positions, state, markets, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel, updates, migrationPlan, migrationState, onPrepareMigration, onExecuteMigration, onCancelMigration }: {
+function PositionLedger({ authenticated, positions, state, markets, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel }: {
   authenticated: boolean;
   positions: PositionView[];
   state: "idle" | "loading" | "ready" | "error";
-  markets: IndexMarket[];
+  markets: MarketEntry[];
   stats: Map<string, MarketStats>;
   onStart: () => void;
   onRetry: () => void;
@@ -1042,12 +966,6 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
   actionState: PlanState;
   onExecute: () => void;
   onCancel: () => void;
-  updates: AvailableIndexUpdate[];
-  migrationPlan: IndexMigrationPlan | null;
-  migrationState: PlanState;
-  onPrepareMigration: (update: AvailableIndexUpdate) => void;
-  onExecuteMigration: () => void;
-  onCancelMigration: () => void;
 }) {
   const summary = summarizePositions(positions);
   const summaryValueEth = positions.reduce((total, position) => total + (positionValueEth(position) ?? 0), 0);
@@ -1056,7 +974,6 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
   const settlement = actionPlan && "settlement" in actionPlan ? actionPlan.settlement : undefined;
   return (
     <section className={`position-ledger ${authenticated ? "" : "is-disconnected"}`} id="positions">
-      {updates.length ? <IndexUpdatePanel updates={updates} plan={migrationPlan} state={migrationState} onPrepare={onPrepareMigration} onExecute={onExecuteMigration} onCancel={onCancelMigration} /> : null}
       {actionState.kind !== "idle" ? (
         <section className={`action-preview is-${actionState.kind}`} aria-live="polite">
           {actionState.kind === "submitted" ? <SuccessCelebration label={actionPlan?.kind === "withdraw" ? "ETH returned" : actionPlan?.kind === "rebalance" ? "Position rebalanced" : "Fees compounded"} /> : null}
@@ -1072,11 +989,11 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
       {showPositions ? <section className="portfolio-summary" aria-label="Portfolio summary">
         <div><span>Position value</span><strong>{summary.valueUsd > 0 ? money(summary.valueUsd) : summaryValueEth > 0 ? ethValue(summaryValueEth) : "—"}</strong><small>{summary.valueUsd > 0 ? `${summary.priced} of ${positions.length} priced` : "From live token balances"}</small></div>
         <div><span>Ready to collect</span><strong>{summary.feesUsd > 0 ? money(summary.feesUsd) : ethValue(summaryFeesEth)}</strong><small>Unclaimed fees</small></div>
-        <div><span>Earning now</span><strong>{summary.earning}</strong><small>of {positions.length} {positions.length === 1 ? "position" : "positions"} in range</small></div>
+        <div><span>In range</span><strong>{summary.earning}</strong><small>of {positions.length} {positions.length === 1 ? "position" : "positions"}</small></div>
         <div><span>Fee APR</span><strong>{formatFeeAprFraction(summary.feeApr)}</strong><small>Across priced positions</small></div>
       </section> : null}
       {showPositions ? <div className="position-list">{positions.map((position) => <article key={`${position.chain}-${position.protocol}-${position.positionManager ?? "default"}-${position.tokenId}`}>
-        <span className="position-pair"><TokenIcon symbol={position.symbol0} src={positionTokenImage(position, markets, stats)} /><span><b>{position.pair}</b><small>{position.chainLabel}{position.venueLabel ? ` · ${position.venueLabel}` : ""}</small></span></span>
+        <span className="position-pair"><TokenIcon symbol={position.symbol0} src={positionTokenImage(position, markets, stats)} /><span><b>{position.pair}</b><small>{position.chainLabel} · {positionVenueLabel(position)}</small></span></span>
         <span><small>Position value</small><b>{positionValueLabel(position)}</b></span>
         <span><small>Ready to collect</small><b>{positionFeesLabel(position)}</b></span>
         <span><small>Fee APR</small><b>{formatFeeAprFraction(position.feeApr ?? null)}</b></span>
@@ -1101,7 +1018,7 @@ function PositionActions({ position, onAction }: {
   </span>;
 }
 
-function positionTokenImage(position: PositionView, markets: IndexMarket[], stats: Map<string, MarketStats>): string | null | undefined {
+function positionTokenImage(position: PositionView, markets: MarketEntry[], stats: Map<string, MarketStats>): string | null | undefined {
   if (position.marketId) {
     const direct = stats.get(position.marketId)?.tokenImageUrl;
     if (direct) return direct;
@@ -1112,6 +1029,14 @@ function positionTokenImage(position: PositionView, markets: IndexMarket[], stat
   )?.market;
   if (!market) return undefined;
   return stats.get(market.id)?.tokenImageUrl ?? ("imageUrl" in market ? market.imageUrl : undefined);
+}
+
+function positionVenueLabel(position: PositionView): string {
+  if (position.venue === "aerodrome-slipstream") return "Aerodrome Slipstream";
+  if (position.protocol === "V2") return "Uniswap V2";
+  if (position.protocol === "V3") return "Uniswap V3";
+  if (position.protocol === "V4") return "Uniswap V4";
+  return position.venueLabel ?? position.protocol;
 }
 
 function positionActionTitle(plan: AnyPositionActionPlan | null, state: PlanState): string {
@@ -1144,45 +1069,17 @@ function formatServiceFee(serviceFeeBps: number): string {
   return `${(serviceFeeBps / 100).toFixed(serviceFeeBps % 100 === 0 ? 0 : 2)}% Wizzy fee`;
 }
 
-function IndexUpdatePanel({ updates, plan, state, onPrepare, onExecute, onCancel }: {
-  updates: AvailableIndexUpdate[];
-  plan: IndexMigrationPlan | null;
-  state: PlanState;
-  onPrepare: (update: AvailableIndexUpdate) => void;
-  onExecute: () => void;
-  onCancel: () => void;
-}) {
-  const busy = state.kind === "planning" || state.kind === "signing";
-  if (state.kind !== "idle") return <section className={`index-update-panel is-${state.kind}`} aria-live="polite">
-    <header><span><b>{plan ? `${plan.fromMarket.symbol} → ${plan.toMarket.symbol}` : "Preparing index update"}</b><small>{state.message}</small></span><button type="button" onClick={onCancel} disabled={busy}>Close</button></header>
-    {plan ? <dl>
-      <div><dt>Position replaced</dt><dd>{plan.fromMarket.symbol} → {plan.toMarket.symbol}</dd></div>
-      <div><dt>Amount moving</dt><dd>At least {trimEth(BigInt(plan.migratedAmountFloorWei))} ETH</dd></div>
-      <div><dt>Wizzy rebalance fee</dt><dd>{trimEth(BigInt(plan.serviceFeeWei))} ETH</dd></div>
-      <div><dt>Approval</dt><dd>One atomic wallet batch</dd></div>
-    </dl> : null}
-    {state.kind === "ready" ? <><p>If any step fails, your original position remains unchanged. Other index positions are untouched.</p><button className="small-primary" type="button" onClick={onExecute}>Update position</button></> : null}
-    {state.kind === "error" ? <button className="secondary-button" type="button" onClick={onCancel}>Dismiss</button> : null}
-  </section>;
-  return <section className="index-update-panel" aria-label="Index update available">
-    <div className="index-update-copy"><span className="update-mark"><RefreshIcon /></span><span><b>Index updated</b><small>{updates.length === 1 ? `${updates[0]!.fromSymbol} has been replaced by ${updates[0]!.toSymbol}.` : `${updates.length} positions can move to the latest index.`}</small></span></div>
-    <div className="index-update-actions">
-      {updates.map((update) => <button className="small-primary" type="button" key={`${update.migrationId}-${update.position.tokenId}`} onClick={() => onPrepare(update)}>Review {update.fromSymbol} update</button>)}
-    </div>
-  </section>;
-}
-
 function PortfolioEmpty({ variant, onPrimary }: {
   variant: "disconnected" | "loading" | "error" | "empty";
   onPrimary?: () => void;
 }) {
   const content = variant === "disconnected"
-    ? { title: "Reveal your markets", body: "Connect to see position value, fees, range status, and index updates.", action: "Connect wallet" }
+    ? { title: "See your positions", body: "Connect to view value, fees, ranges, and available actions.", action: "Connect wallet" }
     : variant === "error"
-      ? { title: "We couldn’t load your positions.", body: "Try again to read your wallet.", action: "Try again" }
+      ? { title: "Positions unavailable", body: "We could not read this wallet. Try again.", action: "Try again" }
     : variant === "empty"
-        ? { title: "Your markets will live here.", body: "Make markets once and Wizzy opens every index position your deposit supports.", action: "Make markets" }
-        : { title: "Reading your positions.", body: "Your liquidity will appear here.", action: "" };
+        ? { title: "No positions yet", body: "Choose a reviewed market and add liquidity in a few taps.", action: "Make market" }
+        : { title: "Reading positions", body: "Checking Base and Robinhood.", action: "" };
   return <section className={`portfolio-empty is-${variant}`} aria-live={variant === "loading" ? "polite" : undefined}>
     <span className="empty-symbol">{variant === "empty" ? <img src="/brand/wizzy-mascot-32.png" alt="" /> : <WalletIcon />}</span>
     <div className="empty-copy">
@@ -1210,19 +1107,12 @@ function PositionRange({ position }: { position: PositionView }) {
   </span>;
 }
 
-function weightedFeeApr(markets: IndexMarket[], stats: Map<string, MarketStats>): number | null {
-  const available = markets.filter(({ market }) => stats.get(market.id)?.trailingFeeAprPct != null);
-  if (!available.length) return null;
-  const weight = available.reduce((sum, row) => sum + row.indexWeightBps, 0);
-  return available.reduce((sum, row) => sum + (stats.get(row.market.id)!.trailingFeeAprPct! * row.indexWeightBps) / weight, 0);
+function marketTierRank(policy: RobinhoodIndexBreadthPolicy, marketId: string): number {
+  const rank = policy.tiers.findIndex((tier) => tier.marketIds.includes(marketId));
+  return rank === -1 ? Number.MAX_SAFE_INTEGER : rank;
 }
 
-function marketTierIndex(policy: RobinhoodIndexBreadthPolicy, marketId: string): number {
-  const index = policy.tiers.findIndex((tier) => tier.marketIds.includes(marketId));
-  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
-}
-
-function chainLabel(chain: IndexChain): string {
+function chainLabel(chain: MarketChain): string {
   if (chain === "base") return "Base";
   if (chain === "robinhood") return "Robinhood";
   return "Solana";
@@ -1325,22 +1215,15 @@ function BrandLogo({ brand, label, compact = false }: { brand: keyof typeof BRAN
   </span>;
 }
 
-function geckoPoolUrl(chain: IndexChain, pool: string): string {
+function geckoPoolUrl(chain: MarketChain, pool: string): string {
   return `https://www.geckoterminal.com/${chain === "base" ? "base" : "robinhood"}/pools/${pool.toLowerCase()}`;
 }
 
-function VenueTrail({ chain, protocol }: { chain: IndexChain; protocol: CuratedMarket["protocol"] }) {
+function VenueTrail({ chain, protocol }: { chain: MarketChain; protocol: CuratedMarket["protocol"] }) {
   return <span className="venue-trail">
     <BrandLogo brand={chain} label={chainLabel(chain)} compact />
     <span>{chainLabel(chain)}</span><i>{protocol === "AERODROME_SLIPSTREAM" ? "Aerodrome Slipstream" : "Uniswap v3"}</i>
   </span>;
-}
-
-function snapshotChainLabel(markets: IndexMarket[]): string {
-  const chains = new Set(markets.map((market) => market.chain));
-  if (chains.size > 1) return "Base + Robinhood";
-  const [chain] = [...chains];
-  return chain ? chainLabel(chain) : "Base + Robinhood";
 }
 
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }
@@ -1348,6 +1231,5 @@ function ChevronIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><pat
 function ExternalLinkIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M17 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" /></svg>; }
 function SendIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-5 14-2.5-5.5L5 12Z" /><path d="m11.5 13.5 3-3" /></svg>; }
 function DisconnectIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3M14 8l4 4-4 4M18 12H9" /></svg>; }
-function RefreshIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 9a7 7 0 0 1 11.2-2L20 12M4 12l2.7 5a7 7 0 0 0 11.2-2" /></svg>; }
 function CheckIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12.5 4 4 8-9" /></svg>; }
 function XIcon() { return <svg className="x-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" /></svg>; }

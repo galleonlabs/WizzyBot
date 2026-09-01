@@ -122,7 +122,7 @@ export function normalizeAchievementRecord(value: unknown, now = new Date().toIS
   }, now).record;
 }
 
-/** Compact server persistence keeps the whole Privy custom-metadata object below its 1KB limit. */
+/** Compact persistence keeps the achievement record inexpensive to store and transfer. */
 export function serializeAchievementRecord(record: AchievementRecord): string {
   const compact: Record<string, unknown> = {
     v: ACHIEVEMENT_STORAGE_VERSION,

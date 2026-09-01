@@ -4,70 +4,66 @@
 
 ## Platform
 
-web
+Web.
 
 ## Users
 
-Wizzy is for crypto-native consumers who want to earn meme-market trading fees without becoming LP technicians. They understand deposits, fees, positions, and withdrawals. Wizzy owns the pool selection, chain routing, asset balancing, liquidity ranges, gas reserves, and rebalancing mechanics.
+Wizzy is for crypto-native people who want to earn pool fees without managing swaps, ranges, routers, or position math by hand. They understand wallets, fees, and withdrawals. Wizzy handles the LP mechanics.
 
-## Product Purpose
+## Purpose
 
-Wizzy is the one-click market maker for memes. The MVP is one ranked, versioned Robinhood Chain index. A user signs in with Privy, chooses where their ETH is coming from, enters one amount, and Wizzy opens every market that amount supports. The user owns every resulting position in their Privy-controlled wallet and can monitor fees or withdraw without learning concentrated-liquidity mechanics.
+Wizzy makes meme-market liquidity feel as simple as a swap. Connect an external EOA, choose a reviewed market on Base or Robinhood Chain, enter one ETH amount, review the costs, and approve the plan in the wallet. The wallet owns every LP position. Wizzy never creates an embedded wallet, holds a key, or signs for the user.
 
-## Positioning
+## Product model
 
-Wizzy turns “be the market maker” into a consumer action. It should feel as direct as a swap: one index, one amount, one primary action. The internal ambition is the “Wintermute of memes” or “Wintermeme”; public copy must not imply affiliation with Wintermute, Robinhood, Uniswap, Meteora, Privy, Relay, or any listed token project.
+- Base and Robinhood Chain are equal product surfaces. Neither is a legacy or secondary network.
+- The main action is "Make market." One amount becomes the token swap, approvals, liquidity position, gas reserve, and disclosed Wizzy fee.
+- The portfolio reads the connected EOA on both chains and groups positions by market and protocol.
+- Collect, rebalance, and withdraw are direct wallet-approved actions. Scheduled agents may monitor and recommend, but cannot sign or broadcast.
+- The version-controlled catalog decides which markets Wizzy promotes. Onchain positions remain readable even when a market is paused or removed from the catalog.
+- Public state, wallet ownership, chain events, and versioned policy are authoritative. Do not invent a parallel custody ledger.
 
-## Operating Context
+## Protocol requirement
 
-- Privy creates and manages the user's self-custodial EVM and Solana wallets under one identity.
-- There is no public allocation builder, destination-network selector, pool selector, range editor, bridge picker, or portfolio-split control. “Pay from” is a checkout choice only: Relay moves ETH from a supported source network into the single Robinhood Chain product.
-- Wizzy publishes one Robinhood index at launch. Each viable 0.05 ETH unit adds the next curator-ranked market, up to the full six-market index; users never choose the count or allocation.
-- Initial inclusion requires at least 30 days of pool history, at least $75,000 in live liquidity, a WETH quote, and a verified Uniswap v3 execution path. An active market that later crosses a monitoring threshold moves to review; security failures or a liquidity collapse cause the curator agent to pause it in the version-controlled catalog and ship the tested deployment. The curator applies deterministic membership and weight policy without an operator vote.
-- Relay moves ETH from the selected supported source network to Robinhood Chain. Wizzy selects the reviewed pool and liquidity range for every market.
-- The product vocabulary is deposit, earn fees, your liquidity, collect, and withdraw. Protocol mechanics belong in receipts and disclosures, not the primary action.
-- Portfolio state should be derived from wallets, LP positions, chain events, and live market data. Avoid a database where onchain or version-controlled state is authoritative.
-- “Markets” is the single home for current positions and the live Robinhood index. Existing Base and Solana positions remain readable and withdrawable without promoting those networks in the launch product.
-- The agent is internal index machinery: it scouts inclusion candidates, monitors pool risk, and publishes the evidence used by deterministic allocation and range policy. It is not a public chat or transaction surface. Deterministic transaction and risk rules remain authoritative.
+The finished product must support Uniswap-style V2, V3, and V4 positions on both chains wherever the required canonical deployments exist. That means creation, discovery, fee collection, liquidity changes, range management where applicable, and full withdrawal. Protocol differences belong in the planner and position detail, not in three separate products.
 
-## Capabilities and Constraints
+Current support is incomplete: the live curated creation catalog is V3 and Aerodrome Slipstream, while V2/V4 readers and action planners exist. Do not describe V2 or V4 as fully supported until the wallet path has been proven end to end on each chain.
 
-- Launch one network-specific index on Robinhood Chain (chain ID 4663). Keep the existing Base, Robinhood, and Solana engines intact for later per-network products; do not present a blended multi-chain index in the MVP.
-- Accept only pools validated by the canonical Uniswap v3 factory and tracked by the curator evidence universe; the version-controlled market catalog is authoritative for new deposits.
-- The active launch set is CASHCAT, PONS, AI, CHUMP, STONKBROKER, and PONSGUY against WETH on reviewed Uniswap v3 pools.
-- Base uses reviewed Uniswap v3 and Aerodrome Slipstream pools; Solana uses Meteora DLMM. Those engines and paused markets remain readable and withdrawable for later network-specific launches.
-- Minimize approvals and confirmations with wallet batching, Relay, Privy embedded wallets, and direct single-token liquidity zaps. Never claim one cryptographic signature when destination networks require additional approvals.
-- The consumer initiates one Wizzy action. The review state explains that Privy will request the network approvals needed to preserve self-custody.
-- The launch fee is 0.15% of deposits, withdrawals, and rebalances, plus 2% of fees compounded. Show Wizzy, Relay, network, and DEX costs in the relevant review or receipt before approval, not as idle-page positioning.
-- Never invent yield. Show “Fee APR” as a simple annualization of the trailing 24-hour pool-fee pace. Use “APY” only when an actual auto-compound policy is active and the calculation accounts for compounding frequency, gas, and product fees.
-- Manual compounding remains a direct, wallet-approved position action. When the curator replaces a Robinhood constituent, a version-controlled migration manifest lets the owner replace only that retired position with its named successor in one atomic wallet batch. Do not expose arbitrary manual or automatic rebalancing until the consumer wallet path can safely build and execute it across the supported venue.
-- Users own the EVM LP NFTs and Solana DLMM positions. Wizzy is not a custodian or discretionary asset manager.
+## Curation
 
-## Brand Commitments
+The curator ranks meme pools using live liquidity, volume, fee generation, age, token and pool integrity, price concentration, holder risk, and execution viability. Every inclusion needs evidence. A market moves to review when its data deteriorates and pauses immediately for a security failure or liquidity collapse.
 
-- Product name: Wizzy.
-- Category claim: “The meme market maker” and “one-click market maker for memes.”
-- Primary action: “Make markets.”
-- Personality: playful, bullish, direct, and financially literate without becoming reckless or juvenile.
-- Complexity is absorbed by the product, not pushed onto the consumer.
-- Risk, variable fees, self-custody, and wallet approvals stay explicit.
+The curator can change the catalog through the tested Git release path. It cannot move user funds, approve a transaction, or override deterministic pool and target validation.
 
-## Product Principles
+## Money
 
-1. One product, not a toolkit: one Robinhood index, one amount, one action. Deposit size changes the number of markets without exposing a builder.
-2. Consumer language first: deposit, earn fees, collect, withdraw.
-3. Self-custody stays honest: the user owns positions and approves required wallet actions.
-4. Onchain by default: public state and version-controlled policy are authoritative.
-5. Fee APR stays precise: it is annualized trailing pool fees, not APY or a promised return.
-6. Technical detail appears on demand, never as a prerequisite for participation.
+Wizzy charges 0.15% when liquidity is added, withdrawn, or rebalanced, and 2% of fees when they are compounded. Show the Wizzy fee, network cost, bridge cost, and DEX impact before wallet approval. Never describe fee APR as guaranteed yield.
 
-## Evidence on Hand
+## Brand
 
-- The repository contains Base and Robinhood definitions, Uniswap and Aerodrome Slipstream planning and calldata, Privy authentication/signing, Relay routing, treasury fee logic, position hydration, agent tools, and tests.
-- Robinhood launch statistics and token imagery come from GeckoTerminal's keyless onchain pool API; each market exposes its GeckoTerminal pool page and the approved Fomo referral action. Fomo is a discovery surface, not a liquidity venue or product endorsement.
-- The Solana path uses Privy Solana wallets, Relay native SOL delivery, and Meteora's maintained DLMM zap SDK.
-- No audited proprietary contracts, verified performance history, testimonials, legal opinion, or third-party endorsements are present. Future work must not fabricate them.
+- Product: Wizzy.
+- Category: the meme market maker.
+- Primary action: Make market.
+- Voice: playful, direct, and financially literate.
+- UI: Uniswap-style simplicity with stronger curation, position charts, and liquidity management.
+- Complexity stays behind the review state. Risk, variable costs, self-custody, and wallet approvals stay visible.
 
-## Accessibility & Inclusion
+## Product rules
 
-The web product must support keyboard navigation, visible focus, reduced motion, readable numerical contrast, responsive mobile use, and plain-language explanations alongside optional protocol detail.
+1. The connected EOA is the only consumer signer.
+2. One view covers Base and Robinhood Chain.
+3. One primary action per state.
+4. Consumer language first; protocol detail on demand.
+5. Fee APR is a trailing rate, not APY or a promise.
+6. Users can always inspect, collect from, and withdraw supported positions they own.
+7. No token launch or buyback claim without a separate explicit release.
+
+## Evidence and limits
+
+- The repository has Base and Robinhood chain definitions, V2/V3/V4 position readers and action calldata, V3 and Aerodrome creation planners, Relay funding, fee logic, curation policy, and wallet-plan tests.
+- Market statistics and imagery come from onchain reads and GeckoTerminal. Fomo is a discovery link, not a liquidity venue or endorsement.
+- There is no audited proprietary liquidity contract, verified performance history, legal opinion, or third-party endorsement. Do not imply otherwise.
+
+## Accessibility
+
+Support keyboard navigation, visible focus, reduced motion, readable contrast, mobile use, 200% zoom, and plain-language explanations alongside protocol detail.

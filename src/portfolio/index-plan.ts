@@ -280,8 +280,8 @@ export async function planMemeIndex(input: {
     ],
     notices: [
       "Wizzy opens as many reviewed markets as your deposit can support, then chooses the networks, pools, and liquidity ranges.",
-      "The Base batch funds every network in one intent. Privy then asks for the destination-wallet signatures each network requires.",
-      "Every EVM LP NFT and Solana DLMM position is created in wallets controlled by this Privy identity.",
+      "The Base batch funds every network in one intent. Each connected destination wallet then approves the actions its network requires.",
+      "Every EVM LP NFT and Solana DLMM position is created directly in the connected self-custody wallets.",
       "Fee APR changes with trading activity. Meme prices can fall, and trading fees may not cover losses.",
     ],
   };

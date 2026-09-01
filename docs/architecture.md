@@ -16,15 +16,15 @@ Wizzy is self-custodial portfolio software. The wallet owns every LP NFT and sig
 
 The six-hour dappnode curator combines deterministic evidence with read-only deep web research. The rules engine alone authorizes replacements; the research agent can verify identity or veto a proposal, but cannot invent an executable change. A validated update changes the centralized JSON catalog in a disposable worktree, passes the full release gate, and ships through Git/Vercel. There is no onchain publication or registry gas cost in the current launch architecture.
 
-## Index deposit path
+## Market entry path
 
-The public product has one fixed index. It does not expose the single-chain allocation APIs, pools, venues, weights, or ranges as consumer controls.
+The public product presents reviewed markets on Base and Robinhood Chain. Protocol and range mechanics stay behind each market's review state.
 
-1. The user enters one ETH amount on Base. The server validates the versioned market policy and returns short-lived plans for every active market.
-2. The first Privy approval opens the Base positions, pays the disclosed deposit fee, and funds Relay deposits for Robinhood Chain and native SOL.
-3. Wizzy waits for Relay before asking for the Robinhood and Solana approvals. Privy keeps the EVM and Solana wallets under the same login, but each network still requires its own wallet authorization.
-4. EVM positions are minted to the user's wallet. Meteora DLMM positions are created with the user's Solana wallet as owner.
-5. Portfolio reads query the reviewed EVM position managers and configured Meteora pools directly. No shadow portfolio database is required.
+1. The user chooses a reviewed market and enters one ETH amount.
+2. The server validates the versioned market policy and returns a short-lived plan for that chain.
+3. The connected EOA reviews the swap, liquidity, fee, and gas reserve before approval.
+4. The LP position is minted directly to that EOA.
+5. Portfolio reads query reviewed position managers and pools directly. No shadow portfolio database is required.
 
 ## Internal EVM planning paths
 
@@ -38,21 +38,21 @@ The public product has one fixed index. It does not expose the single-chain allo
 
 Permissionless launch path: two confirmations from one Base funding balance.
 
-1. Base confirmation atomically executes the Base allocation and a Relay native-ETH deposit for Robinhood Chain.
-2. Wizzy monitors the Relay request ID. After success, it switches the wallet to Robinhood Chain and requests the second atomic allocation batch.
-3. The Robinhood allocation is sized from Relay's minimum output less a gas reserve; any better fill remains in the user's wallet.
+1. The user chooses one market on Base or Robinhood Chain.
+2. Wizzy prepares the allowlisted swap, range, LP mint, and service-fee steps for that market.
+3. The connected wallet approves the atomic batch when supported, or the same steps sequentially when it is not.
 
-A one-confirmation cross-chain call path is a later capability gate. Relay can execute destination calls with smart accounts, but preserving the user's `msg.sender`, sponsorship, and safe handling of dynamic swap leftovers must be proven with the actual Privy/Relay production configuration before Wizzy advertises it.
+A one-confirmation cross-chain call path is a later capability gate. Relay can execute destination calls with smart accounts, but preserving the user's `msg.sender` and safely returning dynamic swap leftovers must be proven with the actual EOA/Relay path before Wizzy advertises it.
 
 ### Solana
 
-Relay delivers native SOL to the user's Privy Solana wallet. Wizzy uses the pinned Meteora zap SDK to create positions only in pools from `src/config/solana-markets.json`. Position reads query those pools by owner. Withdraw and reinvest plans verify the owner, pool, position, fee, expiry, signer set, and instruction program allowlist before Privy requests signatures.
+The dormant Solana path uses the pinned Meteora zap SDK and only pools from `src/config/solana-markets.json`. It is not part of the current Base and Robinhood product. Any future reactivation must use a user-controlled Solana signer and re-prove the owner, pool, position, fee, expiry, signer set, and program allowlist.
 
 Solana token fees land in associated token accounts controlled by `UNABOT_SOLANA_TREASURY`. Native SOL fees accrue as recoverable surplus lamports on the same per-market token account, avoiding an undisclosed rent top-up for an otherwise empty treasury system account.
 
 ## Analytics contract
 
-Revert's position tooling makes the useful comparison set concrete: pool and fee tier, NFT ID, owner, asset amounts, PnL, fee APR, total return, age, range state, time in range, and performance versus holding. Wizzy should show those at position level and aggregate value, fees, chain allocation, range health, and risk at portfolio level.
+Revert's position tooling makes the useful comparison set concrete: pool and fee tier, NFT ID, owner, asset amounts, PnL, fee APR, total return, age, range state, time in range, and performance versus holding. Wizzy should show those at position level and keep the wallet summary limited to value, claimable fees, and range health.
 
 Annualized numbers are unstable for young or briefly active positions. Wizzy labels trailing windows, withholds APR for insufficient history, and presents scenarios rather than guaranteed projections. Market curation is reviewable and fail-closed: AI research may update candidate identity and approve only a deterministic policy proposal; it cannot bypass thresholds, create arbitrary calldata, access signing keys, or transact.
 

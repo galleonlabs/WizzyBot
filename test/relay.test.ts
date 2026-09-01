@@ -44,7 +44,7 @@ describe("Relay funding", () => {
     await expect(quoteBaseToRobinhoodEth({ owner: OWNER, amountInWei: 5_000_000_000_000_000n })).rejects.toThrow(/depository/);
   });
 
-  it("validates a Base to native SOL quote for the Privy Solana wallet", async () => {
+  it("validates a Base to native SOL quote for the connected Solana wallet", async () => {
     const payload = relayQuote();
     payload.details.currencyOut = {
       amount: "579813478",

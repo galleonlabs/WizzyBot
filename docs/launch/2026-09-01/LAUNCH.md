@@ -28,19 +28,19 @@ The hook is the category: Make Meme Markets. The infrastructure and curator mech
 
 > How it works:
 >
-> 1. Sign in with Privy
-> 2. Fund your Wizzy account
+> 1. Connect your wallet
+> 2. Pick a reviewed market
 > 3. Enter an ETH amount
-> 4. Review the current index
+> 4. Review the swap, range and fee
 > 5. Approve the transaction batch
 >
-> No vault. The Uniswap v3 position NFTs go to your wallet.
+> No vault. The LP position goes to your wallet.
 
 ### 4/7
 
-> The index starts with selected WETH markets on Robinhood Chain.
+> Wizzy starts with selected WETH markets on Base and Robinhood Chain.
 >
-> The curator reviews liquidity, volume, security and capacity every six hours—and can update membership and weights as meme markets change.
+> The curator reviews liquidity, volume, security and capacity every six hours—and updates which markets qualify as conditions change.
 
 ### 5/7
 
@@ -50,7 +50,7 @@ The hook is the category: Make Meme Markets. The infrastructure and curator mech
 
 ### 6/7
 
-> Built on Robinhood Chain (@RobinhoodCrypto) with @Uniswap v3. @privy_io provides the embedded wallet. @RelayProtocol provides fast cross-chain funding.
+> Built on Base and Robinhood Chain (@RobinhoodCrypto) with @Uniswap v3 and Aerodrome Slipstream. @RelayProtocol provides cross-chain funding.
 >
 > Constituent trade links open in @fomo.
 >
@@ -58,7 +58,7 @@ The hook is the category: Make Meme Markets. The infrastructure and curator mech
 
 ### 7/7
 
-> Wizzy starts with meme-market LPs on Robinhood Chain.
+> Wizzy starts with meme-market LPs on Base and Robinhood Chain.
 >
 > The direction: more protocols, more chains and the easiest LP experience for memes.
 >
@@ -74,7 +74,7 @@ Fomo's strongest current product posts are short, product-first statements: the 
 
 - Post 1 makes one category claim in five words before the link.
 - Post 2 names the job Wizzy removes instead of calling the experience "simple" or "seamless."
-- Posts 3–5 prove how it works, what is in the index, and what remains manageable after deposit.
+- Posts 3–5 prove how it works, which markets qualify, and what remains manageable after deposit.
 - Post 6 contains every ecosystem tag. Tags do not interrupt the hook and do not imply an announced partnership.
 - Post 7 states the direction without promising a chain, protocol, token, or date that has not shipped.
 - There are no hashtags. The ecosystem handles and concrete nouns are more useful than `#DeFi`, `#Crypto`, or `#memecoin` spam.
@@ -83,7 +83,7 @@ Fomo's strongest current product posts are short, product-first statements: the 
 
 | Failure mode | Fomo/Uniswap pattern | Wizzy response |
 | --- | --- | --- |
-| Infrastructure before value | The strongest posts lead with a product outcome or category fact. | Robinhood Chain, Uniswap, Privy, Relay, and Fomo appear only in post 6. |
+| Infrastructure before value | The strongest posts lead with a product outcome or category fact. | Base, Robinhood Chain, Uniswap, Aerodrome, Relay, and Fomo appear only in post 6. |
 | Empty launch language | Their best posts avoid "revolutionary," "game-changing," and "thrilled to announce." | The opening names the product category directly: Make Meme Markets. |
 | Too much copy | The reference posts are highly compressed. | Each post has one job; no post tries to explain the whole system. |
 | Unsupported performance hook | Uniswap uses a dated historical metric when it makes a metric claim. | The thread makes no APR, return, volume, or TVL promise. |
@@ -108,12 +108,12 @@ The asset is a launch billboard, not a UI screenshot. “Make Meme Markets” is
 
 ### 08:30–08:50: smoke check
 
-1. Open `https://wizzy.meme` in a signed-out tab and confirm the Make and Markets views load.
+1. Open `https://wizzy.meme` in a signed-out tab and confirm the Make and Positions views load.
 2. Confirm Pool activity shows real adds/removals and links to Robinhood Chain Blockscout.
-3. Sign in to the launch account and confirm the Privy wallet control opens without clipping.
+3. Connect an external wallet and confirm the wallet control opens without clipping.
 4. Check a small deposit quote through the review step. Do not broadcast solely for the smoke test.
-5. Confirm the active market set loads and post 4 still accurately describes the curator's dynamic membership and weights.
-6. Confirm `@RobinhoodCrypto`, `@Uniswap`, `@privy_io`, `@RelayProtocol`, and `@fomo` still resolve to the intended official accounts.
+5. Confirm the active market list loads and post 4 still accurately describes the qualification review.
+6. Confirm `@RobinhoodCrypto`, `@Uniswap`, `@RelayProtocol`, and `@fomo` still resolve to the intended official accounts.
 
 ### 09:00: publish
 
@@ -134,15 +134,15 @@ The asset is a launch billboard, not a UI screenshot. “Make Meme Markets” is
 
 ### Is this a vault?
 
-> No. Wizzy prepares the transactions, but the Uniswap v3 position NFTs are minted to your wallet. You can export the Privy wallet and manage the positions independently.
+> No. Wizzy prepares the transactions, but each LP position is minted to the external wallet you connected. You can manage it independently.
 
 ### Does Wizzy custody funds?
 
-> No. Your ETH and LP positions stay in your embedded self-custodial wallet. Wizzy does not pool user deposits in a vault.
+> No. Your ETH and LP positions stay in the external wallet you connected. Wizzy does not pool user deposits in a vault.
 
 ### Why these markets?
 
-> The active Robinhood Chain WETH pools are selected under published liquidity, volume, age, security and capacity rules. The curator reviews membership and weights every six hours.
+> Base and Robinhood WETH pools qualify under published liquidity, volume, age, security and capacity rules. The curator reviews the market list every six hours.
 
 ### Is there a Wizzy token?
 
@@ -152,19 +152,19 @@ The asset is a launch billboard, not a UI screenshot. “Make Meme Markets” is
 
 > LPing still has token-price, impermanent-loss, out-of-range, smart-contract and bridging risk. Wizzy reduces setup and management work; it does not remove those risks.
 
-### Why Robinhood Chain?
+### Why Base and Robinhood Chain?
 
-> Robinhood Chain is live, EVM-compatible, uses ETH for gas, and has public Uniswap liquidity. That makes it a focused place to build the first Wizzy index.
+> Base and Robinhood Chain are EVM networks with ETH gas and active meme-market liquidity. Wizzy gives both the same reviewed, wallet-owned LP flow.
 
 ## Claim and source record
 
 Repository evidence is the source of truth for Wizzy-specific behavior:
 
-- `README.md` — one amount, self-custodial Privy wallet, Relay funding, user-visible positions, and six-hour curation.
+- `README.md` — one amount, an external wallet, Relay funding, user-visible positions, and six-hour curation.
 - `docs/CURATION.md` — launch membership, weights, policy, cadence, and Robinhood-only public MVP.
 - `docs/LAUNCH_PRIVACY.md` — no implied affiliation, no personal identity, no token bundling.
 - `docs/TOKEN_FLYWHEEL.md` — the app launches without a token.
-- `src/portfolio/index-selection.ts` — deposit breadth tiers.
+- `src/portfolio/index-selection.ts` — reviewed market selection rules.
 - `src/portfolio/allocation.ts` — reviewed venue/range selection and user-owned mint recipient.
 - `src/portfolio/position-actions.ts` — compound, rebalance, and ETH withdrawal preparation.
 
@@ -174,7 +174,6 @@ Primary external references, checked 31 August 2026:
 - Uniswap current voice: [TradePools launch](https://x.com/Uniswap/status/2085136053661213180), [Robinhood Chain volume post](https://x.com/Uniswap/status/2092738034768752965), [short product post](https://x.com/Uniswap/status/2091897238666490211).
 - [Robinhood Chain overview](https://docs.robinhood.com/chain/), [network details](https://docs.robinhood.com/chain/connecting/), [bridging routes](https://docs.robinhood.com/chain/bridging/), and [brand guidelines](https://docs.robinhood.com/chain/brand-guidelines/). The guidelines require the full name “Robinhood Chain” and `@RobinhoodCrypto`, not `@RobinhoodApp`, for related content.
 - [Uniswap liquidity overview](https://developers.uniswap.org/docs/liquidity/overview) and [v3 position ownership](https://support.uniswap.org/hc/en-us/articles/20980786685069-Why-is-liquidity-position-ownership-represented-by-tokens-or-NFTs).
-- [Privy embedded-wallet overview](https://docs.privy.io/wallets/overview/embedded) and [wallet export](https://docs.privy.io/wallets/wallets/export).
 
 ## Media review verdict
 

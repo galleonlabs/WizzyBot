@@ -4,7 +4,7 @@
 
 Wizzy can operate under a public pseudonym. It cannot honestly promise total anonymity.
 
-GitHub, Vercel, Privy, Pools, X, infrastructure providers, payment providers, legal advisers, and public blockchains may retain or expose operator information. Blockchain funding and wallet activity are public and may be linkable. The policy is to prevent unnecessary public attribution while keeping lawful records and accurate disclosures—not to conceal ownership from providers, regulators, counterparties, or users who are entitled to know it.
+GitHub, Vercel, Pools, X, wallet providers, infrastructure providers, payment providers, legal advisers, and public blockchains may retain or expose operator information. Blockchain funding and wallet activity are public and may be linkable. The policy is to prevent unnecessary public attribution while keeping lawful records and accurate disclosures—not to conceal ownership from providers, regulators, counterparties, or users who are entitled to know it.
 
 ## Current public boundary
 
@@ -26,7 +26,7 @@ This boundary is enforced by a repository test over shipped source and public as
 
 ## Wallet and custody controls
 
-The creator/treasury EOA is a dedicated wallet whose private key is stored as a retrievable, encrypted, production-only Vercel secret. The application and dappnode curator do not read it. Centralized index curation changes the version-controlled catalog and does not require the wallet or an onchain signature. There is deliberately no multisig.
+The creator/treasury EOA is a dedicated wallet whose private key is stored as a retrievable, encrypted, production-only Vercel secret. The application and dappnode curator do not read it. Market curation changes the version-controlled catalog and does not require the wallet or an onchain signature. There is deliberately no multisig.
 
 Before the wallet controls material value, re-verify the Vercel recovery path, project-administrator list, dappnode file permissions, and public address. The key must never be placed in client variables, source, shell history, logs, screenshots, analytics, or social tooling.
 
@@ -39,7 +39,7 @@ Assume every funding transaction is publicly attributable through chain analysis
 - Before submitting to Pools, verify the selected account, chain, creator address, recipients, and transaction simulation.
 - Before posting on X, verify the final onchain contract address from independent chain data and use the same canonical address everywhere.
 - Do not claim affiliation with Robinhood, Uniswap, Fomo, Pools, or any constituent token.
-- Do not imply that pseudonymity removes related-party conflicts. Publish treasury, creator, allocations, vesting, and index-sleeve control.
+- Do not imply that pseudonymity removes related-party conflicts. Publish treasury, creator, allocations, vesting, and any related-party market control.
 
 These controls apply to the separate future token launch. They are not part of the initial application launch and do not imply that a token is scheduled.
 
@@ -49,20 +49,20 @@ These controls apply to the separate future token launch. They are not part of t
 - [ ] No public source map, error payload, analytics event, or response header exposes an operator or account slug.
 - [ ] Creator and treasury addresses are dedicated and independently verified.
 - [ ] No secret is present in Git history, build output, Vercel client variables, logs, or browser storage.
-- [ ] Product copy makes no token date, index-inclusion, buyback, fee-support, yield, or appreciation promise.
+- [ ] Product copy makes no token date, market-inclusion, buyback, fee-support, yield, or appreciation promise.
 - [ ] The application, curator, and deployment path cannot create a token, add a related-party sleeve, or route fees into token/WETH liquidity.
 - [ ] Public language says pseudonymous, not anonymous.
 - [ ] Legal, tax, sanctions, KYC, financial-promotion, and record-keeping requirements are handled where applicable.
 
 ## Future token launch checklist
 
-- [ ] The token go/no-go record in [Token and index plan](TOKEN_FLYWHEEL.md) is complete after at least 30 days of application evidence.
+- [ ] The token go/no-go record in the [future token plan](TOKEN_FLYWHEEL.md) is complete after at least 30 days of application evidence.
 - [ ] Launch-provider and X identities use dedicated credentials and hardened recovery.
 - [ ] Connected-wallet account, chain, recipients, permissions, and full transaction simulation are reviewed before signing.
 - [ ] Token contract, allocation, vesting, treasury, related-party sleeve, and risk disclosures are public.
 - [ ] Public language says pseudonymous, not anonymous.
 - [ ] Independent legal review covers the launch jurisdictions, public communications, related-party sleeve, treasury policy, and financial-promotion requirements.
-- [ ] The token launches at 0% index weight; sleeve activation remains a later, separately evidenced release.
+- [ ] A token launch does not automatically add the token to Wizzy's reviewed market list; inclusion remains a later, separately evidenced release.
 
 ## Incident response
 

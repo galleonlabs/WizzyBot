@@ -1,6 +1,6 @@
 # Production runbook
 
-How to run Wizzy. The consumer web index covers Base, Robinhood Chain, and Solana. The operator CLI covers EVM position primitives. Users keep every EVM LP NFT and Solana DLMM position.
+How to run Wizzy. The consumer app presents reviewed meme markets on Base and Robinhood Chain. The operator CLI covers EVM position primitives. Users keep every LP position in their connected wallet.
 
 **Never commit `.env`.** Copy `.env.example` locally. `.env` is gitignored. Do not paste secrets into git, Vercel project settings screenshots, or this file.
 
@@ -11,15 +11,15 @@ The initial application launch does not deploy, buy, list, or include a Wizzy to
 No application, curator, CLI, keeper, or ordinary deployment path may:
 
 - create or announce a Wizzy token;
-- add or increase a related-party index sleeve;
+- add a related-party market or route fees into its liquidity;
 - route product fees into token/WETH liquidity;
 - describe treasury revenue as a buyback, yield, price floor, or token-holder entitlement.
 
-A future token is a separate, manually authorized release governed by [Token and index plan](TOKEN_FLYWHEEL.md). Token launch and later sleeve activation are also separate releases.
+A future token is a separate, manually authorized release governed by the [future token plan](TOKEN_FLYWHEEL.md). Token launch and any later market inclusion are also separate releases.
 
 ## Pool activity
 
-The public rail under the navigation is labelled **Pool activity**. It reports Uniswap V3 `Mint` and `Burn` events from only the active Robinhood pools in the current index; it does not imply that Wizzy vaults user funds.
+The public rail under the navigation is labelled **Pool activity**. It reports Uniswap V3 `Mint` and `Burn` events from the reviewed Robinhood pools; it does not imply that Wizzy vaults user funds.
 
 `GET /api/pool-activity` has a fixed two-request RPC budget per shared cache fill: one block-number read, then one `eth_getLogs` query covering every active pool and both event types over the most recent 1,000 blocks. Do not replace this with per-pool scans or transaction, receipt, or block-detail lookups. Set `ROBINHOOD_ACTIVITY_RPC_URL` to an archive-capable endpoint that accepts the complete block range; Alchemy Free limits Robinhood `eth_getLogs` to 10 blocks, so it cannot serve this feed efficiently. If a scan fails, the same cache fill retries on the default Robinhood RPC and finally with a 250-block window, because the public RPC's load-balanced nodes enforce inconsistent range caps. The server cache refreshes at most once per 60 seconds and can serve stale data for five minutes. Browsers poll at most once per minute, pause while the tab is hidden, retain the last good result during a transient failure, and never contact the RPC directly.
 
@@ -72,7 +72,7 @@ unabot chat
 unabot "status 12345"
 ```
 
-Hosted chat is the Next/eve app (email login only; Google stays off until OAuth exists). See [Vercel](#vercel).
+Hosted chat is operator infrastructure behind Vercel OIDC. It can inspect positions and prepare transaction plans, but it cannot sign for a consumer. See [Vercel](#vercel).
 
 ## Telegram
 
@@ -108,7 +108,7 @@ unabot run --interval 60000
 unabot --live run --once
 ```
 
-Hosted keeper is the eve schedule `*/15 * * * *` (`agent/schedules/keeper.ts`). It skips cleanly until `UNABOT_KEEPER_OWNER` names the wallet to scan, and stays dry-run unless `KEEPER_LIVE=1` **and** `PRIVY_APP_SECRET` is set. `UNABOT_KEEPER_LIVE=1` is accepted as an alias.
+Hosted keeper is the observe-only eve schedule `*/15 * * * *` (`agent/schedules/keeper.ts`). It skips cleanly until `UNABOT_KEEPER_OWNER` names the EOA to scan. It can recommend actions but never signs or broadcasts them.
 
 ## Env
 
@@ -119,7 +119,7 @@ Set these in `.env` locally or in the Vercel project `wizzy`. Values here are pu
 | `BASE_RPC_URL` | Base RPC. Default `https://mainnet.base.org`. Use a dedicated provider in production. |
 | `ROBINHOOD_RPC_URL` | Robinhood RPC. Default `https://rpc.mainnet.chain.robinhood.com`. Use a dedicated provider in production. |
 | `ROBINHOOD_ACTIVITY_RPC_URL` | Optional server-only archive RPC for the shared Pool activity scan. It must accept a 1,000-block `eth_getLogs` range; the scan remains fixed at two requests per cache fill. |
-| `SOLANA_RPC_URL` | Server-only Solana endpoint used for planning, position reads, submission, and confirmation. Never expose a credentialed RPC URL through a `NEXT_PUBLIC_` variable. Privy manages wallet connectivity in the browser. |
+| `SOLANA_RPC_URL` | Server-only endpoint retained for the dormant Solana planner and position reader. Never expose a credentialed RPC URL through a `NEXT_PUBLIC_` variable. |
 | `UNISWAP_API_KEY` | Optional. Write paths use Uniswap LP + Trading APIs when set. Never commit. |
 | `UNABOT_PRIVATE_KEY` | CLI `--live` signer. `0x` + 32-byte hex. Never commit. Hosted agent does **not** use this. |
 | `UNABOT_TREASURY` | Optional override. Product fees go here. |
@@ -128,11 +128,6 @@ Set these in `.env` locally or in the Vercel project `wizzy`. Values here are pu
 | `UNABOT_SOLANA_TREASURY` | Public Solana fee recipient. Required to prepare Solana withdraw and reinvest actions. |
 | `UNABOT_ETH_USD` | Optional USD/ETH fallback for skip math. |
 | `TELEGRAM_BOT_TOKEN` | Telegram surface. Never commit. |
-| `PRIVY_APP_ID` / `NEXT_PUBLIC_PRIVY_APP_ID` | Public app id: `cmtft1kti01cf0dl73c3zpuem` |
-| `PRIVY_APP_SECRET` | Required for hosted live signing and Privy route auth. Leave empty for dry-run / stub. **Do not put the value in this file.** |
-| `PRIVY_AUTHORIZATION_KEY` | Optional Wallet API authorization key. Later. |
-| `PRIVY_WALLET_ID` | Optional hosted wallet id. |
-| `KEEPER_LIVE` | Set to `1` so the 15-minute keeper may broadcast (still needs the Privy secret). |
 | `UNABOT_KEEPER_OWNER` | Wallet address the hosted keeper scans. Unset, the schedule logs a skip and does nothing. |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. Or link the Vercel project and use `VERCEL_OIDC_TOKEN`. |
 | `EVE_ALLOW_ANON` | Set to `1` to admit anonymous eve HTTP in production. Default fail-closed. |
@@ -152,14 +147,14 @@ The persistent workflow is documented in `docs/CURATION.md`. The dappnode timer 
 | Surface | Dry-run (default) | Live |
 | --- | --- | --- |
 | CLI / chat / telegram | Plan only. Prints `dry-run: no broadcast`. | `--live` + type `yes` on a TTY. CLI signs with `UNABOT_PRIVATE_KEY`. |
-| MCP / hosted tools | `live` omitted or false. | `live=true` **and** `confirm=true`. Hosted signs with Privy, not a raw key. |
-| Hosted keeper | Plans only. | `KEEPER_LIVE=1` + `PRIVY_APP_SECRET`. |
+| MCP / hosted tools | `live` omitted or false. | `live=true` **and** `confirm=true` prepares an EOA wallet plan. Hosted code never signs or broadcasts it. |
+| Hosted keeper | Observe-only scans and recommendations. | No unattended execution path. |
 
-Without the Privy secret, hosted live writes stub and do not broadcast. Targets are allowlisted (NFPM, Permit2, Universal Router, v2 router, v4 position manager, treasury, plus the pair tokens).
+Hosted plans are allowlisted to the relevant position manager, Permit2, router, treasury, and pair tokens. The connected EOA remains the only consumer signer.
 
 ## Vercel
 
-Project name: **`unabot`**.
+Project name: **`wizzy`**.
 
 `vercel.json` runs `bun install` then `next build`. `withEve()` ships the chat UI and `/eve/v1` together.
 

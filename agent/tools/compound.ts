@@ -6,9 +6,9 @@ export default defineTool({
   description: "Collect fees, optional swap to ratio, increase liquidity. Skips if uneconomic. Dry-run by default.",
   inputSchema: z.object({
     tokenId: z.string().min(1),
-    live: z.boolean().optional().default(false).describe("Broadcast on Base or Robinhood. Default dry-run."),
-    confirm: z.boolean().optional().default(false).describe("Required true before any live write."),
-    owner: z.string().optional().describe("Wallet that holds the NFT. Defaults to the Privy hosted wallet."),
+    live: z.boolean().optional().default(false).describe("Prepare the connected EOA transaction plan. Default dry-run."),
+    confirm: z.boolean().optional().default(false).describe("Required true before preparing a wallet transaction plan."),
+    owner: z.string().regex(/^0x[a-fA-F0-9]{40}$/).describe("Connected EOA that owns and approves the position."),
     chain: z.enum(["base", "robinhood"]).optional().default("base").describe("base | robinhood (default base)."),
     noFee: z.boolean().optional(),
     feeSource: z.enum(["fees", "notional"]).optional(),

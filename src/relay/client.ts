@@ -251,7 +251,7 @@ export async function quoteBaseToSolanaSol(input: {
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 5 * 60_000).toISOString(),
     notices: [
-      "Relay routes Base ETH into native SOL at this Privy-linked Solana address.",
+      "Relay routes Base ETH into native SOL at the connected Solana address.",
       "The minimum destination amount includes Relay's quoted slippage tolerance.",
       "Solana liquidity transactions remain self-custodial and require this Solana wallet's signature.",
     ],

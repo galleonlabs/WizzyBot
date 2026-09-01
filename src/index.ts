@@ -21,7 +21,6 @@ export { v4MintTx, v4ClaimFeesTx, v4DecreaseTx, V4_ACTIONS } from "./uniswap/v4-
 export { getHold, rememberHold, HOLD_LIMITATION } from "./core/hold.js";
 export { telegramBootMessage, planTelegramReply } from "./surfaces/telegram.js";
 export { listPositions, statusPosition, compoundPosition, rangePosition, exitPosition, mintPosition, runKeeperScan, assertWriteAllowed } from "./surfaces/hosted.js";
-export { loadPrivyEnv, createPrivyClient, privyConfigured, DEFAULT_PRIVY_APP_ID } from "./signer/privy.js";
 export { decideForPosition, runOnce, runLoop } from "./keeper/loop.js";
 export { createAlertSink, StdoutSink, WebhookSink, redactSecrets, formatLog } from "./keeper/alerts.js";
 export { SKIP_REASONS, classifySkip } from "./keeper/skip.js";

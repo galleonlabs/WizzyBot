@@ -657,7 +657,7 @@ export function PortfolioApp() {
   const indexLedger = (
     <section className="index-section index-catalog">
       <header className="section-title">
-        <div><h2>Robinhood Wizzy Index</h2><p>Actively curated as meme markets change.</p></div>
+        <div><h2>The meme markets</h2><p>Every pool reviewed by Wizzy agents, every six hours.</p></div>
       </header>
       <MarketLedger
         markets={activeMarkets}
@@ -751,7 +751,7 @@ export function PortfolioApp() {
           ) : (
             <section className="index-main markets-view">
               <header className="index-title-row">
-                <div><h1>{hasPortfolioAccess ? "Your markets" : "The live index"}</h1><p>{hasPortfolioAccess ? (positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Your wallet is connected. New positions appear here.") : "Wizzy agents regularly review which markets qualify."}</p></div>
+                <div><h1>{hasPortfolioAccess ? "Your markets" : "Your portfolio"}</h1><p>{hasPortfolioAccess ? (positions.length ? `${positions.length} position${positions.length === 1 ? "" : "s"} in this wallet.` : "Your wallet is connected. New positions appear here.") : "Wizzy agents regularly review which markets qualify."}</p></div>
               </header>
               {positionLedger}
             </section>
@@ -836,7 +836,7 @@ function PoolActivityGroup({ items, duplicate = false }: { items: PoolActivityIt
 }
 
 function IndexShowcase({ markets, stats, loading }: { markets: IndexMarket[]; stats: Map<string, MarketStats>; loading: boolean }) {
-  return <div className="index-showcase" aria-label="Robinhood Wizzy Index">
+  return <div className="index-showcase" aria-label="Robinhood meme markets">
     <div className="network-lockup" aria-label="Built on Robinhood Chain">
       <img src={BRAND_ASSETS.robinhood} alt="" />
       <span className="network-name"><small>Built on</small><b>Robinhood Chain</b></span>
@@ -1047,24 +1047,14 @@ function IndexSnapshot({ markets, stats, state }: { markets: IndexMarket[]; stat
   const volume = markets.reduce((sum, { market }) => sum + (stats.get(market.id)?.volume24hUsd ?? 0), 0);
   const liquidity = markets.reduce((sum, { market }) => sum + (stats.get(market.id)?.liquidityUsd ?? 0), 0);
   const feeApr = weightedFeeApr(markets, stats);
-  const compositionLabel = markets.map(({ market, indexWeightBps }) => `${market.symbol} ${(indexWeightBps / 100).toFixed(0)}%`).join(", ");
-  return <section className={`index-snapshot is-${state}`} aria-label="Live index snapshot">
+  return <section className={`index-snapshot is-${state}`} aria-label="Meme market stats">
     <div className="index-snapshot-top">
       <span className="snapshot-origin"><img src={BRAND_ASSETS.robinhood} alt="" /><span><small>Live on</small><b>Robinhood Chain</b></span></span>
       <dl className="index-vitals">
-        <div><dt>Fee APR</dt><dd>{formatFeeApr(feeApr)}</dd><small>Based on 24h fees</small></div>
-        <div><dt>24h volume</dt><dd>{state === "ready" ? compactMoney(volume) : "—"}</dd><small>Across the index</small></div>
-        <div><dt>Liquidity</dt><dd>{state === "ready" ? compactMoney(liquidity) : "—"}</dd><small>Across the index</small></div>
+        <div><dt>Fee APR</dt><dd>{formatFeeApr(feeApr)}</dd><small>Volume-weighted, 24h fees</small></div>
+        <div><dt>24h volume</dt><dd>{state === "ready" ? compactMoney(volume) : "—"}</dd><small>Across all pools</small></div>
+        <div><dt>Liquidity</dt><dd>{state === "ready" ? compactMoney(liquidity) : "—"}</dd><small>Across all pools</small></div>
       </dl>
-    </div>
-    <div className="index-composition">
-      <span className="composition-heading"><b>Index composition</b><small>Curator weights</small></span>
-      <span className={`composition-track ${state === "loading" ? "is-loading" : ""}`} role="img" aria-label={compositionLabel || "Reading index composition"}>
-        {state === "loading" ? Array.from({ length: INDEX_MARKET_COUNT }, (_, index) => <i key={index} />) : markets.map(({ market, indexWeightBps }, index) => <i className="composition-segment" key={market.id} style={{ "--market-color": market.color, "--market-index": index, "--market-weight": indexWeightBps } as CSSProperties} />)}
-      </span>
-      {state === "ready" ? <span className="composition-key">
-        {markets.map(({ market, indexWeightBps }, index) => <span className="composition-item" key={market.id} style={{ "--market-index": index, "--market-weight": indexWeightBps } as CSSProperties}><TokenIcon symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}</b><small>{(indexWeightBps / 100).toFixed(0)}%</small></span></span>)}
-      </span> : null}
     </div>
   </section>;
 }

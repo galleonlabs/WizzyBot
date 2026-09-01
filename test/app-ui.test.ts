@@ -38,7 +38,7 @@ describe("meme index product UI", () => {
     expect(portfolio).toContain("Make markets");
     expect(portfolio).toContain("Fee APR");
     expect(portfolio).toContain("Based on 24h fees");
-    expect(portfolio).toContain("Robinhood Wizzy Index");
+    expect(portfolio).toContain("The meme markets");
     expect(portfolio).toContain("Earning now");
     expect(portfolio).toContain('{ id: "markets", label: "Portfolio" }');
     expect(portfolio).toContain('id="positions"');
@@ -163,10 +163,10 @@ describe("meme index product UI", () => {
 
   it("uses one live Markets surface differently before and after wallet connection", () => {
     expect(portfolio).toContain("const hasPortfolioAccess = authenticated || previewMode");
-    expect(portfolio).toContain('hasPortfolioAccess ? "Your markets" : "The live index"');
+    expect(portfolio).toContain('hasPortfolioAccess ? "Your markets" : "Your portfolio"');
     expect(portfolio).toContain("{positionLedger}");
     expect(portfolio).toContain('className="index-snapshot');
-    expect(portfolio).toContain("Index composition");
+    expect(portfolio).not.toContain("Index composition");
     expect(portfolio).toContain("Curator weights");
     expect(portfolio).toContain("Across the index");
     expect(portfolio).toContain('action: "Connect wallet"');
@@ -186,11 +186,11 @@ describe("meme index product UI", () => {
   });
 
   it("keeps the launch surface Robinhood-specific while preserving self-custody", () => {
-    expect(portfolio).toContain("Robinhood Wizzy Index");
+    expect(portfolio).toContain("The meme markets");
     expect(portfolio).toContain("Built on Robinhood Chain");
     expect(portfolio).not.toContain("curated markets");
     expect(portfolio).toContain("Wizzy agents regularly review which markets qualify.");
-    expect(portfolio).toContain("Actively curated as meme markets change.");
+    expect(portfolio).toContain("Every pool reviewed by Wizzy agents, every six hours.");
     expect(portfolio).toContain('src={BRAND_ASSETS.robinhood}');
     expect(portfolio).toContain("Self-custodial");
     expect(portfolio).toContain("Wizzy swaps, ranges, and mints your position in a single confirmation.");

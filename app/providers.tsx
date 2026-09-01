@@ -21,7 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         externalWallets: {
           solana: { connectors: solanaConnectors },
         },
-        defaultChain: base,
+        defaultChain: robinhoodChain,
         supportedChains: [mainnet, base, arbitrum, optimism, unichain, worldchain, blast, linea, scroll, zora, ink, abstract, mode, robinhoodChain],
       }}
     >

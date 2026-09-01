@@ -15,8 +15,6 @@ export {
 export { getMarketCatalog } from "./markets/catalog.js";
 export { fetchMarketStats } from "./markets/stats.js";
 export { fetchRecentPoolActivity, mergePoolActivityItems } from "./markets/activity.js";
-export { getStableCatalog, activeStableVaults } from "./vaults/catalog.js";
-export { planStableIndex, planStableWithdraw, readStablePositions } from "./portfolio/stable-plan.js";
 export { getSolanaMarketCatalog } from "./markets/solana-catalog.js";
 export { fetchSolanaMarketStats } from "./markets/solana-stats.js";
 export { planAllocation } from "./portfolio/allocation.js";

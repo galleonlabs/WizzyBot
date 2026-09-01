@@ -1,5 +1,5 @@
-import { StableApp } from "./stable-app";
+import { PortfolioApp } from "./portfolio-app";
 
 export default function Page() {
-  return <StableApp />;
+  return <PortfolioApp />;
 }

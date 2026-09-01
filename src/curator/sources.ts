@@ -159,7 +159,7 @@ function geckoPoolToPair(definition: MarketDefinition, pool: GeckoPool): DexPair
   const memeIsBase = pool.relationships.base_token.data.id.toLowerCase().endsWith(tokenSuffix);
   const createdAt = pool.attributes.pool_created_at ? Date.parse(pool.attributes.pool_created_at) : Number.NaN;
   return {
-    url: `https://www.geckoterminal.com/robinhood/pools/${definition.pool.toLowerCase()}`,
+    url: `https://www.geckoterminal.com/${definition.chain}/pools/${definition.pool.toLowerCase()}`,
     priceUsd: memeIsBase ? pool.attributes.base_token_price_usd : pool.attributes.quote_token_price_usd,
     priceChange: { h24: numberOrNull(pool.attributes.price_change_percentage?.h24) ?? undefined },
     liquidity: { usd: numberOrNull(pool.attributes.reserve_in_usd) ?? undefined },
@@ -169,11 +169,11 @@ function geckoPoolToPair(definition: MarketDefinition, pool: GeckoPool): DexPair
   };
 }
 
-async function geckoPairs(definitions: MarketDefinition[]): Promise<Map<string, DexPair>> {
+async function geckoPairs(definitions: MarketDefinition[], chain: "base" | "robinhood"): Promise<Map<string, DexPair>> {
   if (!definitions.length) return new Map();
   const addresses = definitions.map((definition) => definition.pool.toLowerCase()).join(",");
   const payload = await getJson<{ data?: GeckoPool[] }>(
-    `https://api.geckoterminal.com/api/v2/networks/robinhood/pools/multi/${addresses}?include=base_token%2Cquote_token%2Cdex`,
+    `https://api.geckoterminal.com/api/v2/networks/${chain}/pools/multi/${addresses}?include=base_token%2Cquote_token%2Cdex`,
   );
   const definitionsByPool = new Map(definitions.map((definition) => [definition.pool.toLowerCase(), definition]));
   return new Map((payload?.data ?? []).flatMap((pool) => {
@@ -273,12 +273,23 @@ function evmSecurityFlags(token: GoPlusToken | null): string[] {
 async function collectEvm(
   definition: MarketDefinition,
   observedAt: string,
-  robinhoodPairs: Map<string, DexPair>,
+  geckoPairsByPool: Map<string, DexPair>,
   securityByToken: Map<string, GoPlusToken>,
 ): Promise<CuratorObservation> {
-  const pair = definition.chain === "robinhood"
-    ? robinhoodPairs.get(definition.pool.toLowerCase()) ?? null
-    : await dexPair(definition.chain, definition.pool);
+  const geckoPair = geckoPairsByPool.get(definition.pool.toLowerCase()) ?? null;
+  const dexScreenerPair = definition.chain === "base" ? await dexPair(definition.chain, definition.pool) : null;
+  const pair = dexScreenerPair || geckoPair
+    ? {
+        ...geckoPair,
+        ...dexScreenerPair,
+        priceChange: dexScreenerPair?.priceChange ?? geckoPair?.priceChange,
+        liquidity: dexScreenerPair?.liquidity ?? geckoPair?.liquidity,
+        volume: dexScreenerPair?.volume ?? geckoPair?.volume,
+        pairCreatedAt: dexScreenerPair?.pairCreatedAt ?? geckoPair?.pairCreatedAt,
+        info: dexScreenerPair?.info ?? geckoPair?.info,
+        url: dexScreenerPair?.url ?? geckoPair?.url,
+      }
+    : null;
   const security = securityByToken.get(definition.token.toLowerCase()) ?? null;
   const topExternallyOwnedHolder = security?.holders
     ?.filter((holder) => holder.is_contract !== 1)
@@ -348,11 +359,19 @@ export async function collectCuratorObservations(observedAt = new Date().toISOSt
   const marketDefinitions = definitions();
   const baseDefinitions = marketDefinitions.filter((definition) => definition.chain === "base");
   const robinhoodDefinitions = marketDefinitions.filter((definition) => definition.chain === "robinhood");
-  const robinhoodPairsRequest = geckoPairs(robinhoodDefinitions);
+  const [basePairsRequest, robinhoodPairsRequest] = [
+    geckoPairs(baseDefinitions, "base"),
+    geckoPairs(robinhoodDefinitions, "robinhood"),
+  ];
   const baseSecurity = await goPlusTokens(baseDefinitions, 8453);
   const robinhoodSecurity = await goPlusTokens(robinhoodDefinitions, 4663);
-  const robinhoodPairs = await robinhoodPairsRequest;
+  const [basePairs, robinhoodPairs] = await Promise.all([basePairsRequest, robinhoodPairsRequest]);
   return Promise.all(marketDefinitions.map((definition) => definition.chain === "solana"
     ? collectSolana(definition, observedAt)
-    : collectEvm(definition, observedAt, robinhoodPairs, definition.chain === "robinhood" ? robinhoodSecurity : baseSecurity)));
+    : collectEvm(
+        definition,
+        observedAt,
+        definition.chain === "robinhood" ? robinhoodPairs : basePairs,
+        definition.chain === "robinhood" ? robinhoodSecurity : baseSecurity,
+      )));
 }

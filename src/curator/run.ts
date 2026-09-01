@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { getCuratorConfig } from "./config.js";
 import { evaluateMarket, proposeReplacements, type CuratorSnapshot, type MarketEvaluation } from "./policy.js";
 import { collectCuratorObservations } from "./sources.js";
+import { discoverCuratorCandidates, type CuratorDiscovery } from "./discovery.js";
 
 export type CuratorReport = {
   version: 1;
@@ -12,6 +13,7 @@ export type CuratorReport = {
   configVersion: number;
   snapshotCadenceMinutes: number;
   evaluations: MarketEvaluation[];
+  discoveries: CuratorDiscovery[];
   replacements: ReturnType<typeof proposeReplacements>;
 };
 
@@ -56,12 +58,15 @@ export function renderCuratorMarkdown(report: CuratorReport): string {
     const liquidity = row.summary.medianLiquidityUsd === null ? "—" : `$${Math.round(row.summary.medianLiquidityUsd).toLocaleString("en-US")}`;
     const volume = row.summary.medianVolume24hUsd === null ? "—" : `$${Math.round(row.summary.medianVolume24hUsd).toLocaleString("en-US")}`;
     const apr = row.summary.medianFeeAprPct === null ? "—" : `${row.summary.medianFeeAprPct.toFixed(1)}%`;
-    return `| ${row.symbol} | ${row.chain} | ${row.incumbent ? "active" : "watch"} | ${row.recommendation} | ${liquidity} | ${volume} | ${apr} | ${row.summary.historyHours.toFixed(0)}h |`;
+    return `| ${row.symbol} | ${row.chain} | ${row.incumbent ? "active" : "watch"} | ${row.recommendation} | ${row.quality.score}/100 (${row.quality.confidence}) | ${liquidity} | ${volume} | ${apr} | ${row.summary.historyHours.toFixed(0)}h |`;
   }).join("\n");
+  const discoveries = report.discoveries.length
+    ? report.discoveries.map((row) => `| ${row.symbol} | ${row.chain} | $${Math.round(row.liquidityUsd).toLocaleString("en-US")} | $${Math.round(row.volume24hUsd).toLocaleString("en-US")} | ${row.poolAgeDays.toFixed(0)}d | ${row.sourceUrl} |`).join("\n")
+    : "| — | — | — | — | — | No new policy-qualified V3 leads. |";
   const replacements = report.replacements.length
-    ? report.replacements.map((row) => `- ${row.chain}: replace ${row.incumbentSymbol} with ${row.candidateSymbol} (${row.aprMultiple.toFixed(1)}× median fee APR)`).join("\n")
+    ? report.replacements.map((row) => `- ${row.chain}: replace ${row.incumbentSymbol} with ${row.candidateSymbol} (${row.qualityAdvantage >= 0 ? "+" : ""}${row.qualityAdvantage} quality, ${(row.liquidityRatio * 100).toFixed(0)}% liquidity, ${row.aprMultiple.toFixed(1)}× fee pace)`).join("\n")
     : "- None.";
-  return `# Wizzy market curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live market set. This report supplies evidence and policy-valid proposals for the curator agent to apply through the normal tested deployment path.\n\n| Market | Chain | Set | Call | Median TVL | Median 24h volume | Median fee APR | History |\n|---|---|---:|---|---:|---:|---:|---:|\n${table}\n\n## Replacements\n\n${replacements}\n`;
+  return `# Wizzy market curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live market set. This report supplies evidence and policy-valid proposals for the curator agent to apply through the normal tested deployment path. Fee pace is a trailing observation, not a promise or a standalone selection rule.\n\n| Market | Chain | Set | Call | LP quality | Median TVL | Median 24h volume | Median fee pace | History |\n|---|---|---:|---|---:|---:|---:|---:|---:|\n${table}\n\n## Discovery leads\n\nLeads pass the pool-age, liquidity, volume, WETH-pair, and supported-Uniswap-V3 gates. They are not approved until identity and security research is recorded.\n\n| Token | Chain | TVL | 24h volume | Pool age | Source |\n|---|---|---:|---:|---:|---|\n${discoveries}\n\n## Replacements\n\n${replacements}\n`;
 }
 
 export async function runCurator(options: { stateDir?: string; persist?: boolean; observedAt?: string } = {}): Promise<CuratorReport> {
@@ -69,7 +74,10 @@ export async function runCurator(options: { stateDir?: string; persist?: boolean
   const observedAt = options.observedAt ?? new Date().toISOString();
   const stateDir = options.stateDir ?? defaultCuratorStateDir();
   const historyPath = join(stateDir, "history.jsonl");
-  const observations = await collectCuratorObservations(observedAt);
+  const [observations, discoveries] = await Promise.all([
+    collectCuratorObservations(observedAt),
+    discoverCuratorCandidates(observedAt),
+  ]);
   const snapshot: CuratorSnapshot = { version: 1, observedAt, markets: observations };
   const cutoff = Date.parse(observedAt) - config.policy.historyDays * 86_400_000;
   const history = await readSnapshots(historyPath, cutoff);
@@ -88,6 +96,7 @@ export async function runCurator(options: { stateDir?: string; persist?: boolean
     configVersion: config.version,
     snapshotCadenceMinutes: config.policy.snapshotMinutes,
     evaluations,
+    discoveries,
     replacements: proposeReplacements(evaluations, config.policy),
   };
   if (options.persist !== false) {

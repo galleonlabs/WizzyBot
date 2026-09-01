@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "verdict", "summary", "candidateReviews", "replacement"],
+  "required": ["schemaVersion", "verdict", "summary", "candidateReviews", "candidateNominations", "replacement"],
   "properties": {
     "schemaVersion": { "type": "integer", "const": 1 },
     "verdict": { "type": "string", "enum": ["no_change", "replace"] },
@@ -19,6 +19,35 @@
           "rationale": { "type": "array", "items": { "type": "string" } },
           "sources": {
             "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["url", "title", "finding"],
+              "properties": {
+                "url": { "type": "string" },
+                "title": { "type": "string" },
+                "finding": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "candidateNominations": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["discoveryId", "identity", "rationale", "sources"],
+        "properties": {
+          "discoveryId": { "type": "string" },
+          "identity": { "type": "string", "enum": ["reviewed", "watch"] },
+          "rationale": { "type": "array", "minItems": 1, "maxItems": 10, "items": { "type": "string" } },
+          "sources": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 12,
             "items": {
               "type": "object",
               "additionalProperties": false,

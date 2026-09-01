@@ -51,6 +51,10 @@ describe("agentic centralized curator", () => {
       candidateFeeAprPct: 900,
       incumbentFeeAprPct: 100,
       aprMultiple: 9,
+      candidateQualityScore: 90,
+      incumbentQualityScore: 70,
+      qualityAdvantage: 20,
+      liquidityRatio: 1,
     };
     const result = planCentralizedCatalogUpdate({
       report: { ...report([evaluation(candidate.id, "eligible", false)]), replacements: [proposal] },
@@ -100,6 +104,10 @@ describe("agentic centralized curator", () => {
       candidateFeeAprPct: 450,
       incumbentFeeAprPct: 100,
       aprMultiple: 4.5,
+      candidateQualityScore: 90,
+      incumbentQualityScore: 70,
+      qualityAdvantage: 20,
+      liquidityRatio: 1,
     };
     const result = planCentralizedCatalogUpdate({
       report: { ...report([evaluation(candidate.id, "eligible", false, "base")]), replacements: [proposal] },
@@ -150,6 +158,66 @@ describe("agentic centralized curator", () => {
       today: "2026-09-01",
     });
     expect(result.appliedReviews).toEqual([`${candidate.id}:reviewed`]);
+  });
+
+  it("adds a researched discovery to the watch registry without activating it", () => {
+    const config = structuredClone(getCuratorConfig());
+    const discovery = {
+      id: "base-fresh-555555",
+      chain: "base" as const,
+      name: "Fresh Meme",
+      symbol: "FRESH",
+      token: "0x5555555555555555555555555555555555555555" as const,
+      pool: "0x6666666666666666666666666666666666666666" as const,
+      protocol: "V3" as const,
+      feePips: 10_000,
+      liquidityUsd: 900_000,
+      volume24hUsd: 400_000,
+      poolAgeDays: 90,
+      sourceUrl: "https://www.geckoterminal.com/base/pools/0x6666666666666666666666666666666666666666",
+      dexId: "uniswap-v3-base",
+    };
+    const baseSources = [
+      { url: discovery.sourceUrl, title: "Pool", finding: "Pool identity and live market data" },
+      { url: `https://basescan.org/token/${discovery.token}`, title: "Contract", finding: "Token contract and source" },
+      { url: "https://example.com/fresh", title: "Project", finding: "Project identity" },
+    ];
+    const inputReport = { ...report([]), discoveries: [discovery] };
+    const result = planCentralizedCatalogUpdate({
+      report: inputReport,
+      decision: decision({
+        candidateNominations: [{ discoveryId: discovery.id, identity: "watch", rationale: ["worth a proof window"], sources: baseSources }],
+      }),
+      curatorConfig: config,
+      catalog: structuredClone(getMarketCatalog()),
+      today: "2026-09-01",
+    });
+    expect(result.appliedNominations).toEqual([`${discovery.id}:watch`]);
+    expect(result.curatorConfig.candidates.find((candidate) => candidate.id === discovery.id)).toMatchObject({
+      identity: "watch",
+      risk: "experimental",
+      chain: "base",
+      protocol: "V3",
+      sources: baseSources.map((source) => source.url),
+    });
+    expect(result.catalog).toEqual(getMarketCatalog());
+    expect(result.changedFiles).toEqual(["src/config/curator.json"]);
+  });
+
+  it("refuses a discovery nomination that was not emitted by the deterministic report", () => {
+    expect(() => planCentralizedCatalogUpdate({
+      report: report([]),
+      decision: decision({
+        candidateNominations: [{ discoveryId: "base-invented-token", identity: "watch", rationale: ["invented"], sources: [
+          { url: "https://www.geckoterminal.com/base/pools/example", title: "Pool", finding: "Pool" },
+          { url: "https://basescan.org/token/example", title: "Contract", finding: "Contract" },
+          { url: "https://example.com/project", title: "Project", finding: "Project" },
+        ] }],
+      }),
+      curatorConfig: structuredClone(getCuratorConfig()),
+      catalog: structuredClone(getMarketCatalog()),
+      today: "2026-09-01",
+    })).toThrow("unknown discovery");
   });
 
   it("pauses an incumbent the deterministic report calls pause", () => {
@@ -213,6 +281,7 @@ function report(evaluations: MarketEvaluation[]): CuratorReport {
     configVersion: getCuratorConfig().version,
     snapshotCadenceMinutes: 360,
     evaluations,
+    discoveries: [],
     replacements: [],
   };
 }
@@ -231,6 +300,15 @@ function evaluation(
     incumbent,
     recommendation,
     estimatedCapacityUsd: 10_000,
+    quality: {
+      score: 85,
+      confidence: "high",
+      depth: 25,
+      flow: 20,
+      durability: 20,
+      resilience: 15,
+      trust: 5,
+    },
     reasons: ["test"],
     summary: {
       marketId,
@@ -261,6 +339,7 @@ function decision(overrides: Partial<CuratorResearchDecision> = {}): CuratorRese
     verdict: "no_change",
     summary: "No policy-authorized replacement",
     candidateReviews: [],
+    candidateNominations: [],
     replacement: null,
     ...overrides,
   };

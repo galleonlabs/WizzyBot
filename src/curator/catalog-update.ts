@@ -16,11 +16,19 @@ const CandidateReviewSchema = z.object({
   sources: z.array(ResearchSourceSchema).max(12),
 });
 
+const CandidateNominationSchema = z.object({
+  discoveryId: z.string().regex(/^[a-z0-9-]+$/),
+  identity: z.enum(["reviewed", "watch"]),
+  rationale: z.array(z.string().min(1).max(500)).min(1).max(10),
+  sources: z.array(ResearchSourceSchema).min(3).max(12),
+});
+
 export const CuratorResearchDecisionSchema = z.object({
   schemaVersion: z.literal(1),
   verdict: z.enum(["no_change", "replace"]),
   summary: z.string().min(1).max(1_500),
   candidateReviews: z.array(CandidateReviewSchema).max(32),
+  candidateNominations: z.array(CandidateNominationSchema).max(16),
   replacement: z.object({
     fromMarketId: z.string().regex(/^[a-z0-9-]+$/),
     toMarketId: z.string().regex(/^[a-z0-9-]+$/),
@@ -39,6 +47,7 @@ export type CentralizedCatalogUpdate = {
   catalog: MarketCatalog;
   changedFiles: Array<"src/config/curator.json" | "src/config/markets.json">;
   appliedReviews: string[];
+  appliedNominations: string[];
   appliedReplacement: null | { fromMarketId: string; toMarketId: string };
   appliedPauses: string[];
 };
@@ -60,6 +69,37 @@ export function planCentralizedCatalogUpdate(input: {
   const candidates = new Map(curatorConfig.candidates.map((candidate) => [candidate.id, candidate]));
   const evaluations = new Map(input.report.evaluations.map((evaluation) => [evaluation.marketId, evaluation]));
   const appliedReviews: string[] = [];
+  const appliedNominations: string[] = [];
+
+  const discoveries = new Map(input.report.discoveries.map((discovery) => [discovery.id, discovery]));
+  for (const nomination of decision.candidateNominations) {
+    const discovery = discoveries.get(nomination.discoveryId);
+    if (!discovery) throw new Error(`Research nominated unknown discovery ${nomination.discoveryId}`);
+    assertResearchEvidence(nomination.sources, discovery.chain);
+    if (candidates.has(discovery.id)) throw new Error(`Candidate ${discovery.id} is already tracked`);
+    const duplicate = [
+      ...curatorConfig.candidates.filter((candidate) => candidate.chain !== "solana"),
+      ...catalog.chains.flatMap((chain) => chain.markets),
+    ].some((candidate) => candidate.token.toLowerCase() === discovery.token.toLowerCase()
+      || candidate.pool.toLowerCase() === discovery.pool.toLowerCase());
+    if (duplicate) throw new Error(`Discovery ${discovery.id} duplicates a tracked token or pool`);
+    const candidate = {
+      id: discovery.id,
+      name: discovery.name,
+      symbol: discovery.symbol,
+      feePips: discovery.feePips,
+      risk: "experimental" as const,
+      identity: nomination.identity,
+      chain: discovery.chain,
+      token: discovery.token,
+      pool: discovery.pool,
+      protocol: "V3" as const,
+      sources: nomination.sources.map((source) => source.url),
+    };
+    curatorConfig.candidates.push(candidate);
+    candidates.set(candidate.id, candidate);
+    appliedNominations.push(`${candidate.id}:${candidate.identity}`);
+  }
 
   for (const review of decision.candidateReviews) {
     const candidate = candidates.get(review.candidateId);
@@ -75,7 +115,7 @@ export function planCentralizedCatalogUpdate(input: {
     }
   }
 
-  if (appliedReviews.length) {
+  if (appliedReviews.length || appliedNominations.length) {
     curatorConfig.version += 1;
     curatorConfig.updatedAt = input.today;
   }
@@ -146,14 +186,14 @@ export function planCentralizedCatalogUpdate(input: {
   }
 
   const changedFiles: CentralizedCatalogUpdate["changedFiles"] = [];
-  if (appliedReviews.length) changedFiles.push("src/config/curator.json");
+  if (appliedReviews.length || appliedNominations.length) changedFiles.push("src/config/curator.json");
   if (appliedReplacement || appliedPauses.length) changedFiles.push("src/config/markets.json");
-  return { curatorConfig, catalog, changedFiles, appliedReviews, appliedReplacement, appliedPauses };
+  return { curatorConfig, catalog, changedFiles, appliedReviews, appliedNominations, appliedReplacement, appliedPauses };
 }
 
 function assertResearchEvidence(
   sources: CuratorResearchDecision["candidateReviews"][number]["sources"],
-  chain: CuratorConfig["candidates"][number]["chain"],
+  chain: CuratorConfig["candidates"][number]["chain"] | "base" | "robinhood",
 ): void {
   if (sources.length < 3) throw new Error("A reviewed identity requires at least three cited sources");
   const hosts = new Set(sources.map((source) => new URL(source.url).hostname.toLowerCase().replace(/^www\./, "")));

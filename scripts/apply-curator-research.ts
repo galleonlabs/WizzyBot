@@ -49,6 +49,7 @@ const audit = {
   summary: decision.summary,
   changedFiles: result.changedFiles,
   appliedReviews: result.appliedReviews,
+  appliedNominations: result.appliedNominations,
   appliedReplacement: result.appliedReplacement,
   appliedPauses: result.appliedPauses,
 };

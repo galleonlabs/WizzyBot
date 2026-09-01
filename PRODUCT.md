@@ -33,6 +33,8 @@ Current support includes reviewed creation routes, position discovery, and walle
 
 The curator ranks meme pools using live liquidity, volume, fee generation, age, token and pool integrity, price concentration, holder risk, and execution viability. Every inclusion needs evidence. A market moves to review when its data deteriorates and pauses immediately for a security failure or liquidity collapse.
 
+Fresh Uniswap V3/WETH discovery leads are not endorsements. A lead enters the watch registry only after source-backed identity research, then must survive the configured observation window before it can become eligible for the catalog. Replacement decisions preserve liquidity capacity and require a measurable quality improvement; a higher one-day fee extrapolation is never sufficient by itself.
+
 The curator can change the catalog through the tested Git release path. It cannot move user funds, approve a transaction, or override deterministic pool and target validation.
 
 ## Money

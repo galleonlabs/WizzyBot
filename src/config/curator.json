@@ -1,6 +1,6 @@
 {
-  "version": 6,
-  "updatedAt": "2026-08-31",
+  "version": 7,
+  "updatedAt": "2026-09-01",
   "policy": {
     "snapshotMinutes": 360,
     "historyDays": 30,
@@ -10,10 +10,49 @@
     "incumbentLiquidityUsd": 75000,
     "minimumVolume24hUsd": 50000,
     "maximumLiquidityDrop24hPct": 50,
+    "maximumPriceChange24hPct": 45,
+    "maximumTopHolderPct": 20,
+    "minimumQualityScore": 65,
     "maximumPoolAllocationBps": 100,
-    "replacementAprMultiplier": 1.5
+    "replacementAprMultiplier": 1.5,
+    "replacementQualityAdvantage": 5,
+    "minimumReplacementLiquidityRatio": 0.75
   },
   "candidates": [
+    {
+      "id": "base-drb",
+      "name": "DebtReliefBot",
+      "symbol": "DRB",
+      "feePips": 10000,
+      "risk": "experimental",
+      "identity": "watch",
+      "chain": "base",
+      "token": "0x3ec2156d4c0a9cbdab4a016633b7bcf6a8d68ea2",
+      "pool": "0x5116773e18a9c7bb03ebb961b38678e45e238923",
+      "protocol": "V3",
+      "sources": [
+        "https://www.geckoterminal.com/base/pools/0x5116773e18a9c7bb03ebb961b38678e45e238923",
+        "https://basescan.org/token/0x3ec2156d4c0a9cbdab4a016633b7bcf6a8d68ea2",
+        "https://bio.site/drbtaskforce"
+      ]
+    },
+    {
+      "id": "base-bnkr",
+      "name": "BankrCoin",
+      "symbol": "BNKR",
+      "feePips": 10000,
+      "risk": "experimental",
+      "identity": "watch",
+      "chain": "base",
+      "token": "0x22af33fe49fd1fa80c7149773dde5890d3c76f3b",
+      "pool": "0xaec085e5a5ce8d96a7bdd3eb3a62445d4f6ce703",
+      "protocol": "V3",
+      "sources": [
+        "https://www.geckoterminal.com/base/pools/0xaec085e5a5ce8d96a7bdd3eb3a62445d4f6ce703",
+        "https://basescan.org/token/0x22af33fe49fd1fa80c7149773dde5890d3c76f3b",
+        "https://bankr.bot"
+      ]
+    },
     {
       "id": "robinhood-microduck",
       "name": "Microduck",

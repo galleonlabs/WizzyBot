@@ -14,8 +14,13 @@ const PolicySchema = z.object({
   incumbentLiquidityUsd: z.number().positive(),
   minimumVolume24hUsd: z.number().positive(),
   maximumLiquidityDrop24hPct: z.number().positive().max(100),
+  maximumPriceChange24hPct: z.number().positive().max(500),
+  maximumTopHolderPct: z.number().positive().max(100),
+  minimumQualityScore: z.number().int().min(0).max(100),
   maximumPoolAllocationBps: z.number().int().positive().max(1_000),
   replacementAprMultiplier: z.number().min(1).max(10),
+  replacementQualityAdvantage: z.number().int().min(0).max(100),
+  minimumReplacementLiquidityRatio: z.number().positive().max(1),
 });
 
 const CandidateBase = z.object({
@@ -25,6 +30,7 @@ const CandidateBase = z.object({
   feePips: z.number().int().positive(),
   risk: z.enum(["established", "emerging", "experimental"]),
   identity: z.enum(["reviewed", "watch"]),
+  sources: z.array(z.string().url()).min(2).max(12).optional(),
 });
 
 const CandidateSchema = z.discriminatedUnion("chain", [

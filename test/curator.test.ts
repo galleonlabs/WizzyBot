@@ -48,6 +48,7 @@ describe("market curator", () => {
       configVersion: 1,
       snapshotCadenceMinutes: 360,
       evaluations: [],
+      discoveries: [],
       replacements: [],
     };
     const markdown = renderCuratorMarkdown(report);
@@ -81,6 +82,22 @@ describe("market curator", () => {
     expect(evaluation.reasons.join(" ")).toContain("younger than 30 days");
   });
 
+  it("reviews a young incumbent instead of presenting an extrapolated fee spike as healthy", () => {
+    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", poolAgeDays: 12, feeAprPct: 3_000 }, 0), policy);
+    expect(evaluation.recommendation).toBe("review");
+    expect(evaluation.reasons.join(" ")).toContain("younger than 30 days");
+    expect(evaluation.quality.confidence).toBe("low");
+  });
+
+  it("keeps high fee pace from overriding volatile or concentrated candidate risk", () => {
+    const volatile = evaluateMarket(history({ feeAprPct: 4_000, priceChange24hPct: 70 }), policy);
+    const concentrated = evaluateMarket(history({ feeAprPct: 4_000, topHolderPct: 35 }), policy);
+    expect(volatile.recommendation).toBe("observe");
+    expect(volatile.reasons.join(" ")).toContain("price move exceeds");
+    expect(concentrated.recommendation).toBe("observe");
+    expect(concentrated.reasons.join(" ")).toContain("largest externally owned holder");
+  });
+
   it("raises an immediate pause recommendation for hard security failures", () => {
     const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", securityFlags: ["honeypot"] }, 2), policy);
     expect(evaluation.recommendation).toBe("pause");
@@ -110,10 +127,18 @@ describe("market curator", () => {
 
   it("only proposes a same-chain replacement with a material fee advantage", () => {
     const candidate = evaluateMarket(history({ marketId: "base-candidate" }), policy);
-    const incumbent = evaluateMarket(history({ marketId: "base-incumbent", symbol: "OLD", incumbent: true, catalogStatus: "active", feeAprPct: 8, volume24hUsd: 55_000, liquidityUsd: 500_000 }), policy);
+    const incumbent = evaluateMarket(history({ marketId: "base-incumbent", symbol: "OLD", incumbent: true, catalogStatus: "active", feeAprPct: 8, volume24hUsd: 55_000, liquidityUsd: 500_000, priceChange24hPct: 25, topHolderPct: 18 }), policy);
     const proposals = proposeReplacements([candidate, incumbent], policy);
     expect(proposals).toHaveLength(1);
     expect(proposals[0]).toMatchObject({ candidateMarketId: "base-candidate", incumbentMarketId: "base-incumbent" });
     expect(proposals[0]!.aprMultiple).toBeGreaterThan(policy.replacementAprMultiplier);
+    expect(proposals[0]!.qualityAdvantage).toBeGreaterThanOrEqual(policy.replacementQualityAdvantage);
+    expect(proposals[0]!.liquidityRatio).toBeGreaterThanOrEqual(policy.minimumReplacementLiquidityRatio);
+  });
+
+  it("refuses a headline-APR replacement that would materially reduce pool depth", () => {
+    const candidate = evaluateMarket(history({ marketId: "base-candidate", feeAprPct: 5_000, liquidityUsd: 300_000 }), policy);
+    const incumbent = evaluateMarket(history({ marketId: "base-incumbent", symbol: "OLD", incumbent: true, catalogStatus: "active", feeAprPct: 8, liquidityUsd: 2_000_000 }), policy);
+    expect(proposeReplacements([candidate, incumbent], policy)).toEqual([]);
   });
 });

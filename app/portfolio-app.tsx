@@ -566,10 +566,6 @@ export function PortfolioApp() {
   }
 
   function openZap(marketId: string) {
-    if (!authenticated) {
-      startLogin("markets");
-      return;
-    }
     setZapMarketId((current) => current === marketId ? null : marketId);
     setZapPlan(null);
     setZapState({ kind: "idle" });
@@ -577,7 +573,10 @@ export function PortfolioApp() {
   }
 
   async function prepareZap(marketId: string) {
-    if (!address) return;
+    if (!authenticated || !address) {
+      startLogin("markets");
+      return;
+    }
     let amountWei: bigint;
     try {
       amountWei = parseEther(zapAmount || "0");

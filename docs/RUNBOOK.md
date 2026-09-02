@@ -1,6 +1,6 @@
 # Production runbook
 
-How to run Wizzy. The consumer app presents reviewed meme markets on Base and Robinhood Chain. The operator CLI covers EVM position primitives. Users keep every LP position in their connected wallet.
+How to run Wizzy. The consumer app curates meme LP pools on Base and Robinhood Chain, swaps wallets into pool tokens through Relay with a Wizzy fee, and hands off to Uniswap or Aerodrome. The operator CLI covers EVM position primitives. Users keep every LP position in their connected wallet.
 
 **Never commit `.env`.** Copy `.env.example` locally. `.env` is gitignored. Do not paste secrets into git, Vercel project settings screenshots, or this file.
 
@@ -128,6 +128,7 @@ Set these in `.env` locally or in the Vercel project `wizzy`. Values here are pu
 | `UNABOT_ETH_USD` | Optional USD/ETH fallback for skip math. |
 | `TELEGRAM_BOT_TOKEN` | Telegram surface. Never commit. |
 | `UNABOT_KEEPER_OWNER` | Wallet address the hosted keeper scans. Unset, the schedule logs a skip and does nothing. |
+| `WIZZY_APP_FEE_BPS` | Optional override for the Relay app fee (default 30 bps, capped at 500). Paid to `UNABOT_TREASURY` or the built-in treasury. |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. Or link the Vercel project and use `VERCEL_OIDC_TOKEN`. |
 | `EVE_ALLOW_ANON` | Set to `1` to admit anonymous eve HTTP in production. Default fail-closed. |
 

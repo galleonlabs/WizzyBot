@@ -1,5 +1,6 @@
 /** Local preview only. Never served as a live wallet list. */
 import type { PositionView } from "./cards";
+import type { CuratedPool } from "./portfolio-types";
 
 function previewLiquidity(tickLower: number, tickUpper: number, tickCurrent: number, venue: "uniswap-v3" | "aerodrome-slipstream") {
   const count = 32;
@@ -163,3 +164,77 @@ export function isShotQuery(): boolean {
   if (process.env.NODE_ENV !== "development") return false;
   return new URLSearchParams(window.location.search).get("shot") === "1";
 }
+
+export const SHOT_POOLS: CuratedPool[] = [
+  {
+    id: "robinhood:0xd42a491087a15e5afd51feb3606066cc152d2b09",
+    chain: "robinhood",
+    chainId: 4663,
+    venue: "uniswap-v3",
+    venueLabel: "Uniswap V3",
+    pool: "0xd42A491087a15E5afd51FEb3606066Cc152d2b09",
+    token: { address: "0x020bfC650A365f8BB26819deAAbF3E21291018b4", symbol: "CASHCAT", name: "Cashcat", imageUrl: null },
+    quote: { address: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", symbol: "WETH" },
+    fee: 3000,
+    tickSpacing: 60,
+    priceUsd: 0.27,
+    priceChange24h: 4.2,
+    liquidityUsd: 2_771_883,
+    volume24hUsd: 40_123_865,
+    txns24h: 18_400,
+    feeApr24hPct: 1585,
+    createdAt: "2026-07-01T12:00:00.000Z",
+    ageDays: 62.8,
+    reviewed: true,
+    marketId: "robinhood-cashcat",
+    flags: ["reviewed"],
+    sourceUrl: null,
+  },
+  {
+    id: "base:0x4e829f8a5213c42535ab84aa40bd4adcce9cba02",
+    chain: "base",
+    chainId: 8453,
+    venue: "aerodrome-slipstream",
+    venueLabel: "Aerodrome Slipstream",
+    pool: "0x4e829F8A5213c42535AB84AA40BD4aDCCE9cBa02",
+    token: { address: "0x532f27101965dd16442E59d40670FaF5eBB142E4", symbol: "BRETT", name: "Brett", imageUrl: null },
+    quote: { address: "0x4200000000000000000000000000000000000006", symbol: "WETH" },
+    fee: 2111,
+    tickSpacing: 200,
+    priceUsd: 0.0049,
+    priceChange24h: -1.1,
+    liquidityUsd: 797_100,
+    volume24hUsd: 128_600,
+    txns24h: 900,
+    feeApr24hPct: 12.3,
+    createdAt: "2025-01-10T12:00:00.000Z",
+    ageDays: 600,
+    reviewed: true,
+    marketId: "base-brett",
+    flags: ["reviewed"],
+    sourceUrl: null,
+  },
+  {
+    id: "base:0x1000000000000000000000000000000000000001",
+    chain: "base",
+    chainId: 8453,
+    venue: "uniswap-v2",
+    venueLabel: "Uniswap V2",
+    pool: "0x1000000000000000000000000000000000000001",
+    token: { address: "0x2000000000000000000000000000000000000002", symbol: "PBALL", name: "Pinball", imageUrl: null },
+    quote: { address: "0x4200000000000000000000000000000000000006", symbol: "WETH" },
+    fee: 3000,
+    tickSpacing: null,
+    priceUsd: 0.0012,
+    priceChange24h: 38,
+    liquidityUsd: 203_589,
+    volume24hUsd: 468_409,
+    txns24h: 2_100,
+    feeApr24hPct: 252,
+    createdAt: "2026-08-31T12:00:00.000Z",
+    ageDays: 2.1,
+    reviewed: false,
+    flags: ["unchecked", "new"],
+    sourceUrl: null,
+  },
+];

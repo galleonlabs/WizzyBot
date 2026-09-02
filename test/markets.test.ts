@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { activeMarkets, chainCatalog, getMarketCatalog, parseMarketCatalog } from "../src/markets/catalog.js";
+import { activeMarkets, chainCatalog, getMarketCatalog, liquidityVenueFor, parseMarketCatalog } from "../src/markets/catalog.js";
 import { deriveGeckoMarketStats, deriveMarketStats } from "../src/markets/stats.js";
 import { activeSolanaMarkets, getSolanaMarketCatalog } from "../src/markets/solana-catalog.js";
 import { deriveSolanaMarketStats } from "../src/markets/solana-stats.js";
-import { liquidityVenueFor } from "../src/portfolio/allocation.js";
 
 describe("curated meme markets", () => {
   it("offers a materially broad active menu on both supported chains", () => {

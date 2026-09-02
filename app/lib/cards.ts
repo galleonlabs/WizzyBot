@@ -76,6 +76,10 @@ export type PositionView = {
   owner?: string;
   holdNote?: string;
   liquidityProfile?: LiquidityProfile;
+  address0?: string;
+  address1?: string;
+  decimals0?: number;
+  decimals1?: number;
 };
 
 export type PositionRangeGeometry = {
@@ -208,6 +212,10 @@ export function lightRowToView(row: Record<string, unknown>): PositionView | nul
       ...row.view,
       marketId: typeof row.marketId === "string" ? row.marketId : row.view.marketId,
       liquidityProfile: asLiquidityProfile(row.liquidityProfile),
+      address0: typeof row.address0 === "string" ? row.address0 : undefined,
+      address1: typeof row.address1 === "string" ? row.address1 : undefined,
+      decimals0: typeof row.decimals0 === "number" ? row.decimals0 : undefined,
+      decimals1: typeof row.decimals1 === "number" ? row.decimals1 : undefined,
     };
   }
   if (typeof row.pair !== "string") return null;
@@ -269,6 +277,10 @@ export function lightRowToView(row: Record<string, unknown>): PositionView | nul
     ilUsd: num(row.ilUsd),
     feesVsIlUsd: num(row.feesVsIlUsd) ?? holdDeltaUsd,
     liquidityProfile: asLiquidityProfile(row.liquidityProfile),
+    address0: typeof row.address0 === "string" ? row.address0 : undefined,
+    address1: typeof row.address1 === "string" ? row.address1 : undefined,
+    decimals0: typeof row.decimals0 === "number" ? row.decimals0 : undefined,
+    decimals1: typeof row.decimals1 === "number" ? row.decimals1 : undefined,
   };
 }
 

@@ -1,66 +1,112 @@
 import type { ChainSlug } from "./chains";
 import type { WalletTransaction } from "./wallet-calls";
 
-export type MarketRisk = "established" | "emerging" | "experimental";
+export type PoolVenue = "uniswap-v3" | "uniswap-v2" | "uniswap-v4" | "aerodrome-slipstream";
 
-export type CuratedMarket = {
+export type PoolFlag =
+  | "reviewed"
+  | "new"
+  | "thin"
+  | "quiet"
+  | "unchecked"
+  | "unverified"
+  | "mintable"
+  | "pausable"
+  | "blacklist"
+  | "hidden-owner"
+  | "proxy"
+  | "tax";
+
+export type CuratedPool = {
   id: string;
-  name: string;
-  symbol: string;
-  token: `0x${string}`;
-  quoteSymbol: string;
-  protocol: "V3" | "AERODROME_SLIPSTREAM";
-  aerodromeDeployment?: "legacy" | "min-unstake";
-  pool: `0x${string}`;
-  fee: number;
-  rangeWidthPct: number;
-  status: "active" | "paused" | "watch";
-  risk: MarketRisk;
-  imageUrl?: string;
-  color: string;
-  liquidityVenues?: Array<
-    | { protocol: "V2"; pool: `0x${string}` }
-    | { protocol: "V4"; poolId: `0x${string}`; quoteSymbol: "ETH"; fee: number; tickSpacing: number; hooks: `0x${string}` }
-  >;
-};
-
-export type CuratedChain = {
-  slug: ChainSlug;
+  chain: ChainSlug;
   chainId: number;
-  label: string;
-  accent: string;
-  minimumAllocationWei: string;
-  markets: CuratedMarket[];
-};
-
-export type MarketCatalog = {
-  version: number;
-  updatedAt: string;
-  chains: CuratedChain[];
-};
-
-export type MarketStats = {
-  marketId: string;
-  tokenImageUrl: string | null;
-  feePips: number;
+  venue: PoolVenue;
+  venueLabel: string;
+  pool: string;
+  token: { address: string; symbol: string; name: string; imageUrl: string | null };
+  quote: { address: string; symbol: string };
+  fee: number | null;
+  tickSpacing: number | null;
   priceUsd: number | null;
   priceChange24h: number | null;
-  liquidityUsd: number | null;
-  volume24hUsd: number | null;
-  marketCapUsd: number | null;
-  trailingFeeAprPct: number | null;
-  poolAgeDays: number | null;
-  energy: number | null;
+  liquidityUsd: number;
+  volume24hUsd: number;
+  txns24h: number | null;
+  feeApr24hPct: number | null;
+  createdAt: string | null;
+  ageDays: number | null;
+  reviewed: boolean;
+  marketId?: string;
+  flags: PoolFlag[];
   sourceUrl: string | null;
-  asOf: string;
 };
 
-export type MarketsPayload = {
-  catalog: MarketCatalog;
-  solana: SolanaChainCatalog;
-  fundingChains: EthFundingChain[];
-  stats: MarketStats[];
-  source: string;
+export type PoolsPayload = {
+  pools: CuratedPool[];
+  asOf: string;
+  scanned: number;
+  excluded: number;
+  degraded: string[];
+};
+
+export type RelayCurrency = { chainId: number; address: string; symbol: string; decimals: number };
+
+export type RelayTransaction = WalletTransaction & { chainId: number };
+
+export type RelaySwapQuote = {
+  provider: "Relay";
+  requestId: string;
+  owner: `0x${string}`;
+  originChainId: number;
+  destinationChainId: number;
+  currencyIn: RelayCurrency;
+  currencyOut: RelayCurrency;
+  amountIn: string;
+  expectedAmountOut: string;
+  minimumAmountOut: string;
+  amountOutUsd: string | null;
+  fees: { appBps: number; appAmount: string; appUsd: string | null; relayerUsd: string | null; gasUsd: string | null };
+  impactPercent: string | null;
+  estimatedSeconds: number | null;
+  steps: Array<{ id: string; description: string; transactions: RelayTransaction[] }>;
+  transactions: RelayTransaction[];
+  statusPath: string;
+  createdAt: string;
+  expiresAt: string;
+  notices: string[];
+};
+
+export type RelayChainOption = { id: number; label: string; slug: string };
+
+export const RELAY_CHAINS: readonly RelayChainOption[] = [
+  { id: 8453, label: "Base", slug: "base" },
+  { id: 4663, label: "Robinhood Chain", slug: "robinhood" },
+  { id: 1, label: "Ethereum", slug: "ethereum" },
+  { id: 42161, label: "Arbitrum", slug: "arbitrum" },
+  { id: 10, label: "Optimism", slug: "optimism" },
+];
+
+export type PositionActionKind = "collect" | "decrease" | "withdraw";
+
+export type PositionActionPlan = {
+  kind: PositionActionKind;
+  owner: `0x${string}`;
+  chain: ChainSlug;
+  chainId: number;
+  tokenId: string;
+  pair: string;
+  execution: "wallet_transactions";
+  atomic: true;
+  expectedConfirmations: 1;
+  serviceFeeBps: 0;
+  removal?: { percent: number; amount0: string; amount1: string; burn: boolean };
+  tokens: { symbol0: string; decimals0: number; address0: `0x${string}`; symbol1: string; decimals1: number; address1: `0x${string}` };
+  transactions: WalletTransaction[];
+  allowedTargets: `0x${string}`[];
+  createdAt: string;
+  expiresAt: string;
+  notices: string[];
 };
 
 export type PoolActivityItem = {
@@ -81,127 +127,4 @@ export type PoolActivityPayload = {
   asOfBlock: string | null;
   scannedBlocks: number;
   rpcRequests: 2;
-};
-
-export type EthFundingChain = {
-  id: number;
-  label: string;
-};
-
-export type SolanaCuratedMarket = {
-  id: string;
-  name: string;
-  symbol: string;
-  token: string;
-  quoteToken: string;
-  quoteSymbol: "SOL";
-  protocol: "Meteora DLMM";
-  pool: string;
-  feeBps: number;
-  binStep: number;
-  rangeDelta: number;
-  status: "active" | "paused" | "watch";
-  risk: MarketRisk;
-  color: string;
-};
-
-export type SolanaChainCatalog = {
-  slug: "solana";
-  chainId: 792703809;
-  label: "Solana";
-  accent: string;
-  minimumAllocationLamports: string;
-  gasReserveLamports: string;
-  markets: SolanaCuratedMarket[];
-};
-
-export type AllocationMarketPlan = {
-  marketId: string;
-  symbol: string;
-  pool: `0x${string}`;
-  protocol: "V2" | "V3" | "V4";
-  venue: "uniswap-v2" | "uniswap-v3" | "uniswap-v4" | "aerodrome-slipstream";
-  liquidityTarget: `0x${string}`;
-  quoteSymbol: "ETH" | "WETH";
-  budgetWei: string;
-  swapInWei: string;
-  quotedMemeOut: string;
-  minimumMemeOut: string;
-  mintQuote: string;
-  mintMeme: string;
-  tickLower: number;
-  tickUpper: number;
-  leftoverQuote: string;
-  leftoverMeme: string;
-};
-
-export type AllocationPlan = {
-  kind: "allocate";
-  owner: `0x${string}`;
-  chain: ChainSlug;
-  chainId: number;
-  amountWei: string;
-  serviceFeeBps: number;
-  serviceFeeWei: string;
-  netAllocationWei: string;
-  expectedConfirmations: 1;
-  execution: "wallet_transactions";
-  atomic: false;
-  createdAt: string;
-  expiresAt: string;
-  markets: AllocationMarketPlan[];
-  transactions: WalletTransaction[];
-  allowedTargets: `0x${string}`[];
-  notices: string[];
-  venueSelection?: {
-    methodology: "venue-quality-v1";
-    selectedKey: "PRIMARY" | "V2" | "V4";
-    selectedProtocol: "V2" | "V3" | "V4" | "AERODROME_SLIPSTREAM";
-    selectedPoolReference: `0x${string}`;
-    switched: boolean;
-    confidence: "high" | "guarded" | "fallback";
-    decisionReasons: string[];
-  };
-};
-
-export type PositionActionKind = "collect" | "compound" | "increase" | "decrease" | "rebalance" | "withdraw";
-
-export type PositionActionPlan = {
-  kind: PositionActionKind;
-  owner: `0x${string}`;
-  chain: ChainSlug;
-  chainId: number;
-  tokenId: string;
-  pair: string;
-  execution: "wallet_transactions";
-  atomic: false;
-  expectedConfirmations: 1;
-  serviceFeeBps: number;
-  serviceFee: Array<{ token: `0x${string}`; symbol: string; amount: string }>;
-  funding?: {
-    amountWei: string;
-    serviceFeeWei: string;
-    netAmountWei: string;
-    quoteSymbol: "ETH" | "WETH";
-    quoteAmount: string;
-    memeSymbol: string;
-    memeAmount: string;
-  };
-  range?: {
-    tickLower: number;
-    tickUpper: number;
-    currentTick: number;
-    previousTickLower: number;
-    previousTickUpper: number;
-    preset?: "focused" | "balanced" | "wide";
-    swap?: { tokenIn: string; tokenOut: string; amountIn: string; minimumAmountOut: string };
-  };
-  removal?: { percent: number; amount0: string; amount1: string; burn: boolean };
-  settlement?: { asset: "ETH"; minimumAmountWei: string; marketSymbol: string };
-  tokens?: { symbol0: string; decimals0: number; symbol1: string; decimals1: number };
-  transactions: WalletTransaction[];
-  allowedTargets: `0x${string}`[];
-  createdAt: string;
-  expiresAt: string;
-  notices: string[];
 };

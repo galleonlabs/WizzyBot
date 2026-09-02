@@ -3,58 +3,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useAccount, useConfig, useConnect, useDisconnect, type Connector } from "wagmi";
 import { createPortal } from "react-dom";
-import { parseEther } from "viem";
 import { lightRowToView, type PositionView } from "./lib/cards";
 import { readJsonPayload } from "./lib/api-payload";
 import { loadPositionRows } from "./lib/position-loading";
 import { type ChainSlug } from "./lib/chains";
-import {
-  type AllocationPlan,
-  type MarketsPayload,
-  type MarketStats,
-  type PositionActionKind,
-  type PositionActionPlan,
-} from "./lib/portfolio-types";
-import { impliedEthUsd, summarizePositions } from "./lib/position-math";
+import { type CuratedPool, type PoolsPayload, type PositionActionKind, type PositionActionPlan } from "./lib/portfolio-types";
+import { impliedEthUsd, positionOrientation, summarizePositions } from "./lib/position-math";
 import { money, capitalize, short } from "./lib/format";
-import { isShotQuery, SHOT_VIEWS } from "./lib/shot-fixture";
+import { isShotQuery, SHOT_POOLS, SHOT_VIEWS } from "./lib/shot-fixture";
 import { sendPlanTransactions, type PlanSubmission, type WalletTransaction } from "./lib/wallet-calls";
 import { reportClientError, trackProductEvent } from "./lib/telemetry-client";
 import { AchievementCenter } from "./achievement-center";
 import { SendEthDialog } from "./send-eth-dialog";
 import type { AchievementActionEvidence } from "./lib/achievements";
 import { ActionSheet, type ActionRequest, type BalanceState, type PlanState } from "./positions/action-sheet";
-import { PositionCard, positionKey } from "./positions/position-card";
-import { MarketLedger, type MarketEntry } from "./markets/market-ledger";
+import { PositionCard, positionKey, type CardAction } from "./positions/position-card";
+import { PoolTable } from "./pools/pool-table";
+import { LpSheet, type LpTarget } from "./pools/lp-sheet";
 import { BRAND_ASSETS, ChevronIcon, DisconnectIcon, ExternalLinkIcon, SendIcon, ThemeIcon, WalletIcon, XIcon } from "./ui/icons";
 
-type ViewTab = "positions" | "markets";
+type ViewTab = "pools" | "positions";
 type ThemePreference = "system" | "light" | "dark";
 type ChainBalances = Record<ChainSlug, BalanceState>;
 type ChainLoadState = Record<ChainSlug, "idle" | "loading" | "ready" | "error">;
 type SheetTarget = { position: PositionView; action: PositionActionKind };
 
-const BRIDGE_URLS: Record<ChainSlug, string> = {
-  base: "https://relay.link/bridge/base",
-  robinhood: "https://relay.link/bridge/robinhood",
-};
-const EMPTY_MARKETS: MarketsPayload = {
-  catalog: { version: 1, updatedAt: "", chains: [] },
-  solana: {
-    slug: "solana",
-    chainId: 792703809,
-    label: "Solana",
-    accent: "#8b5cf6",
-    minimumAllocationLamports: "300000000",
-    gasReserveLamports: "25000000",
-    markets: [],
-  },
-  fundingChains: [{ id: 8453, label: "Base" }, { id: 4663, label: "Robinhood Chain" }],
-  stats: [],
-  source: "",
-};
 const EMPTY_BALANCES: ChainBalances = { base: { kind: "idle" }, robinhood: { kind: "idle" } };
 const IDLE_CHAINS: ChainLoadState = { base: "idle", robinhood: "idle" };
+const EMPTY_POOLS: PoolsPayload = { pools: [], asOf: "", scanned: 0, excluded: 0, degraded: [] };
 
 export function PortfolioApp() {
   const wagmiConfig = useConfig();
@@ -63,22 +39,19 @@ export function PortfolioApp() {
   const { disconnect } = useDisconnect();
   const ready = accountStatus !== "reconnecting";
   const authenticated = accountStatus === "connected";
-  const [tab, setTab] = useState<ViewTab>("positions");
+  const [tab, setTab] = useState<ViewTab>("pools");
   const [theme, setTheme] = useState<ThemePreference>("dark");
   const [balances, setBalances] = useState<ChainBalances>(EMPTY_BALANCES);
-  const [markets, setMarkets] = useState<MarketsPayload>(EMPTY_MARKETS);
-  const [marketsState, setMarketsState] = useState<"loading" | "ready" | "error">("loading");
+  const [pools, setPools] = useState<PoolsPayload>(EMPTY_POOLS);
+  const [poolsState, setPoolsState] = useState<"loading" | "ready" | "error">("loading");
   const [positions, setPositions] = useState<PositionView[]>([]);
   const [chainState, setChainState] = useState<ChainLoadState>(IDLE_CHAINS);
   const [ethUsdByChain, setEthUsdByChain] = useState<Partial<Record<ChainSlug, number>>>({});
   const [previewMode, setPreviewMode] = useState(false);
   const [sheet, setSheet] = useState<SheetTarget | null>(null);
+  const [lpTarget, setLpTarget] = useState<LpTarget | null>(null);
   const [actionPlan, setActionPlan] = useState<PositionActionPlan | null>(null);
   const [actionState, setActionState] = useState<PlanState>({ kind: "idle" });
-  const [zapMarketId, setZapMarketId] = useState<string | null>(null);
-  const [zapAmount, setZapAmount] = useState("0.05");
-  const [zapPlan, setZapPlan] = useState<AllocationPlan | null>(null);
-  const [zapState, setZapState] = useState<PlanState>({ kind: "idle" });
   const [sendOpen, setSendOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const positionsRequestRef = useRef(0);
@@ -146,6 +119,26 @@ export function PortfolioApp() {
     }
   }
 
+  const loadPools = useCallback(async (attempt = 0) => {
+    if (attempt === 0) setPoolsState("loading");
+    try {
+      const response = await fetch("/api/pools", { cache: "no-cache" });
+      const payload = await readJsonPayload(response) as PoolsPayload & { error?: string; warming?: boolean };
+      if (response.status === 202 && payload.warming) {
+        // A cold instance is still sweeping. Poll until the first snapshot lands.
+        if (attempt < 20) window.setTimeout(() => void loadPools(attempt + 1), 4_000);
+        else setPoolsState("error");
+        return;
+      }
+      if (!response.ok || !Array.isArray(payload.pools)) throw new Error(payload.error ?? "Could not load pools");
+      setPools(payload);
+      setPoolsState("ready");
+    } catch (error) {
+      setPoolsState("error");
+      reportClientError("markets", error);
+    }
+  }, []);
+
   const loadPositions = useCallback(async () => {
     const requestId = ++positionsRequestRef.current;
     if (!authenticated || !address) {
@@ -196,24 +189,17 @@ export function PortfolioApp() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("view") === "markets") setTab("markets");
+    if (params.get("view") === "positions") setTab("positions");
     if (isShotQuery()) {
       setPreviewMode(true);
       setPositions(SHOT_VIEWS);
       setChainState({ base: "ready", robinhood: "ready" });
+      setPools({ pools: SHOT_POOLS, asOf: new Date().toISOString(), scanned: 3, excluded: 0, degraded: [] });
+      setPoolsState("ready");
+      return;
     }
-    fetch("/api/markets", { cache: "no-cache" })
-      .then(async (response) => {
-        const payload = await readJsonPayload(response) as MarketsPayload;
-        if (!response.ok) throw new Error("Could not load markets");
-        setMarkets(payload);
-        setMarketsState("ready");
-      })
-      .catch((error) => {
-        setMarketsState("error");
-        reportClientError("markets", error);
-      });
-  }, []);
+    void loadPools();
+  }, [loadPools]);
 
   useEffect(() => {
     if (!previewMode && !isShotQuery()) void loadPositions();
@@ -221,28 +207,23 @@ export function PortfolioApp() {
 
   useEffect(() => {
     if (previewMode || isShotQuery()) return;
-    setZapPlan(null);
-    setZapState({ kind: "idle" });
     setSheet(null);
+    setLpTarget(null);
     setActionPlan(null);
     setActionState({ kind: "idle" });
   }, [address, authenticated, previewMode]);
 
-  const activeMarkets = useMemo<MarketEntry[]>(() => {
-    return markets.catalog.chains.flatMap((chain) => chain.markets
-      .filter((market) => market.status === "active")
-      .map((market) => ({ market, chain: chain.slug })));
-  }, [markets]);
-  const stats = useMemo(() => new Map(markets.stats.map((row) => [row.marketId, row])), [markets.stats]);
+  const poolsByAddress = useMemo(() => new Map(pools.pools.map((pool) => [`${pool.chain}:${pool.pool.toLowerCase()}`, pool])), [pools]);
   const hasPortfolioAccess = authenticated || previewMode;
   const impliedEth = useMemo(() => impliedEthUsd(positions), [positions]);
   const ethUsdFor = useCallback((chain?: string) => (chain === "base" || chain === "robinhood" ? ethUsdByChain[chain] : undefined) ?? ethUsdByChain.base ?? ethUsdByChain.robinhood ?? impliedEth, [ethUsdByChain, impliedEth]);
+  const poolFor = useCallback((position: PositionView) => position.pool && position.chain ? poolsByAddress.get(`${position.chain}:${position.pool.toLowerCase()}`) : undefined, [poolsByAddress]);
 
   function changeTab(next: ViewTab) {
     if (next === tab) return;
     setTab(next);
     const url = new URL(window.location.href);
-    if (next === "positions") url.searchParams.delete("view");
+    if (next === "pools") url.searchParams.delete("view");
     else url.searchParams.set("view", next);
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
   }
@@ -267,20 +248,19 @@ export function PortfolioApp() {
     }
   }
 
-  function startLogin(source: "header" | "positions" | "markets") {
+  function startLogin(source: "header" | "positions" | "pools") {
     trackProductEvent("Login Started", { source });
     resetConnect();
     setConnectOpen(true);
   }
 
-  function fundChain(chain: ChainSlug) {
-    if (!authenticated || !address) {
-      startLogin("positions");
+  function openPool(pool: CuratedPool) {
+    if (!authenticated && !previewMode) {
+      startLogin("pools");
       return;
     }
-    const destinationChainId = chain === "robinhood" ? 4663 : 8453;
-    trackProductEvent("Cross-chain Funding Started", { destinationChainId });
-    window.open(`${BRIDGE_URLS[chain]}?toAddress=${address}`, "_blank", "noopener,noreferrer");
+    trackProductEvent("Pool Opened", { chainId: pool.chainId, venue: pool.venue, reviewed: pool.reviewed });
+    setLpTarget({ kind: "new", pool });
   }
 
   async function requestPositionActionPlan(position: PositionView, request: ActionRequest): Promise<PositionActionPlan> {
@@ -294,11 +274,7 @@ export function PortfolioApp() {
         chain: position.chain,
         tokenId: position.tokenId,
         action: request.action,
-        amountWei: request.amountWei,
         percent: request.percent,
-        tickLower: request.tickLower,
-        tickUpper: request.tickUpper,
-        settle: request.settle,
         protocol: position.protocol === "V2" || position.protocol === "V3" || position.protocol === "V4" ? position.protocol : undefined,
         venue: position.venue === "aerodrome-slipstream" || position.venue === "uniswap-v3" ? position.venue : undefined,
         positionManager: position.positionManager,
@@ -309,7 +285,16 @@ export function PortfolioApp() {
     return payload.plan;
   }
 
-  function openSheet(position: PositionView, action: PositionActionKind) {
+  function openAction(position: PositionView, action: CardAction) {
+    if (action === "add") {
+      const orientation = positionOrientation(position);
+      const memeAddress = orientation.quoteIsToken0 === null ? undefined : orientation.quoteIsToken0 ? position.address1 : position.address0;
+      const memeDecimals = orientation.quoteIsToken0 ? position.decimals1 : position.decimals0;
+      if (!memeAddress) return;
+      trackProductEvent("Position Action Opened", { action, chainId: position.chain === "robinhood" ? 4663 : 8453 });
+      setLpTarget({ kind: "add", position, meme: { address: memeAddress, symbol: orientation.memeSymbol, decimals: memeDecimals ?? 18 }, image: poolFor(position)?.token.imageUrl });
+      return;
+    }
     actionRequestRef.current = null;
     setActionPlan(null);
     setActionState({ kind: "idle" });
@@ -354,7 +339,7 @@ export function PortfolioApp() {
     const target = sheet;
     const request = actionRequestRef.current;
     if (!actionPlan || !address || !target || !request) return;
-    if (!sameAddress(actionPlan.owner, address)) {
+    if (actionPlan.owner.toLowerCase() !== address.toLowerCase()) {
       setActionPlan(null);
       setActionState({ kind: "error", message: "Your wallet changed. Review this action again." });
       return;
@@ -364,124 +349,29 @@ export function PortfolioApp() {
       const freshPlan = await requestPositionActionPlan(target.position, request);
       setActionPlan(freshPlan);
       setActionState({ kind: "signing", message: "Confirm in your wallet" });
-      const confirmedEvm = await sendEvmBatch({
+      await sendEvmBatch({
         owner: freshPlan.owner,
         chainId: freshPlan.chainId,
         transactions: freshPlan.transactions,
         onStep: (message) => setActionState({ kind: "waiting", message }),
       });
       await Promise.all([loadPositions(), loadBalances()]);
-      if (freshPlan.kind === "withdraw") {
-        setZapPlan(null);
-        setZapState({ kind: "idle" });
-      }
       setActionState({ kind: "submitted", message: successMessage(freshPlan) });
-      if ((freshPlan.kind === "compound" || freshPlan.kind === "rebalance") && freshPlan.chain === "robinhood" && confirmedEvm) {
-        const transactionHashes = confirmedEvm.transactionHashes;
-        if (transactionHashes.length) void achievementActionRef.current?.({
-          action: freshPlan.kind,
-          chainId: 4663,
-          tokenId: freshPlan.tokenId,
-          transactionHashes,
-        });
-      }
-      trackProductEvent(eventName(freshPlan.kind), { chainId: freshPlan.chainId });
+      trackProductEvent(freshPlan.kind === "withdraw" ? "Withdrawal Confirmed" : freshPlan.kind === "decrease" ? "Reduce Confirmed" : "Fees Collected", { chainId: freshPlan.chainId });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : "Wallet submission failed" });
       reportClientError("position-action", error);
     }
   }
 
-  function openZap(marketId: string) {
-    setZapMarketId((current) => current === marketId ? null : marketId);
-    setZapPlan(null);
-    setZapState({ kind: "idle" });
-    trackProductEvent("Zap Opened", { marketId });
+  function sellAfterExit(position: PositionView, token: { address: string; symbol: string; decimals: number }) {
+    const image = poolFor(position)?.token.imageUrl;
+    setSheet(null);
+    setActionPlan(null);
+    setActionState({ kind: "idle" });
+    setLpTarget({ kind: "sell", position, token, image });
   }
 
-  async function requestAllocationPlan(input: { owner: string; chain: ChainSlug; amountWei: string; marketId: string }): Promise<AllocationPlan> {
-    const response = await fetch("/api/portfolio/allocate", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      cache: "no-store",
-      body: JSON.stringify({
-        owner: input.owner,
-        chain: input.chain,
-        amountWei: input.amountWei,
-        marketId: input.marketId,
-      }),
-    });
-    const payload = await readJsonPayload(response) as { plan?: AllocationPlan; error?: string };
-    if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not quote this market");
-    return payload.plan;
-  }
-
-  async function prepareZap(marketId: string) {
-    if (!authenticated || !address) {
-      startLogin("markets");
-      return;
-    }
-    const selected = activeMarkets.find((entry) => entry.market.id === marketId);
-    if (!selected || selected.chain === "solana") {
-      setZapState({ kind: "error", message: "This market is no longer available." });
-      return;
-    }
-    let amountWei: bigint;
-    try {
-      amountWei = parseEther(zapAmount || "0");
-    } catch {
-      setZapState({ kind: "error", message: "Enter a valid ETH amount." });
-      return;
-    }
-    setZapState({ kind: "planning", message: "Quoting the pool…" });
-    setZapPlan(null);
-    try {
-      const plan = await requestAllocationPlan({ owner: address, chain: selected.chain, amountWei: amountWei.toString(), marketId });
-      setZapPlan(plan);
-      setZapState({ kind: "ready", message: "Review the position, then confirm in your wallet." });
-      trackProductEvent("Zap Quote Ready", { marketId });
-    } catch (error) {
-      setZapState({ kind: "error", message: error instanceof Error ? error.message : "Could not quote this market" });
-      reportClientError("market-plan", error);
-    }
-  }
-
-  async function executeZap() {
-    if (!zapPlan || !address) return;
-    if (!sameAddress(zapPlan.owner, address)) {
-      setZapPlan(null);
-      setZapState({ kind: "error", message: "Your wallet changed. Review a fresh quote before continuing." });
-      return;
-    }
-    try {
-      const marketId = zapPlan.markets[0]?.marketId;
-      if (!marketId) throw new Error("This market quote is incomplete. Review it again.");
-      setZapState({ kind: "planning", message: "Refreshing the pool quote and checking the latest chain state…" });
-      const freshPlan = await requestAllocationPlan({
-        owner: address,
-        chain: zapPlan.chain,
-        amountWei: zapPlan.amountWei,
-        marketId,
-      });
-      setZapPlan(freshPlan);
-      setZapState({ kind: "signing", message: "Approve the market in your wallet." });
-      await sendEvmBatch({
-        owner: freshPlan.owner,
-        chainId: freshPlan.chainId,
-        transactions: freshPlan.transactions,
-        onStep: (message) => setZapState({ kind: "waiting", message }),
-      });
-      await loadPositions();
-      setZapState({ kind: "submitted", message: "Position opened. The NFT is in your wallet." });
-      setZapPlan(null);
-      trackProductEvent("Zap Confirmed", { marketId });
-    } catch (error) {
-      setZapState({ kind: "error", message: error instanceof Error ? error.message : "The position could not be opened" });
-      reportClientError("market-submit", error);
-    }
-  }
-
-  const positionImage = (position: PositionView) => positionTokenImage(position, activeMarkets, stats);
   const sheetBusy = actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting";
 
   return (
@@ -495,7 +385,7 @@ export function PortfolioApp() {
         <span className="wizzy-ghost wizzy-ghost-6" />
       </div>
       <header className="market-nav">
-        <button className="wizzy-wordmark" type="button" onClick={() => changeTab("positions")} aria-label="Wizzy positions">
+        <button className="wizzy-wordmark" type="button" onClick={() => changeTab("pools")} aria-label="Wizzy pools">
           <picture className="wizzy-mark" aria-hidden="true">
             {theme === "system" ? <source media="(prefers-color-scheme: dark)" srcSet="/brand/wizzy-mascot-dark.svg" /> : null}
             <img src={theme === "dark" ? "/brand/wizzy-mascot-dark.svg" : "/brand/wizzy-mascot-light.svg"} alt="" />
@@ -503,7 +393,7 @@ export function PortfolioApp() {
           <span>Wizzy</span>
         </button>
         <nav aria-label="Primary navigation">
-          {([{ id: "positions", label: "Positions" }, { id: "markets", label: "Markets" }] as const).map((item) => (
+          {([{ id: "pools", label: "Pools" }, { id: "positions", label: "Positions" }] as const).map((item) => (
             <button key={item.id} type="button" className={tab === item.id ? "is-active" : ""} onClick={() => changeTab(item.id)}>{item.label}</button>
           ))}
         </nav>
@@ -533,49 +423,35 @@ export function PortfolioApp() {
       {previewMode ? <div className="preview-banner">Illustrative preview · development only</div> : null}
 
       <div className="market-shell" data-view={tab}>
-        {tab === "positions" ? (
+        {tab === "pools" ? (
+          <section className="pools-page">
+            <header className="page-head">
+              <div>
+                <h1>Meme yield, curated.</h1>
+                <p>Every ETH-paired meme pool on Uniswap and Aerodrome across Base and Robinhood Chain, minus the scams and the dust. Swap into the exact tokens with Relay, then open the position on the venue.</p>
+              </div>
+              <span className="network-lockup" aria-label="Built on Base and Robinhood Chain">
+                <span className="network-icons" aria-hidden="true"><img src={BRAND_ASSETS.base} alt="" /><img src={BRAND_ASSETS.robinhood} alt="" /></span>
+                <span className="network-name"><small>Curating</small><b>Base + Robinhood</b></span>
+              </span>
+            </header>
+            {poolsState === "ready" ? <p className="pool-meta">{pools.pools.length} pools listed · {pools.pools.filter((pool) => pool.reviewed).length} hand-reviewed · {pools.excluded} filtered out{pools.degraded.length ? " · partial sweep" : ""}{pools.asOf ? ` · updated ${relativeTime(pools.asOf)}` : ""}</p> : null}
+            <PoolTable pools={pools.pools} state={poolsState} onSelect={openPool} onRetry={() => void loadPools()} />
+            <p className="pool-footnote">Wizzy adds a 0.3% fee inside each Relay quote. Nothing is charged on collecting, reducing, or exiting, and Wizzy never holds your funds.</p>
+          </section>
+        ) : (
           <PositionsPage
             authenticated={hasPortfolioAccess}
             positions={positions}
             chainState={chainState}
             ethUsdFor={ethUsdFor}
-            stats={stats}
-            imageFor={positionImage}
+            poolFor={poolFor}
             busy={sheetBusy}
             onConnect={() => startLogin("positions")}
             onRetry={() => void loadPositions()}
-            onNew={() => changeTab("markets")}
-            onAction={openSheet}
+            onNew={() => changeTab("pools")}
+            onAction={openAction}
           />
-        ) : (
-          <section className="markets-page">
-            <header className="page-head">
-              <div>
-                <h1>Markets</h1>
-                <p>Reviewed meme pools on Base and Robinhood Chain. Add ETH to open a new position in your wallet.</p>
-              </div>
-              <span className="network-lockup" aria-label="Built on Base and Robinhood Chain">
-                <span className="network-icons" aria-hidden="true"><img src={BRAND_ASSETS.base} alt="" /><img src={BRAND_ASSETS.robinhood} alt="" /></span>
-                <span className="network-name"><small>Built on</small><b>Base + Robinhood</b></span>
-              </span>
-            </header>
-            <MarketLedger
-              markets={activeMarkets}
-              stats={stats}
-              state={marketsState}
-              zapMarketId={zapMarketId}
-              zapAmount={zapAmount}
-              zapPlan={zapPlan}
-              zapState={zapState}
-              onOpenZap={openZap}
-              onZapAmount={(next) => { setZapAmount(next); setZapPlan(null); if (zapState.kind !== "idle") setZapState({ kind: "idle" }); }}
-              onPrepareZap={(id) => void prepareZap(id)}
-              onExecuteZap={() => void executeZap()}
-              onCloseZap={() => { setZapMarketId(null); setZapPlan(null); setZapState({ kind: "idle" }); }}
-              balances={authenticated ? balances : null}
-              onFund={fundChain}
-            />
-          </section>
         )}
       </div>
 
@@ -583,16 +459,21 @@ export function PortfolioApp() {
         key={`${positionKey(sheet.position)}-${sheet.action}`}
         position={positions.find((candidate) => positionKey(candidate) === positionKey(sheet.position)) ?? sheet.position}
         action={sheet.action}
-        ethUsd={ethUsdFor(sheet.position.chain)}
-        image={positionImage(sheet.position)}
-        balance={authenticated && (sheet.position.chain === "base" || sheet.position.chain === "robinhood") ? balances[sheet.position.chain] : null}
+        image={poolFor(sheet.position)?.token.imageUrl}
         plan={actionPlan}
         state={actionState}
         onPlan={(request) => void preparePositionAction(request)}
         onExecute={() => void executePositionAction()}
         onReset={resetSheet}
         onClose={closeSheet}
-        onFund={() => { if (sheet.position.chain === "base" || sheet.position.chain === "robinhood") fundChain(sheet.position.chain); }}
+        onSell={(token) => sellAfterExit(sheet.position, token)}
+      /> : null}
+      {lpTarget ? <LpSheet
+        key={lpTarget.kind === "new" ? lpTarget.pool.id : `${lpTarget.kind}-${positionKey(lpTarget.position)}`}
+        target={lpTarget}
+        owner={address}
+        onClose={() => setLpTarget(null)}
+        onCompleted={() => { void loadBalances(); void loadPositions(); }}
       /> : null}
       {address ? <SendEthDialog open={sendOpen} owner={address} balanceWei={balances.robinhood.kind === "ready" ? balances.robinhood.balanceWei : undefined} onClose={() => setSendOpen(false)} onSend={sendRobinhoodEth} /> : null}
       <ConnectWalletDialog
@@ -607,18 +488,17 @@ export function PortfolioApp() {
   );
 }
 
-function PositionsPage({ authenticated, positions, chainState, ethUsdFor, stats, imageFor, busy, onConnect, onRetry, onNew, onAction }: {
+function PositionsPage({ authenticated, positions, chainState, ethUsdFor, poolFor, busy, onConnect, onRetry, onNew, onAction }: {
   authenticated: boolean;
   positions: PositionView[];
   chainState: ChainLoadState;
   ethUsdFor: (chain?: string) => number | undefined;
-  stats: Map<string, MarketStats>;
-  imageFor: (position: PositionView) => string | null | undefined;
+  poolFor: (position: PositionView) => CuratedPool | undefined;
   busy: boolean;
   onConnect: () => void;
   onRetry: () => void;
   onNew: () => void;
-  onAction: (position: PositionView, action: PositionActionKind) => void;
+  onAction: (position: PositionView, action: CardAction) => void;
 }) {
   const loading = chainState.base === "loading" || chainState.robinhood === "loading";
   const failed = (["base", "robinhood"] as const).filter((chain) => chainState[chain] === "error");
@@ -630,26 +510,26 @@ function PositionsPage({ authenticated, positions, chainState, ethUsdFor, stats,
       <div>
         <h1>Positions</h1>
         <p>{authenticated
-          ? positions.length ? `${positions.length} open position${positions.length === 1 ? "" : "s"} across Base and Robinhood.` : "Every LP position in your wallet, ready to manage."
+          ? positions.length ? `${positions.length} open position${positions.length === 1 ? "" : "s"} across Base and Robinhood.` : "Every LP position in your wallet, with one-transaction actions."
           : "Connect your wallet to see and manage your liquidity."}</p>
       </div>
-      {authenticated ? <button className="page-cta" type="button" onClick={onNew}>New position</button> : null}
+      {authenticated ? <button className="page-cta" type="button" onClick={onNew}>Find a pool</button> : null}
     </header>
     {authenticated && positions.length ? <dl className="portfolio-summary" aria-label="Portfolio summary">
       <div><dt>Total value</dt><dd>{summary.priced ? money(summary.valueUsd) : "—"}</dd></div>
       <div><dt>Unclaimed fees</dt><dd className={summary.feesUsd > 0 ? "positive" : ""}>{summary.priced ? money(summary.feesUsd) : "—"}</dd></div>
       <div><dt>In range</dt><dd>{summary.inRange} of {summary.total}</dd></div>
     </dl> : null}
-    {!authenticated ? <EmptyState title="See your positions" body="Connect to view value, fees, ranges, and every action in one place." action="Connect wallet" onAction={onConnect} /> : null}
-    {authenticated && settled && !positions.length && !failed.length ? <EmptyState title="No positions yet" body="Pick a reviewed market and add ETH to open your first one." action="Browse markets" onAction={onNew} /> : null}
+    {!authenticated ? <EmptyState title="See your positions" body="Connect to view value, fees, ranges, and one-transaction actions in one place." action="Connect wallet" onAction={onConnect} /> : null}
+    {authenticated && settled && !positions.length && !failed.length ? <EmptyState title="No positions yet" body="Pick a curated pool, swap into its tokens, and open your first one on the venue." action="Browse pools" onAction={onNew} /> : null}
     {authenticated && failed.length ? <EmptyState variant="error" title={`Could not read ${failed.map((chain) => chain === "base" ? "Base" : "Robinhood").join(" or ")}`} body="The network did not answer in time. Positions on that chain are hidden until it does." action="Try again" onAction={onRetry} /> : null}
     <div className="position-grid">
       {sorted.map((position) => <PositionCard
         key={positionKey(position)}
         view={position}
         ethUsd={ethUsdFor(position.chain)}
-        stat={position.marketId ? stats.get(position.marketId) : undefined}
-        image={imageFor(position)}
+        poolApr={poolFor(position)?.feeApr24hPct ?? null}
+        image={poolFor(position)?.token.imageUrl}
         busy={busy}
         onAction={(action) => onAction(position, action)}
       />)}
@@ -778,38 +658,15 @@ function handleMenuNavigation(event: ReactKeyboardEvent<HTMLDivElement>) {
   items[next]?.focus();
 }
 
-function positionTokenImage(position: PositionView, markets: MarketEntry[], stats: Map<string, MarketStats>): string | null | undefined {
-  if (position.marketId) {
-    const direct = stats.get(position.marketId)?.tokenImageUrl;
-    if (direct) return direct;
-  }
-  const market = markets.find(({ market }) =>
-    (position.pool && "pool" in market && market.pool.toLowerCase() === position.pool.toLowerCase())
-    || market.symbol.toLowerCase() === position.symbol0.toLowerCase()
-    || market.symbol.toLowerCase() === position.symbol1.toLowerCase(),
-  )?.market;
-  if (!market) return undefined;
-  return stats.get(market.id)?.tokenImageUrl ?? ("imageUrl" in market ? market.imageUrl : undefined);
-}
-
 function successMessage(plan: PositionActionPlan): string {
-  if (plan.kind === "withdraw") return plan.settlement ? "Your ETH is back in your wallet." : "Both pool tokens are back in your wallet.";
+  if (plan.kind === "withdraw") return "Both pool tokens are back in your wallet.";
   if (plan.kind === "decrease") return `${plan.removal?.percent ?? ""}% of the position is back in your wallet.`.trim();
-  if (plan.kind === "rebalance") return "Your liquidity is earning in its new range.";
-  if (plan.kind === "increase") return "Your added liquidity is in this position.";
-  if (plan.kind === "collect") return "Your fees are in your wallet.";
-  return "Your fees are back at work.";
+  return "Your fees are in your wallet.";
 }
 
-function eventName(kind: PositionActionKind): string {
-  if (kind === "withdraw") return "Withdrawal Confirmed";
-  if (kind === "decrease") return "Reduce Confirmed";
-  if (kind === "rebalance") return "Rebalance Confirmed";
-  if (kind === "increase") return "Liquidity Increased";
-  if (kind === "collect") return "Fees Collected";
-  return "Compound Confirmed";
-}
-
-function sameAddress(left: string, right: string): boolean {
-  return left.toLowerCase() === right.toLowerCase();
+function relativeTime(iso: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  return `${Math.round(minutes / 60)} h ago`;
 }

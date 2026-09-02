@@ -13,7 +13,7 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "child-src 'self'",
   "frame-src https://challenges.cloudflare.com",
-  "connect-src 'self' https://rpc.mainnet.chain.robinhood.com https://robinhood-rpc.publicnode.com https://mainnet.base.org https://api.relay.link",
+  "connect-src 'self' https://rpc.mainnet.chain.robinhood.com https://robinhood-rpc.publicnode.com https://mainnet.base.org https://eth.merkle.io https://arb1.arbitrum.io https://mainnet.optimism.io https://api.relay.link",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
 ].join("; ");

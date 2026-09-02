@@ -1,0 +1,461 @@
+{
+ "data": [
+  {
+   "id": "robinhood_0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+   "type": "pool",
+   "attributes": {
+    "address": "0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+    "name": "USDG / WETH 0.01%",
+    "base_token_price_usd": "1.00141150562952",
+    "quote_token_price_usd": "2400.05",
+    "price_change_percentage": {
+     "h24": "0.045"
+    },
+    "reserve_in_usd": "15269222.0222",
+    "volume_usd": {
+     "h24": "743074874.179312"
+    },
+    "transactions": {
+     "h24": {
+      "buys": 921974,
+      "sells": 956093,
+      "buyers": 62985,
+      "sellers": 58299
+     }
+    },
+    "pool_created_at": "2026-07-02T20:51:08Z"
+   },
+   "relationships": {
+    "base_token": {
+     "data": {
+      "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "type": "token"
+     }
+    },
+    "quote_token": {
+     "data": {
+      "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "type": "token"
+     }
+    },
+    "dex": {
+     "data": {
+      "id": "uniswap-v3-robinhood",
+      "type": "dex"
+     }
+    }
+   }
+  },
+  {
+   "id": "robinhood_0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+   "type": "pool",
+   "attributes": {
+    "address": "0xd4eb21209c4d6093f80b5b84f5c45cc093ea14a3",
+    "name": "NVDA / USDG 0.05%",
+    "base_token_price_usd": "223.642728966633",
+    "quote_token_price_usd": "0.999546940802739",
+    "price_change_percentage": {
+     "h24": "2.506"
+    },
+    "reserve_in_usd": "6120310.6238",
+    "volume_usd": {
+     "h24": "41142823.5248339"
+    },
+    "transactions": {
+     "h24": {
+      "buys": 66338,
+      "sells": 64098,
+      "buyers": 17028,
+      "sellers": 16495
+     }
+    },
+    "pool_created_at": "2026-07-21T11:02:06Z"
+   },
+   "relationships": {
+    "base_token": {
+     "data": {
+      "id": "robinhood_0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec",
+      "type": "token"
+     }
+    },
+    "quote_token": {
+     "data": {
+      "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "type": "token"
+     }
+    },
+    "dex": {
+     "data": {
+      "id": "uniswap-v3-robinhood",
+      "type": "dex"
+     }
+    }
+   }
+  },
+  {
+   "id": "robinhood_0xd42a491087a15e5afd51feb3606066cc152d2b09",
+   "type": "pool",
+   "attributes": {
+    "address": "0xd42a491087a15e5afd51feb3606066cc152d2b09",
+    "name": "CASHCAT / WETH 0.3%",
+    "base_token_price_usd": "0.241654686850375",
+    "quote_token_price_usd": "2400.05",
+    "price_change_percentage": {
+     "h24": "10.731"
+    },
+    "reserve_in_usd": "2795905.3668",
+    "volume_usd": {
+     "h24": "39645294.2543381"
+    },
+    "transactions": {
+     "h24": {
+      "buys": 24698,
+      "sells": 24567,
+      "buyers": 2135,
+      "sellers": 2141
+     }
+    },
+    "pool_created_at": "2026-07-01T19:38:42Z"
+   },
+   "relationships": {
+    "base_token": {
+     "data": {
+      "id": "robinhood_0x020bfc650a365f8bb26819deaabf3e21291018b4",
+      "type": "token"
+     }
+    },
+    "quote_token": {
+     "data": {
+      "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "type": "token"
+     }
+    },
+    "dex": {
+     "data": {
+      "id": "uniswap-v3-robinhood",
+      "type": "dex"
+     }
+    }
+   }
+  },
+  {
+   "id": "robinhood_0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+   "type": "pool",
+   "attributes": {
+    "address": "0xc4a21f9d6485fc5893dd4a491b320a83daf4da1d",
+    "name": "AI / WETH 1%",
+    "base_token_price_usd": "0.227673789482379",
+    "quote_token_price_usd": "2400.09",
+    "price_change_percentage": {
+     "h24": "23.904"
+    },
+    "reserve_in_usd": "2948743.3737",
+    "volume_usd": {
+     "h24": "34605148.6232866"
+    },
+    "transactions": {
+     "h24": {
+      "buys": 19174,
+      "sells": 14116,
+      "buyers": 5918,
+      "sellers": 5553
+     }
+    },
+    "pool_created_at": "2026-07-22T16:37:33Z"
+   },
+   "relationships": {
+    "base_token": {
+     "data": {
+      "id": "robinhood_0x2e8c31162b855a2ffa90f6f8634643ad6f111e18",
+      "type": "token"
+     }
+    },
+    "quote_token": {
+     "data": {
+      "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "type": "token"
+     }
+    },
+    "dex": {
+     "data": {
+      "id": "uniswap-v3-robinhood",
+      "type": "dex"
+     }
+    }
+   }
+  },
+  {
+   "id": "robinhood_0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+   "type": "pool",
+   "attributes": {
+    "address": "0x69bfaf19c9f377bb306a89aed9f6b07e2c1a8d9a",
+    "name": "USDG / WETH 0.05%",
+    "base_token_price_usd": "1.00191305746603",
+    "quote_token_price_usd": "2400.05",
+    "price_change_percentage": {
+     "h24": "0.074"
+    },
+    "reserve_in_usd": "3893880.2408",
+    "volume_usd": {
+     "h24": "33594979.9221956"
+    },
+    "transactions": {
+     "h24": {
+      "buys": 68286,
+      "sells": 72597,
+      "buyers": 12117,
+      "sellers": 11634
+     }
+    },
+    "pool_created_at": "2026-06-29T09:34:25Z"
+   },
+   "relationships": {
+    "base_token": {
+     "data": {
+      "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "type": "token"
+     }
+    },
+    "quote_token": {
+     "data": {
+      "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "type": "token"
+     }
+    },
+    "dex": {
+     "data": {
+      "id": "uniswap-v3-robinhood",
+      "type": "dex"
+     }
+    }
+   }
+  },
+  {
+   "id": "robinhood_0xed50bdeea8adc232f159486192a4157281d722ff",
+   "type": "pool",
+   "attributes": {
+    "address": "0xed50bdeea8adc232f159486192a4157281d722ff",
+    "name": "PONS / WETH 0.3%",
+    "base_token_price_usd": "0.377451609213267",
+    "quote_token_price_usd": "2400.05",
+    "price_change_percentage": {
+     "h24": "-12.682"
+    },
+    "reserve_in_usd": "1653694.6913",
+    "volume_usd": {
+     "h24": "26085655.7233539"
+    },
+    "transactions": {
+     "h24": {
+      "buys": 14483,
+      "sells": 12405,
+      "buyers": 2325,
+      "sellers": 2401
+     }
+    },
+    "pool_created_at": "2026-07-16T15:39:37Z"
+   },
+   "relationships": {
+    "base_token": {
+     "data": {
+      "id": "robinhood_0x39dbed3a2bd333467115de45665cc57f813c4571",
+      "type": "token"
+     }
+    },
+    "quote_token": {
+     "data": {
+      "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "type": "token"
+     }
+    },
+    "dex": {
+     "data": {
+      "id": "uniswap-v3-robinhood",
+      "type": "dex"
+     }
+    }
+   }
+  },
+  {
+   "id": "robinhood_0xddcbba3666f578e3f09516f21ff85bfee859ab5e",
+   "type": "pool",
+   "attributes": {
+    "address": "0xddcbba3666f578e3f09516f21ff85bfee859ab5e",
+    "name": "SPY / WETH 0.05%",
+    "base_token_price_usd": "765.592464868559",
+    "quote_token_price_usd": "2400.05",
+    "price_change_percentage": {
+     "h24": "0.289"
+    },
+    "reserve_in_usd": "1048677.367",
+    "volume_usd": {
+     "h24": "23608563.8487577"
+    },
+    "transactions": {
+     "h24": {
+      "buys": 31357,
+      "sells": 31420,
+      "buyers": 11168,
+      "sellers": 11070
+     }
+    },
+    "pool_created_at": "2026-08-03T13:56:47Z"
+   },
+   "relationships": {
+    "base_token": {
+     "data": {
+      "id": "robinhood_0x117cc2133c37b721f49de2a7a74833232b3b4c0c",
+      "type": "token"
+     }
+    },
+    "quote_token": {
+     "data": {
+      "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "type": "token"
+     }
+    },
+    "dex": {
+     "data": {
+      "id": "uniswap-v3-robinhood",
+      "type": "dex"
+     }
+    }
+   }
+  },
+  {
+   "id": "robinhood_0xd9ab4b7fae6dc2f7020134ec744a8f53ef3e5e24",
+   "type": "pool",
+   "attributes": {
+    "address": "0xd9ab4b7fae6dc2f7020134ec744a8f53ef3e5e24",
+    "name": "TTWO / USDG 0.3%",
+    "base_token_price_usd": "217.929916029597",
+    "quote_token_price_usd": "1.00054034651256",
+    "price_change_percentage": {
+     "h24": "-0.086"
+    },
+    "reserve_in_usd": "755524.3311",
+    "volume_usd": {
+     "h24": "19581729.7952694"
+    },
+    "transactions": {
+     "h24": {
+      "buys": 46532,
+      "sells": 44220,
+      "buyers": 9654,
+      "sellers": 9462
+     }
+    },
+    "pool_created_at": "2026-08-28T16:33:27Z"
+   },
+   "relationships": {
+    "base_token": {
+     "data": {
+      "id": "robinhood_0x5e81213613b6b86eab4c6c50d718d34359459786",
+      "type": "token"
+     }
+    },
+    "quote_token": {
+     "data": {
+      "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "type": "token"
+     }
+    },
+    "dex": {
+     "data": {
+      "id": "uniswap-v3-robinhood",
+      "type": "dex"
+     }
+    }
+   }
+  }
+ ],
+ "included": [
+  {
+   "id": "robinhood_0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+   "type": "token",
+   "attributes": {
+    "address": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+    "symbol": "USDG",
+    "name": "Global Dollar",
+    "image_url": "https://coin-images.coingecko.com/coins/images/51281/large/GDN_USDG_Token_200x200.png?1730484111"
+   }
+  },
+  {
+   "id": "robinhood_0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+   "type": "token",
+   "attributes": {
+    "address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    "symbol": "WETH",
+    "name": "WETH",
+    "image_url": "https://coin-images.coingecko.com/coins/images/102174283/large/weth-robinhood.jpeg?1782924507"
+   }
+  },
+  {
+   "id": "uniswap-v3-robinhood",
+   "type": "dex",
+   "attributes": {
+    "name": "Uniswap V3 (Robinhood)"
+   }
+  },
+  {
+   "id": "robinhood_0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec",
+   "type": "token",
+   "attributes": {
+    "address": "0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec",
+    "symbol": "NVDA",
+    "name": "NVIDIA • Robinhood Token",
+    "image_url": "https://coin-images.coingecko.com/coins/images/102174110/large/0xd0601ce157db5bdc3162bbac2a2c8af5320d9eec.png?1782444565"
+   }
+  },
+  {
+   "id": "robinhood_0x020bfc650a365f8bb26819deaabf3e21291018b4",
+   "type": "token",
+   "attributes": {
+    "address": "0x020bfc650a365f8bb26819deaabf3e21291018b4",
+    "symbol": "CASHCAT",
+    "name": "Cash Cat",
+    "image_url": "https://coin-images.coingecko.com/coins/images/102174280/large/cashcat-logo.jpg?1782922765"
+   }
+  },
+  {
+   "id": "robinhood_0x2e8c31162b855a2ffa90f6f8634643ad6f111e18",
+   "type": "token",
+   "attributes": {
+    "address": "0x2e8c31162b855a2ffa90f6f8634643ad6f111e18",
+    "symbol": "AI",
+    "name": "Artificial Inu",
+    "image_url": "https://assets.geckoterminal.com/5ou9sb7h478ezv28urbjpzf1fl3e"
+   }
+  },
+  {
+   "id": "robinhood_0x39dbed3a2bd333467115de45665cc57f813c4571",
+   "type": "token",
+   "attributes": {
+    "address": "0x39dbed3a2bd333467115de45665cc57f813c4571",
+    "symbol": "PONS",
+    "name": "Pons",
+    "image_url": "https://coin-images.coingecko.com/coins/images/102174571/large/jhitvkisdq8fhxvimdkpcw7y3dx5.?1784093932"
+   }
+  },
+  {
+   "id": "robinhood_0x117cc2133c37b721f49de2a7a74833232b3b4c0c",
+   "type": "token",
+   "attributes": {
+    "address": "0x117cc2133c37b721f49de2a7a74833232b3b4c0c",
+    "symbol": "SPY",
+    "name": "SPDR S&amp;P 500 ETF Trust • Robinhood Token",
+    "image_url": "https://coin-images.coingecko.com/coins/images/102174115/large/0x117cc2133c37b721f49de2a7a74833232b3b4c0c.png?1782444578"
+   }
+  },
+  {
+   "id": "robinhood_0x5e81213613b6b86eab4c6c50d718d34359459786",
+   "type": "token",
+   "attributes": {
+    "address": "0x5e81213613b6b86eab4c6c50d718d34359459786",
+    "symbol": "TTWO",
+    "name": "Take-Two Interactive Software • Robinhood Token",
+    "image_url": "https://coin-images.coingecko.com/coins/images/102174176/large/0x5e81213613b6b86eab4c6c50d718d34359459786.png?1782444740"
+   }
+  }
+ ]
+}

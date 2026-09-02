@@ -1,5 +1,5 @@
-import { PortfolioApp } from "../portfolio-app";
+import { redirect } from "next/navigation";
 
 export default function AppPage() {
-  return <PortfolioApp />;
+  redirect("/");
 }

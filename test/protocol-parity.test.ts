@@ -5,7 +5,7 @@ import { addressesFor, chainOf, type ChainSlug } from "../src/chains.js";
 import { planMint, quoteMintFromPool, quoteMintV2 } from "../src/core/mint.js";
 import { adapterFor, v2WatchPairsFor } from "../src/core/protocols.js";
 import { chainCatalog, type CuratedMarket } from "../src/markets/catalog.js";
-import { buildPositionActionPlan, buildRebalancePositionActionPlan, positionPoolIsConfigured } from "../src/portfolio/position-actions.js";
+import { atomicActionsFor, buildDecreasePositionActionPlan, buildPositionActionPlan, positionPoolIsConfigured } from "../src/portfolio/position-actions.js";
 import type { PositionSnapshot, Protocol, TokenRef } from "../src/types.js";
 
 const owner = getAddress("0x1111111111111111111111111111111111111111");
@@ -35,31 +35,28 @@ describe("Base and Robinhood protocol parity", () => {
         }
       });
 
-      it(`${chain} ${protocol} has protocol-correct fee and withdrawal management`, () => {
+      it(`${chain} ${protocol} exposes only single-transaction management`, () => {
         const market = marketFor(chain, protocol);
         const position = snapshot(chain, protocol, market);
         const addresses = addressesFor(chain);
         if (protocol === "V2") {
-          expect(() => buildPositionActionPlan(position, owner, chain, "collect")).toThrow("already reinvested");
-          expect(() => buildPositionActionPlan(position, owner, chain, "compound")).toThrow("already reinvested");
-          expect(() => buildRebalancePositionActionPlan({ ...position, inRange: false }, owner, chain)).toThrow("already full range");
-          const withdraw = buildPositionActionPlan(position, owner, chain, "withdraw");
-          expect(withdraw.transactions.some((transaction) => transaction.to === addresses.v2Router)).toBe(true);
+          expect(atomicActionsFor(position)).toEqual([]);
+          expect(() => buildPositionActionPlan(position, owner, chain, "collect")).toThrow("managed on Uniswap");
+          expect(() => buildPositionActionPlan(position, owner, chain, "withdraw")).toThrow("managed on Uniswap");
           return;
         }
-
-        const collect = buildPositionActionPlan(position, owner, chain, "collect");
-        const compound = buildPositionActionPlan(position, owner, chain, "compound");
-        const withdraw = buildPositionActionPlan(position, owner, chain, "withdraw");
-        const outOfRange = snapshot(chain, protocol, market, true);
-        const rebalance = buildRebalancePositionActionPlan(outOfRange, owner, chain);
         const manager = protocol === "V4" ? addresses.v4PositionManager : addresses.nfpm;
-        expect(collect.serviceFeeBps).toBe(0);
-        expect(collect.transactions.some((transaction) => transaction.to === manager)).toBe(true);
-        expect(compound.transactions.some((transaction) => transaction.to === manager)).toBe(true);
-        expect(withdraw.transactions.some((transaction) => transaction.to === manager)).toBe(true);
-        expect(rebalance.transactions.some((transaction) => transaction.to === manager)).toBe(true);
-        expect([collect, compound, withdraw, rebalance].flatMap((plan) => plan.transactions).every((transaction) => transaction.data !== "0x" || BigInt(transaction.value) > 0n)).toBe(true);
+        const collect = buildPositionActionPlan(position, owner, chain, "collect");
+        const decrease = buildDecreasePositionActionPlan(position, owner, chain, 30);
+        const withdraw = buildPositionActionPlan(position, owner, chain, "withdraw");
+        expect(atomicActionsFor(position)).toEqual(["collect", "decrease", "withdraw"]);
+        for (const plan of [collect, decrease, withdraw]) {
+          expect(plan.atomic).toBe(true);
+          expect(plan.serviceFeeBps).toBe(0);
+          expect(plan.transactions).toHaveLength(1);
+          expect(plan.transactions[0]?.to).toBe(manager);
+          expect(plan.transactions[0]?.data).not.toBe("0x");
+        }
       });
     }
   }

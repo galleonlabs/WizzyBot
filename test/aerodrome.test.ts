@@ -3,7 +3,7 @@ import { getAddress } from "viem";
 import { AERODROME_DEPLOYMENTS } from "../src/aerodrome/deployments.js";
 import { exactInSlipstreamTx, mintSlipstreamTx } from "../src/aerodrome/calldata.js";
 import { activeMarkets } from "../src/markets/catalog.js";
-import { buildPositionActionPlan, buildRebalancePositionActionPlan } from "../src/portfolio/position-actions.js";
+import { buildPositionActionPlan } from "../src/portfolio/position-actions.js";
 import type { PositionSnapshot } from "../src/types.js";
 import { AerodromeSlipstreamAdapter } from "../src/aerodrome/positions.js";
 
@@ -56,64 +56,12 @@ describe("Aerodrome Slipstream", () => {
     expect(mint.data.slice(0, 10)).toBe("0xb5007d1f");
   });
 
-  it("compounds and withdraws through the Aerodrome position manager", () => {
+  it("collects through the Aerodrome position manager and sends removals to the venue", () => {
     const collect = buildPositionActionPlan(snapshot(), owner, "base", "collect");
     expect(collect.serviceFeeBps).toBe(0);
     expect(collect.transactions.map((tx) => tx.description)).toEqual(["Aerodrome collect"]);
-
-    const compound = buildPositionActionPlan(snapshot(), owner, "base", "compound");
-    expect(compound.transactions[0]?.description).toBe("Aerodrome collect");
-    expect(compound.transactions.at(-1)?.description).toBe("Aerodrome increaseLiquidity");
-    expect(compound.transactions.filter((tx) => tx.description.startsWith("ERC20.approve")).every((tx) => tx.data !== "0x")).toBe(true);
-    expect(compound.transactions.every((tx) => compound.allowedTargets.includes(tx.to))).toBe(true);
-
-    const withdraw = buildPositionActionPlan(snapshot(), owner, "base", "withdraw");
-    expect(withdraw.transactions.map((tx) => tx.description)).toEqual([
-      "Aerodrome decreaseLiquidity 100%",
-      "Aerodrome collect",
-      "Aerodrome burn empty position",
-    ]);
-    expect(withdraw.transactions[0]?.to).toBe(deployment.positionManager);
-    expect(withdraw.transactions.at(-1)?.to).toBe(deployment.positionManager);
-  });
-
-  it("recentres an out-of-range Slipstream position through the reviewed Aerodrome router", () => {
-    const position = {
-      ...snapshot(),
-      tickCurrent: 600,
-      amount0: 0n,
-      inRange: false,
-      percentThroughRange: 100,
-    };
-    const plan = buildRebalancePositionActionPlan(position, owner, "base", {
-      venue: "aerodrome-slipstream",
-      router: deployment.swapRouter,
-      tokenIn: position.token1.address,
-      tokenOut: position.token0.address,
-      amountIn: 900_000n,
-      minimumAmountOut: 400_000n,
-      tickSpacing: brett.tickSpacing,
-    });
-
-    expect(plan.range).toMatchObject({
-      tickLower: 200,
-      tickUpper: 1000,
-      currentTick: 600,
-      previousTickLower: -400,
-      previousTickUpper: 400,
-      preset: "balanced",
-    });
-    expect(plan.transactions.slice(0, 3).map((tx) => tx.description)).toEqual([
-      "Aerodrome decreaseLiquidity 100%",
-      "Aerodrome collect",
-      "Aerodrome burn empty position",
-    ]);
-    expect(plan.transactions.some((tx) => tx.to === deployment.swapRouter && tx.description.includes("Aerodrome exact-in"))).toBe(true);
-    expect(plan.transactions.at(-1)?.description).toBe("Aerodrome Slipstream mint");
-    expect(plan.transactions.at(-1)?.to).toBe(deployment.positionManager);
-    expect(plan.allowedTargets).toContain(deployment.swapRouter);
-    expect(plan.transactions.every((tx) => plan.allowedTargets.includes(tx.to))).toBe(true);
-    expect(plan.notices[0]).toContain("Aerodrome Slipstream");
+    expect(collect.transactions[0]?.to).toBe(deployment.positionManager);
+    expect(() => buildPositionActionPlan(snapshot(), owner, "base", "withdraw")).toThrow("aerodrome.finance");
   });
 
   it("discovers and values a self-custodied Slipstream NFT", async () => {

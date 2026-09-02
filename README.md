@@ -4,10 +4,10 @@ Make Meme Markets.
 
 Make markets on Base and Robinhood Chain. Your EOA owns every position.
 
-- Connect an external wallet. Wizzy never creates or controls one.
-- Positions first: every Uniswap V3, V4, and Aerodrome Slipstream LP the wallet owns on Base and Robinhood Chain appears as one card with value, unclaimed fees, pool fee APR, and a live range chart.
-- Five actions per position, each in one focused sheet: collect fees, add ETH, reduce by any share, reposition to a preset or custom range, and exit to native ETH or both tokens. Actions work for any owned pool, not only catalog markets.
-- Markets: choose a reviewed meme market and enter one ETH amount to open a new position. Wizzy prepares the swap, range, and liquidity with no Wizzy fee.
+- Pools first: every ETH-paired meme pool on Uniswap V2/V3/V4 and Aerodrome Slipstream across Base and Robinhood Chain, swept from GeckoTerminal every ten minutes and curated deterministically: scams and dust out, honeypots and high-tax tokens out via GoPlus on Base, thin and brand-new pools kept but flagged. The hand-reviewed catalog always makes the menu.
+- Wizzy is a monetised Relay wrapper. "LP this pool" swaps the wallet into the exact tokens the pool needs from any of five networks, with a 0.3% Wizzy fee inside the Relay quote paid to the treasury, then opens the pool's create page on Uniswap or Aerodrome to set the range.
+- Positions: every LP in the wallet with value, unclaimed fees, pool fee APR, and a live range chart. Collect, reduce, and exit run in-app only when they are one transaction; everything multi-step links to the venue. After an exit, selling the meme token for ETH is one more monetised Relay step.
+- Connect an external wallet. Wizzy never creates or controls one and never holds funds.
 - The curator reviews both chains every six hours and ships policy-valid catalog changes through the tested Git path.
 - The application launches without a Wizzy token. Any future token is a separate, gated release.
 

@@ -8,6 +8,7 @@ export const TELEMETRY_AREAS = [
   "cross-chain-funding",
   "send-eth",
   "position-action",
+  "relay",
   "achievements",
   "render",
 ] as const;

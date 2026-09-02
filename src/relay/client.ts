@@ -1,259 +1,173 @@
 import { getAddress, isAddress, type Address, type Hex } from "viem";
-import { ethFundingChain } from "./origins.js";
+import { appFeeBps, appFeeRecipient } from "./fees.js";
+import { relayChain } from "./origins.js";
 
 const RELAY_API = "https://api.relay.link";
-const NATIVE = "0x0000000000000000000000000000000000000000";
-const BASE_CHAIN_ID = 8453;
-const ROBINHOOD_CHAIN_ID = 4663;
-const SOLANA_CHAIN_ID = 792703809;
-const SOLANA_NATIVE = "11111111111111111111111111111111";
-const QUOTE_TIMEOUT_MS = 8_000;
+export const NATIVE_CURRENCY = "0x0000000000000000000000000000000000000000";
+const QUOTE_TIMEOUT_MS = 12_000;
+const QUOTE_TTL_MS = 4 * 60_000;
 
-export type RelayBridgeQuote = {
+export type RelayTransaction = {
+  to: Address;
+  data: Hex;
+  value: string;
+  chainId: number;
+  description: string;
+};
+
+export type RelayCurrency = {
+  chainId: number;
+  address: string;
+  symbol: string;
+  decimals: number;
+};
+
+export type RelaySwapQuote = {
   provider: "Relay";
   requestId: string;
+  owner: Address;
   originChainId: number;
-  destinationChainId: 4663;
-  owner: Address;
-  amountInWei: string;
-  expectedAmountOutWei: string;
-  minimumAmountOutWei: string;
-  relayerFeeWei: string;
-  relayerFeeUsd: string | null;
+  destinationChainId: number;
+  currencyIn: RelayCurrency;
+  currencyOut: RelayCurrency;
+  amountIn: string;
+  expectedAmountOut: string;
+  minimumAmountOut: string;
+  amountOutUsd: string | null;
+  fees: {
+    appBps: number;
+    appAmount: string;
+    appUsd: string | null;
+    relayerUsd: string | null;
+    gasUsd: string | null;
+  };
   impactPercent: string | null;
   estimatedSeconds: number | null;
-  transaction: {
-    to: Address;
-    data: Hex;
-    value: string;
-    description: string;
-  };
+  steps: Array<{ id: string; description: string; transactions: RelayTransaction[] }>;
+  transactions: RelayTransaction[];
   statusPath: string;
   createdAt: string;
   expiresAt: string;
   notices: string[];
 };
 
-export type RelaySolanaQuote = {
-  provider: "Relay";
-  requestId: string;
-  originChainId: 8453;
-  destinationChainId: 792703809;
-  owner: Address;
-  recipient: string;
-  amountInWei: string;
-  expectedAmountOutLamports: string;
-  minimumAmountOutLamports: string;
-  relayerFeeWei: string;
-  relayerFeeUsd: string | null;
-  impactPercent: string | null;
-  estimatedSeconds: number | null;
-  transaction: {
-    to: Address;
-    data: Hex;
-    value: string;
-    description: string;
-  };
-  statusPath: string;
-  createdAt: string;
-  expiresAt: string;
-  notices: string[];
-};
-
-export async function quoteEthToRobinhood(input: {
+/**
+ * One Relay quote with Wizzy's app fee attached. Covers same-chain swaps,
+ * cross-chain bridges, and cross-chain swaps. Every returned transaction is
+ * validated to originate from the connected wallet on the origin chain.
+ */
+export async function quoteRelaySwap(input: {
   owner: string;
-  amountInWei: bigint;
   originChainId: number;
-}): Promise<RelayBridgeQuote> {
+  destinationChainId: number;
+  originCurrency: string;
+  destinationCurrency: string;
+  amountWei: bigint;
+}): Promise<RelaySwapQuote> {
   if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
-  if (input.amountInWei <= 0n) throw new Error("bridge amount must be positive");
-  const origin = ethFundingChain(input.originChainId);
-  if (origin.id === ROBINHOOD_CHAIN_ID) throw new Error("ETH is already on Robinhood Chain");
+  if (input.amountWei <= 0n) throw new Error("amount must be positive");
+  const origin = relayChain(input.originChainId);
+  const destination = relayChain(input.destinationChainId);
+  const originCurrency = currencyAddress(input.originCurrency);
+  const destinationCurrency = currencyAddress(input.destinationCurrency);
+  if (origin.id === destination.id && originCurrency === destinationCurrency) throw new Error("Choose a different token to receive");
   const owner = getAddress(input.owner);
-  const response = await relayFetch("/quote/v2", {
+  const feeBps = appFeeBps();
+  const response = await relayFetch("/quote", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       user: owner,
       recipient: owner,
       originChainId: origin.id,
-      destinationChainId: ROBINHOOD_CHAIN_ID,
-      originCurrency: NATIVE,
-      destinationCurrency: NATIVE,
-      amount: input.amountInWei.toString(),
+      destinationChainId: destination.id,
+      originCurrency,
+      destinationCurrency,
+      amount: input.amountWei.toString(),
       tradeType: "EXACT_INPUT",
-      useExternalLiquidity: false,
+      referrer: "wizzy.meme",
+      ...(feeBps > 0 ? { appFees: [{ recipient: appFeeRecipient(), fee: String(feeBps) }] } : {}),
     }),
   });
   const quote = asRecord(await response.json());
-  const requestId = requiredString(quote.requestId, "Relay requestId");
   const details = asRecord(quote.details);
-  const currencyIn = asRecord(details.currencyIn);
-  const currencyOut = asRecord(details.currencyOut);
-  const inCurrency = asRecord(currencyIn.currency);
-  const outCurrency = asRecord(currencyOut.currency);
-  const step = firstRecord(quote.steps, "Relay deposit step");
-  if (step.kind !== "transaction") throw new Error("Relay quote did not return a transaction step");
-  const item = firstRecord(step.items, "Relay transaction item");
-  const tx = asRecord(item.data);
-  const protocol = asRecord(quote.protocol);
-  const v2 = asRecord(protocol.v2);
-  const paymentDetails = asRecord(v2.paymentDetails);
-
-  const transaction = {
-    from: requiredAddress(tx.from, "Relay transaction sender"),
-    to: requiredAddress(tx.to, "Relay transaction target"),
-    data: requiredHex(tx.data, "Relay transaction data"),
-    value: requiredIntegerString(tx.value, "Relay transaction value"),
-    chainId: requiredNumber(tx.chainId, "Relay transaction chainId"),
-  };
-  const depository = requiredAddress(paymentDetails.depository, "Relay depository");
-  const expectedOut = requiredIntegerString(currencyOut.amount, "Relay expected output");
-  const minimumOut = requiredIntegerString(currencyOut.minimumAmount, "Relay minimum output");
+  const currencyIn = parseCurrency(asRecord(details.currencyIn));
+  const currencyOut = parseCurrency(asRecord(details.currencyOut));
+  const rawSteps = quote.steps;
+  if (!Array.isArray(rawSteps) || !rawSteps.length) throw new Error("Relay returned no steps");
+  const requestId = requiredString(asRecord(rawSteps[0]).requestId ?? quote.requestId, "Relay requestId");
+  const steps = rawSteps.map((entry) => {
+    const step = asRecord(entry);
+    if (step.kind !== "transaction") throw new Error("Relay returned a step this wallet flow cannot sign");
+    const id = requiredString(step.id, "Relay step id");
+    const description = typeof step.description === "string" ? step.description : id;
+    const items = Array.isArray(step.items) ? step.items : [];
+    const transactions = items.map((item): RelayTransaction => {
+      const data = asRecord(asRecord(item).data);
+      const from = requiredAddress(data.from, "Relay transaction sender");
+      const chainId = requiredNumber(data.chainId, "Relay transaction chainId");
+      if (from.toLowerCase() !== owner.toLowerCase()) throw new Error("Relay sender does not match wallet");
+      if (chainId !== origin.id) throw new Error("Relay transaction is not on the origin network");
+      return {
+        to: requiredAddress(data.to, "Relay transaction target"),
+        data: requiredHex(data.data, "Relay transaction data"),
+        value: optionalIntegerString(data.value) ?? "0",
+        chainId,
+        description: `Relay ${description}`,
+      };
+    });
+    if (!transactions.length) throw new Error(`Relay step ${id} has no transaction`);
+    return { id, description, transactions };
+  });
   const quotedIn = requiredIntegerString(currencyIn.amount, "Relay input amount");
-
-  if (transaction.from.toLowerCase() !== owner.toLowerCase()) throw new Error("Relay sender does not match wallet");
-  if (transaction.to.toLowerCase() !== depository.toLowerCase()) throw new Error("Relay target does not match its depository");
-  if (transaction.chainId !== origin.id) throw new Error("Relay deposit network mismatch");
-  if (transaction.value !== input.amountInWei.toString() || quotedIn !== transaction.value) {
-    throw new Error("Relay quote changed the requested input amount");
+  if (quotedIn !== input.amountWei.toString()) throw new Error("Relay quote changed the requested input amount");
+  if (currencyIn.currency.chainId !== origin.id || currencyOut.currency.chainId !== destination.id) throw new Error("Relay quote networks do not match the request");
+  if (currencyIn.currency.address.toLowerCase() !== originCurrency.toLowerCase() || currencyOut.currency.address.toLowerCase() !== destinationCurrency.toLowerCase()) {
+    throw new Error("Relay quote tokens do not match the request");
   }
-  if (requiredNumber(inCurrency.chainId, "Relay input chain") !== origin.id) throw new Error("Relay input chain mismatch");
-  if (requiredNumber(outCurrency.chainId, "Relay output chain") !== ROBINHOOD_CHAIN_ID) throw new Error("Relay output chain mismatch");
-  if (requiredString(inCurrency.address, "Relay input currency").toLowerCase() !== NATIVE) throw new Error("Relay input must be native ETH");
-  if (requiredString(outCurrency.address, "Relay output currency").toLowerCase() !== NATIVE) throw new Error("Relay output must be native ETH");
-  if (BigInt(minimumOut) <= 0n || BigInt(expectedOut) < BigInt(minimumOut)) throw new Error("Relay returned an invalid output range");
-
-  const fees = asRecord(quote.fees);
-  const relayer = asRecord(fees.relayer);
-  const totalImpact = asRecord(details.totalImpact);
-  const now = new Date();
-  return {
-    provider: "Relay",
-    requestId,
-    originChainId: origin.id,
-    destinationChainId: ROBINHOOD_CHAIN_ID,
-    owner,
-    amountInWei: quotedIn,
-    expectedAmountOutWei: expectedOut,
-    minimumAmountOutWei: minimumOut,
-    relayerFeeWei: optionalIntegerString(relayer.amount) ?? "0",
-    relayerFeeUsd: optionalString(relayer.amountUsd),
-    impactPercent: optionalString(totalImpact.percent),
-    estimatedSeconds: optionalNumber(details.timeEstimate),
-    transaction: {
-      to: transaction.to,
-      data: transaction.data,
-      value: transaction.value,
-      description: `Relay ${origin.label} → Robinhood Chain deposit`,
-    },
-    statusPath: `/api/relay/status?requestId=${encodeURIComponent(requestId)}`,
-    createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + 5 * 60_000).toISOString(),
-    notices: [
-      "Relay is an independent third-party bridge and charges the quoted relayer fee.",
-      "The minimum destination amount includes Relay's quoted slippage tolerance.",
-      "If the intent cannot be filled, Relay's protocol refund path returns funds to this wallet.",
-    ],
-  };
-}
-
-export function quoteBaseToRobinhoodEth(input: { owner: string; amountInWei: bigint }): Promise<RelayBridgeQuote> {
-  return quoteEthToRobinhood({ ...input, originChainId: BASE_CHAIN_ID });
-}
-
-export async function quoteBaseToSolanaSol(input: {
-  owner: string;
-  recipient: string;
-  amountInWei: bigint;
-}): Promise<RelaySolanaQuote> {
-  if (!isAddress(input.owner)) throw new Error("owner must be a valid EVM address");
-  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(input.recipient)) throw new Error("recipient must be a valid Solana address");
-  if (input.amountInWei <= 0n) throw new Error("bridge amount must be positive");
-  const owner = getAddress(input.owner);
-  const response = await relayFetch("/quote/v2", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      user: owner,
-      recipient: input.recipient,
-      originChainId: BASE_CHAIN_ID,
-      destinationChainId: SOLANA_CHAIN_ID,
-      originCurrency: NATIVE,
-      destinationCurrency: SOLANA_NATIVE,
-      amount: input.amountInWei.toString(),
-      tradeType: "EXACT_INPUT",
-      useExternalLiquidity: true,
-    }),
-  });
-  const quote = asRecord(await response.json());
-  const requestId = requiredString(quote.requestId, "Relay requestId");
-  const details = asRecord(quote.details);
-  const currencyIn = asRecord(details.currencyIn);
-  const currencyOut = asRecord(details.currencyOut);
-  const inCurrency = asRecord(currencyIn.currency);
-  const outCurrency = asRecord(currencyOut.currency);
-  const step = firstRecord(quote.steps, "Relay deposit step");
-  if (step.kind !== "transaction") throw new Error("Relay quote did not return a transaction step");
-  const item = firstRecord(step.items, "Relay transaction item");
-  const tx = asRecord(item.data);
-  const protocol = asRecord(quote.protocol);
-  const v2 = asRecord(protocol.v2);
-  const paymentDetails = asRecord(v2.paymentDetails);
-
-  const transaction = {
-    from: requiredAddress(tx.from, "Relay transaction sender"),
-    to: requiredAddress(tx.to, "Relay transaction target"),
-    data: requiredHex(tx.data, "Relay transaction data"),
-    value: requiredIntegerString(tx.value, "Relay transaction value"),
-    chainId: requiredNumber(tx.chainId, "Relay transaction chainId"),
-  };
-  const depository = requiredAddress(paymentDetails.depository, "Relay depository");
   const expectedOut = requiredIntegerString(currencyOut.amount, "Relay expected output");
   const minimumOut = requiredIntegerString(currencyOut.minimumAmount, "Relay minimum output");
-  const quotedIn = requiredIntegerString(currencyIn.amount, "Relay input amount");
-
-  if (transaction.from.toLowerCase() !== owner.toLowerCase()) throw new Error("Relay sender does not match wallet");
-  if (transaction.to.toLowerCase() !== depository.toLowerCase()) throw new Error("Relay target does not match its depository");
-  if (transaction.chainId !== BASE_CHAIN_ID) throw new Error("Relay deposit must execute on Base");
-  if (transaction.value !== input.amountInWei.toString() || quotedIn !== transaction.value) throw new Error("Relay quote changed the requested input amount");
-  if (requiredNumber(inCurrency.chainId, "Relay input chain") !== BASE_CHAIN_ID) throw new Error("Relay input chain mismatch");
-  if (requiredNumber(outCurrency.chainId, "Relay output chain") !== SOLANA_CHAIN_ID) throw new Error("Relay output chain mismatch");
-  if (requiredString(inCurrency.address, "Relay input currency").toLowerCase() !== NATIVE) throw new Error("Relay input must be native ETH");
-  if (requiredString(outCurrency.address, "Relay output currency") !== SOLANA_NATIVE) throw new Error("Relay output must be native SOL");
   if (BigInt(minimumOut) <= 0n || BigInt(expectedOut) < BigInt(minimumOut)) throw new Error("Relay returned an invalid output range");
-
+  if (originCurrency === NATIVE_CURRENCY) {
+    const value = steps.flatMap((step) => step.transactions).reduce((sum, tx) => sum + BigInt(tx.value), 0n);
+    if (value !== input.amountWei) throw new Error("Relay deposit value does not match the amount");
+  }
   const fees = asRecord(quote.fees);
-  const relayer = asRecord(fees.relayer);
-  const totalImpact = asRecord(details.totalImpact);
+  const app = optionalRecord(fees.app);
+  const relayer = optionalRecord(fees.relayer);
+  const gas = optionalRecord(fees.gas);
+  const totalImpact = optionalRecord(details.totalImpact);
   const now = new Date();
   return {
     provider: "Relay",
     requestId,
-    originChainId: BASE_CHAIN_ID,
-    destinationChainId: SOLANA_CHAIN_ID,
     owner,
-    recipient: input.recipient,
-    amountInWei: quotedIn,
-    expectedAmountOutLamports: expectedOut,
-    minimumAmountOutLamports: minimumOut,
-    relayerFeeWei: optionalIntegerString(relayer.amount) ?? "0",
-    relayerFeeUsd: optionalString(relayer.amountUsd),
-    impactPercent: optionalString(totalImpact.percent),
-    estimatedSeconds: optionalNumber(details.timeEstimate),
-    transaction: {
-      to: transaction.to,
-      data: transaction.data,
-      value: transaction.value,
-      description: "Relay Base → Solana funding deposit",
+    originChainId: origin.id,
+    destinationChainId: destination.id,
+    currencyIn: currencyIn.currency,
+    currencyOut: currencyOut.currency,
+    amountIn: quotedIn,
+    expectedAmountOut: expectedOut,
+    minimumAmountOut: minimumOut,
+    amountOutUsd: optionalString(currencyOut.amountUsd),
+    fees: {
+      appBps: feeBps,
+      appAmount: optionalIntegerString(app?.amount) ?? "0",
+      appUsd: optionalString(app?.amountUsd),
+      relayerUsd: optionalString(relayer?.amountUsd),
+      gasUsd: optionalString(gas?.amountUsd),
     },
+    impactPercent: optionalString(totalImpact?.percent),
+    estimatedSeconds: optionalNumber(details.timeEstimate),
+    steps,
+    transactions: steps.flatMap((step) => step.transactions),
     statusPath: `/api/relay/status?requestId=${encodeURIComponent(requestId)}`,
     createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + 5 * 60_000).toISOString(),
+    expiresAt: new Date(now.getTime() + QUOTE_TTL_MS).toISOString(),
     notices: [
-      "Relay routes Base ETH into native SOL at the connected Solana address.",
-      "The minimum destination amount includes Relay's quoted slippage tolerance.",
-      "Solana liquidity transactions remain self-custodial and require this Solana wallet's signature.",
+      `Wizzy adds a ${(feeBps / 100).toFixed(2)}% fee to this Relay quote. Relay charges its quoted relayer fee separately.`,
+      "The minimum amount includes Relay's slippage tolerance. If the intent cannot be filled, Relay refunds this wallet.",
+      "Wizzy never holds funds. Tokens land directly in your wallet on the destination network.",
     ],
   };
 }
@@ -264,6 +178,27 @@ export async function relayIntentStatus(requestId: string): Promise<unknown> {
   return response.json();
 }
 
+function currencyAddress(value: string): string {
+  if (value.toLowerCase() === "eth" || value.toLowerCase() === NATIVE_CURRENCY) return NATIVE_CURRENCY;
+  if (!isAddress(value)) throw new Error("currency must be an EVM address or ETH");
+  return getAddress(value);
+}
+
+function parseCurrency(value: Record<string, unknown>): { currency: RelayCurrency; amount: unknown; minimumAmount: unknown; amountUsd: unknown } {
+  const currency = asRecord(value.currency);
+  return {
+    currency: {
+      chainId: requiredNumber(currency.chainId, "Relay currency chain"),
+      address: requiredString(currency.address, "Relay currency address"),
+      symbol: typeof currency.symbol === "string" ? currency.symbol : "?",
+      decimals: typeof currency.decimals === "number" ? currency.decimals : 18,
+    },
+    amount: value.amount,
+    minimumAmount: value.minimumAmount ?? value.amount,
+    amountUsd: value.amountUsd,
+  };
+}
+
 async function relayFetch(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${RELAY_API}${path}`, {
     ...init,
@@ -271,10 +206,25 @@ async function relayFetch(path: string, init?: RequestInit): Promise<Response> {
     signal: AbortSignal.timeout(QUOTE_TIMEOUT_MS),
   });
   if (!response.ok) {
-    const message = await response.text().catch(() => "");
-    throw new Error(`Relay ${response.status}: ${message.slice(0, 240) || response.statusText}`);
+    const body = await response.text().catch(() => "");
+    let message = body.slice(0, 240) || response.statusText;
+    try {
+      const parsed = JSON.parse(body) as { message?: string; errorCode?: string };
+      if (parsed.message) message = friendlyRelayError(parsed.errorCode, parsed.message);
+    } catch {
+      // Non-JSON error bodies fall back to the raw text.
+    }
+    throw new Error(message);
   }
   return response;
+}
+
+function friendlyRelayError(code: string | undefined, message: string): string {
+  if (code === "INSUFFICIENT_LIQUIDITY") return `Relay cannot fill this size right now. ${message.replace(/^Amount is higher than the available liquidity\.?\s*/i, "")}`.trim();
+  if (code === "GAS_IMPACT_TOO_HIGH") return "This amount is too small to cover network fees. Try a larger amount.";
+  if (code === "SWAP_QUOTE_FAILED") return "Relay could not route this swap. Try again or swap on the venue directly.";
+  if (code === "INVALID_INPUT_CURRENCY") return "Relay does not support this token yet.";
+  return message;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -282,9 +232,8 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function firstRecord(value: unknown, label: string): Record<string, unknown> {
-  if (!Array.isArray(value) || value.length === 0) throw new Error(`${label} is missing`);
-  return asRecord(value[0]);
+function optionalRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
 
 function requiredString(value: unknown, label: string): string {

@@ -3,6 +3,7 @@
  * expressed as "ETH per meme token" so the range reads the same way whether
  * ETH is token0 or token1 in the pool. Mirrors src/core/ticks.ts snapping.
  */
+// @ts-ignore NodeNext test resolution requires .js while Turbopack requires the source path.
 import { MAX_TICK, MIN_TICK, type PositionView } from "./cards";
 
 const TICK_BASE = Math.log(1.0001);

@@ -178,6 +178,10 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
           venueLabel: (snap.venue ?? snap.ref.venue) === "aerodrome-slipstream" ? "Aerodrome" : undefined,
           positionManager: snap.positionManager ?? snap.ref.positionManager,
           marketId: catalogMarkets.find((market) => positionPoolIsConfigured(snap, [market]))?.id,
+          address0: snap.token0.address,
+          address1: snap.token1.address,
+          decimals0: snap.token0.decimals,
+          decimals1: snap.token1.decimals,
         };
         try {
           const { view, liquidityProfile } = await liveViewFor(snap, client, env.ethUsd, { readHistory: false, timeoutMs: 3_500 });

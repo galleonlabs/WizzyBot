@@ -22,14 +22,14 @@ const display = Unbounded({
 });
 
 const siteUrl = "https://wizzy.meme";
-const socialTitle = "Wizzy: Make Meme Markets";
+const socialTitle = "Wizzy: Meme Yield, Curated";
 const socialDescription =
-  "Pick a reviewed meme pool on Base or Robinhood, add ETH, and own the liquidity position.";
+  "Curated meme LP pools on Base and Robinhood Chain. Swap into the exact tokens with Relay, open the position on Uniswap or Aerodrome, and manage it in one place.";
 const socialImage = {
   url: "/brand/wizzy-social-unbounded-v1.png",
   width: 1200,
   height: 630,
-  alt: "Wizzy mascot beside the words ‘Make Meme Markets’, with an invitation to deposit ETH and earn trading fees.",
+  alt: "Wizzy mascot beside the words ‘Make Meme Markets’, inviting you to earn trading fees from curated meme pools.",
 };
 
 export const metadata: Metadata = {
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   creator: "Wizzy",
   publisher: "Wizzy",
   category: "finance",
-  keywords: ["meme markets", "Robinhood Chain", "Base", "liquidity", "DeFi", "Wizzy"],
+  keywords: ["meme pools", "LP curator", "Robinhood Chain", "Base", "liquidity", "Relay", "DeFi", "Wizzy"],
   formatDetection: { email: false, address: false, telephone: false },
   robots: {
     index: true,

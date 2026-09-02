@@ -127,3 +127,9 @@ export function allowedMarketAddresses(slug: ChainSlug): Address[] {
   }
   return [...out];
 }
+
+export function liquidityVenueFor(market: CuratedMarket, protocol: "V2" | "V4") {
+  const venue = market.liquidityVenues.find((candidate) => candidate.protocol === protocol);
+  if (!venue) throw new Error(`${market.symbol} has no reviewed Uniswap ${protocol} pool`);
+  return venue;
+}

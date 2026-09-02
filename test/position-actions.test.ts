@@ -47,6 +47,20 @@ describe("self-custodial position actions", () => {
     expect(plan.transactions.every((transaction) => transaction.data !== "0x" || BigInt(transaction.value) > 0n)).toBe(true);
   });
 
+  it("funds a V3 increase with native ETH instead of requiring WETH approval", () => {
+    const position = snapshot();
+    const addresses = addressesFor("base");
+    const allocation = allocationPlan(position, "V3", "uniswap-v3", addresses.nfpm, "NFPM.mint");
+    allocation.markets[0]!.quoteSymbol = "ETH";
+    allocation.transactions = allocation.transactions.filter((transaction) => transaction.to !== addresses.weth);
+    const plan = buildIncreasePositionActionPlan(position, allocation);
+    const increase = plan.transactions.find((transaction) => transaction.description === "NFPM.increaseLiquidity");
+
+    expect(increase).toBeDefined();
+    expect(BigInt(increase!.value)).toBeGreaterThan(0n);
+    expect(plan.transactions.some((transaction) => transaction.to === addresses.weth)).toBe(false);
+  });
+
   it("adds to an existing V2 pool balance instead of creating a separate market", () => {
     const addresses = addressesFor("base");
     const pair = "0x2222222222222222222222222222222222222222" as const;

@@ -119,26 +119,23 @@ export async function planAllocation(input: {
       client,
     });
   }
-  const quotes: MarketQuote[] = [await quoteMarket(client, owner, chain.id, market, net)];
+  const quotes: MarketQuote[] = [await quoteMarket(client, owner, chain.id, market, net, true)];
 
   const addresses = addressesFor(input.chain);
-  const transactions: PlannedTx[] = [wrapEthTx(net, chain.id)];
+  const transactions: PlannedTx[] = [];
   const uniswapQuotes = quotes.filter((quote) => quote.marketPlan.venue === "uniswap-v3");
-  const uniswapSwapWeth = uniswapQuotes.reduce((sum, quote) => sum + BigInt(quote.marketPlan.swapInWei), 0n);
-  if (uniswapSwapWeth > 0n) {
-    transactions.push(
-      erc20ApproveTx(addresses.weth, addresses.swapRouter02, uniswapSwapWeth),
-      ...uniswapQuotes.map((quote) => quote.swap),
-    );
-  }
+  transactions.push(...uniswapQuotes.map((quote) => quote.swap));
+  const aerodromeQuotes = quotes.filter((quote) => quote.marketPlan.venue === "aerodrome-slipstream");
+  const aerodromeBudget = aerodromeQuotes.reduce((sum, quote) => sum + BigInt(quote.marketPlan.budgetWei), 0n);
+  if (aerodromeBudget > 0n) transactions.push(wrapEthTx(aerodromeBudget, chain.id));
   for (const [router, routerQuotes] of groupedByAddress(
-    quotes.filter((quote) => quote.marketPlan.venue === "aerodrome-slipstream"),
+    aerodromeQuotes,
     (quote) => quote.swapSpender,
   )) {
     const amount = routerQuotes.reduce((sum, quote) => sum + BigInt(quote.marketPlan.swapInWei), 0n);
     if (amount > 0n) transactions.push(erc20ApproveTx(addresses.weth, router, amount), ...routerQuotes.map((quote) => quote.swap));
   }
-  for (const [manager, managerQuotes] of groupedByAddress(quotes, (quote) => quote.positionManager)) {
+  for (const [manager, managerQuotes] of groupedByAddress(aerodromeQuotes, (quote) => quote.positionManager)) {
     const amount = managerQuotes.reduce((sum, quote) => sum + quote.mintWeth, 0n);
     const aerodrome = managerQuotes.some((quote) => quote.marketPlan.venue === "aerodrome-slipstream");
     if (amount > 0n) transactions.push(erc20ApproveTx(addresses.weth, manager, aerodrome ? amount + 1n : amount));
@@ -182,7 +179,7 @@ export async function planAllocation(input: {
       "Your wallet confirms each step. Every completed step settles to your wallet, and Wizzy never takes custody.",
       "Quoted outputs and ranges expire. Re-plan instead of signing an expired plan.",
       "Wizzy uses the reviewed Uniswap or Aerodrome pool selected on the market row; there is no basket allocation.",
-      "Any unused WETH or meme tokens remain in your wallet.",
+      "Any unused ETH, WETH, or meme tokens remain in your wallet.",
     ],
   };
 }
@@ -365,10 +362,11 @@ async function quoteMarket(
   chainId: number,
   market: CuratedMarket,
   budget: bigint,
+  useNative = false,
 ): Promise<MarketQuote> {
   return market.protocol === "AERODROME_SLIPSTREAM"
     ? quoteAerodromeMarket(client, owner, chainId, market, budget)
-    : quoteUniswapMarket(client, owner, chainId, market, budget);
+    : quoteUniswapMarket(client, owner, chainId, market, budget, useNative);
 }
 
 async function quoteUniswapMarket(
@@ -377,6 +375,7 @@ async function quoteUniswapMarket(
   chainId: number,
   market: CuratedMarket,
   budget: bigint,
+  useNative = false,
 ): Promise<MarketQuote> {
   const swapIn = (budget * SWAP_SHARE_BPS) / BPS;
   const wethForMint = budget - swapIn;
@@ -445,6 +444,7 @@ async function quoteUniswapMarket(
     recipient: owner,
     slippageBps: Number(SWAP_SLIPPAGE_BPS),
     deadlineSec: WALLET_PLAN_DEADLINE_SEC,
+    useNative,
   });
   const swap = exactInV3Tx({
     tokenIn: market.quoteToken,
@@ -454,6 +454,7 @@ async function quoteUniswapMarket(
     amountOutMin: minimumMemeOut,
     recipient: owner,
     payerIsUser: true,
+    useNative,
     deadlineSec: WALLET_PLAN_DEADLINE_SEC,
     chainId,
   });
@@ -467,7 +468,7 @@ async function quoteUniswapMarket(
       pool: market.pool,
       venue: "uniswap-v3",
       liquidityTarget: addressesFor(chainId === 4663 ? "robinhood" : "base").nfpm,
-      quoteSymbol: "WETH",
+      quoteSymbol: useNative ? "ETH" : "WETH",
       budgetWei: budget.toString(),
       swapInWei: swapIn.toString(),
       quotedMemeOut: quotedMemeOut.toString(),

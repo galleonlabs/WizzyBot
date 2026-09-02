@@ -182,7 +182,14 @@ export function buildIncreasePositionActionPlan(
             slippageBps: 150,
             deadlineSec: WALLET_PLAN_DEADLINE_SEC,
           })
-        : increaseCalldata(snapshot, add0, add1, 150, WALLET_PLAN_DEADLINE_SEC);
+        : increaseCalldata(
+            snapshot,
+            add0,
+            add1,
+            150,
+            WALLET_PLAN_DEADLINE_SEC,
+            market.quoteSymbol === "ETH",
+          );
 
   let replacedMint = false;
   const transactions = allocation.transactions.map((transaction) => {

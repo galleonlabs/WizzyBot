@@ -42,6 +42,7 @@ export function exactInV3Tx(args: {
   amountOutMin: bigint;
   recipient: Address;
   payerIsUser?: boolean;
+  useNative?: boolean;
   deadlineSec?: number;
   chainId?: number;
 }): PlannedTx {
@@ -59,10 +60,16 @@ export function exactInV3Tx(args: {
     }],
   });
   const addresses = addressesFor(slugForChainId(args.chainId ?? CHAIN_ID));
+  if (args.useNative && args.tokenIn.toLowerCase() !== addresses.weth.toLowerCase()) {
+    throw new Error("native ETH can only fund a WETH input swap");
+  }
   return {
     to: addresses.swapRouter02,
     data,
-    value: 0n,
+    // SwapRouter02 wraps msg.value when the input token is WETH. Funding the
+    // exact-input swap with native ETH removes a wrap + approval pair and
+    // avoids wallets simulating a stale WETH allowance between signatures.
+    value: args.useNative ? args.amountIn : 0n,
     description: `UR v3 exact-in ${args.tokenIn} → ${args.tokenOut}`,
   };
 }

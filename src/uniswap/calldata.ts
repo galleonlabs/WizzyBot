@@ -66,6 +66,7 @@ export function increaseCalldata(
   add1: bigint,
   slippageBps = DEFAULT_SLIPPAGE_BPS,
   deadlineSec = DEFAULT_DEADLINE_SEC,
+  useNative = false,
 ): PlannedTx {
   const pool = sdkPool(position);
   const next = Position.fromAmounts({
@@ -80,6 +81,7 @@ export function increaseCalldata(
     tokenId: position.ref.tokenId.toString(),
     slippageTolerance: slippage(slippageBps),
     deadline: Math.floor(Date.now() / 1000) + deadlineSec,
+    useNative: useNative ? Ether.onChain(position.ref.chainId ?? CHAIN_ID) : undefined,
   });
   return {
     to: addressesFor(slugForChainId(position.ref.chainId)).nfpm,

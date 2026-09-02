@@ -39,7 +39,7 @@ type MarketEntry = {
 };
 const MARKET_SKELETON_COUNT = 6;
 const MARKETS_PER_PAGE = 8;
-const FOMO_URL = "https://fomo.family/r/makemememarkets";
+const FOMO_REFERRER = "makemememarkets";
 const BRIDGE_URLS: Record<ChainSlug, string> = {
   base: "https://relay.link/bridge/base",
   robinhood: "https://relay.link/bridge/robinhood",
@@ -897,7 +897,7 @@ function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapPlan, 
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
                   {zappable ? <button className="market-link zap-link" type="button" aria-haspopup="dialog" onClick={() => onOpenZap(market.id)} aria-label={`Make the ${market.symbol}/WETH market`}><span className="market-link-label">Make market</span></button> : null}
-                  {zappable ? <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a> : null}
+                  {zappable ? <a className="market-link fomo-link" href={fomoTokenUrl(chain, market.token)} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a> : null}
                 </span></td>
               </tr>;
             }) : null}
@@ -1526,6 +1526,10 @@ function BrandLogo({ brand, label, compact = false }: { brand: keyof typeof BRAN
     <img src={BRAND_ASSETS[brand]} alt="" aria-hidden="true" />
     {compact ? null : <span>{label}</span>}
   </span>;
+}
+
+function fomoTokenUrl(chain: MarketChain, token: string): string {
+  return `https://fomo.family/tokens/${chain}/${token.toLowerCase()}?r=${FOMO_REFERRER}`;
 }
 
 function VenueTrail({ chain, protocol }: { chain: MarketChain; protocol: CuratedMarket["protocol"] }) {

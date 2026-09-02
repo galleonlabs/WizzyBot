@@ -77,7 +77,10 @@ describe("meme market maker UI", () => {
     expect(portfolio).not.toContain("scrollIntoView");
     expect(portfolio).toContain('useState<"all" | ChainSlug>("robinhood")');
     expect(portfolio).not.toMatch(/GeckoTerminal|gecko-link|BRAND_ASSETS\.gecko|geckoPoolUrl/);
-    expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
+    expect(portfolio).toContain('const FOMO_REFERRER = "makemememarkets"');
+    expect(portfolio).toContain("https://fomo.family/tokens/${chain}/${token.toLowerCase()}?r=${FOMO_REFERRER}");
+    expect(portfolio).toContain("href={fomoTokenUrl(chain, market.token)}");
+    expect(portfolio).not.toContain("https://fomo.family/r/");
     expect(portfolio).toContain("Trade on Fomo");
     expect(portfolio).toContain("Trade ${market.symbol}/WETH on Fomo");
     expect(portfolio).toContain("{zappable ? <a className=\"market-link fomo-link\"");

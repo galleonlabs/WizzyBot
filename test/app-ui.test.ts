@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const page = readFileSync("app/page.tsx", "utf8");
+const adminPage = readFileSync("app/admin/page.tsx", "utf8");
 const portfolio = readFileSync("app/portfolio-app.tsx", "utf8");
 const sendEthDialog = readFileSync("app/send-eth-dialog.tsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
@@ -35,6 +36,12 @@ const telemetry = readFileSync("app/lib/telemetry.ts", "utf8");
 const shotFixture = readFileSync("app/lib/shot-fixture.ts", "utf8");
 
 describe("meme market maker UI", () => {
+  it("exposes the full app at a passwordless, non-indexed admin route", () => {
+    expect(adminPage).toContain("<PortfolioApp />");
+    expect(adminPage).toContain("index: false");
+    expect(adminPage).not.toMatch(/password|authenticate|redirect/i);
+  });
+
   it("leads with one consumer market-making action and honest market evidence", () => {
     expect(page).toContain("coming-soon");
     expect(page).toContain("Coming soon");

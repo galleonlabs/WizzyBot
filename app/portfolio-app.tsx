@@ -74,7 +74,6 @@ const BRAND_ASSETS = {
   robinhood: "https://assets.relay.link/icons/4663/light.png",
   solana: "https://assets.relay.link/icons/792703809/light.png",
   fomo: "https://fomo.family/favicon.svg",
-  gecko: "https://www.geckoterminal.com/favicon.ico",
 } as const;
 
 const EMPTY_MARKETS: MarketsPayload = {
@@ -844,7 +843,7 @@ function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapPlan, 
   balances: ChainBalances | null;
   onFund: (chain: ChainSlug) => void;
 }) {
-  const [chainFilter, setChainFilter] = useState<"all" | ChainSlug>("all");
+  const [chainFilter, setChainFilter] = useState<"all" | ChainSlug>("robinhood");
   const [marketQuery, setMarketQuery] = useState("");
   const [marketPage, setMarketPage] = useState(1);
   const normalizedQuery = marketQuery.trim().toLocaleLowerCase();
@@ -898,7 +897,6 @@ function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapPlan, 
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
                   {zappable ? <button className="market-link zap-link" type="button" aria-haspopup="dialog" onClick={() => onOpenZap(market.id)} aria-label={`Make the ${market.symbol}/WETH market`}><span className="market-link-label">Make market</span></button> : null}
-                  <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(chain, market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
                   {zappable ? <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a> : null}
                 </span></td>
               </tr>;
@@ -1528,10 +1526,6 @@ function BrandLogo({ brand, label, compact = false }: { brand: keyof typeof BRAN
     <img src={BRAND_ASSETS[brand]} alt="" aria-hidden="true" />
     {compact ? null : <span>{label}</span>}
   </span>;
-}
-
-function geckoPoolUrl(chain: MarketChain, pool: string): string {
-  return `https://www.geckoterminal.com/${chain === "base" ? "base" : "robinhood"}/pools/${pool.toLowerCase()}`;
 }
 
 function VenueTrail({ chain, protocol }: { chain: MarketChain; protocol: CuratedMarket["protocol"] }) {

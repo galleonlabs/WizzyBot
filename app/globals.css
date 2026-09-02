@@ -1252,7 +1252,6 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
   .market-table .pair-cell small { font-size: 12px; }
   .market-table .market-link img { width: 18px; height: 18px; flex-basis: 18px; }
   .market-table .market-links { display: grid; grid-template-columns: minmax(0, 1fr) 48px; width: 100%; }
-  .market-table .market-links:has(.fomo-link) { grid-template-columns: minmax(0, 1fr) 48px 48px; }
   .market-table .skeleton-row { display: block; }
   .market-table .skeleton-row td { display: block; width: 100%; }
   .market-pagination { margin-top: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }

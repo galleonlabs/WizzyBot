@@ -75,8 +75,8 @@ describe("meme market maker UI", () => {
     expect(portfolio).not.toContain("empty-route");
     expect(portfolio).not.toContain('label: "Portfolio"');
     expect(portfolio).not.toContain("scrollIntoView");
-    expect(portfolio).toContain('chain === "base" ? "base" : "robinhood"');
-    expect(portfolio).toContain("View ${market.symbol}/WETH on GeckoTerminal");
+    expect(portfolio).toContain('useState<"all" | ChainSlug>("robinhood")');
+    expect(portfolio).not.toMatch(/GeckoTerminal|gecko-link|BRAND_ASSETS\.gecko|geckoPoolUrl/);
     expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
     expect(portfolio).toContain("Trade on Fomo");
     expect(portfolio).toContain("Trade ${market.symbol}/WETH on Fomo");
@@ -109,7 +109,8 @@ describe("meme market maker UI", () => {
     expect(css).toContain(".action-preview.is-submitted { grid-template-columns: auto minmax(0, 1fr)");
     expect(css).toContain(".action-preview.is-submitted > .action-buttons { grid-column: 1 / -1; }");
     expect(css).toContain(".market-link { width: 48px; min-height: 48px");
-    expect(css).toContain(".market-table .market-links:has(.fomo-link)");
+    expect(css).toContain(".market-table .market-links { display: grid; grid-template-columns: minmax(0, 1fr) 48px;");
+    expect(css).not.toContain(".market-table .market-links:has(.fomo-link)");
     expect(css).toContain(".position-manage,\n  .action-buttons button { min-height: 48px; }");
     expect(css).toContain(".empty-action { width: 100%; min-height: 48px");
   });

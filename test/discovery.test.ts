@@ -128,17 +128,20 @@ describe("meme pool discovery", () => {
     expect(pools[1]!.venueLabel).toBe("Aerodrome Slipstream");
   });
 
-  it("keeps the last good chain sweep when a refresh comes back degraded", () => {
+  it("carries recent pools forward when a refresh comes back degraded", () => {
     const base = { id: "base:1", chain: "base" as const, volume24hUsd: 5 } as never;
+    const base2 = { id: "base:2", chain: "base" as const, volume24hUsd: 7 } as never;
     const robinhood = { id: "robinhood:1", chain: "robinhood" as const, volume24hUsd: 9 } as never;
-    const previous = { pools: [base, robinhood], asOf: "2026-09-02T10:00:00.000Z", scanned: 2, excluded: 0, degraded: [] };
+    const previous = { pools: [base, base2, robinhood], asOf: "2026-09-02T10:00:00.000Z", scanned: 3, excluded: 0, degraded: [] };
     const partial = { pools: [base], asOf: "2026-09-02T10:10:00.000Z", scanned: 1, excluded: 0, degraded: ["rate limit"] };
     const merged = mergeSnapshots(previous, partial);
-    expect(merged.pools.map((pool) => pool.id)).toEqual(["robinhood:1", "base:1"]);
-    expect(merged.degraded).toHaveLength(2);
+    expect(merged.pools.map((pool) => pool.id)).toEqual(["robinhood:1", "base:2", "base:1"]);
+    expect(merged.degraded[1]).toContain("Carried 2 pools forward");
     const clean = { ...partial, degraded: [] };
     expect(mergeSnapshots(previous, clean)).toBe(clean);
     expect(mergeSnapshots(undefined, partial)).toBe(partial);
+    const stale = { ...previous, asOf: "2026-09-02T08:00:00.000Z" };
+    expect(mergeSnapshots(stale, partial)).toBe(partial);
   });
 
   it("falls back to the reviewed catalog when every upstream is down", () => {

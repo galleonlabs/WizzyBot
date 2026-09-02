@@ -539,27 +539,26 @@ export async function fetchCuratedPools(): Promise<PoolsSnapshot> {
   return { pools, asOf: new Date().toISOString(), scanned: raw.length, excluded: excluded.length, degraded };
 }
 
+const CARRY_FORWARD_MS = 60 * 60_000;
+
 /**
- * When a sweep comes back degraded, keep the last good pools for any chain the
- * new sweep missed entirely, so a rate-limited refresh never empties the menu.
+ * When a sweep comes back degraded, carry forward every pool the previous
+ * snapshot knew that this sweep missed, as long as the previous snapshot is
+ * under an hour old. Rate limits then only delay updates instead of shrinking
+ * the menu; consecutive partial sweeps converge on the full set.
  */
 export function mergeSnapshots(previous: PoolsSnapshot | undefined, next: PoolsSnapshot): PoolsSnapshot {
   if (!previous || !next.degraded.length) return next;
-  const chains: ChainSlug[] = ["base", "robinhood"];
-  const pools = [...next.pools];
-  const carried: string[] = [];
-  for (const chain of chains) {
-    if (pools.some((pool) => pool.chain === chain)) continue;
-    const kept = previous.pools.filter((pool) => pool.chain === chain);
-    if (!kept.length) continue;
-    pools.push(...kept);
-    carried.push(chain);
-  }
-  pools.sort((a, b) => b.volume24hUsd - a.volume24hUsd);
+  const previousAge = Date.parse(next.asOf) - Date.parse(previous.asOf);
+  if (!Number.isFinite(previousAge) || previousAge > CARRY_FORWARD_MS) return next;
+  const seen = new Set(next.pools.map((pool) => pool.id));
+  const carried = previous.pools.filter((pool) => !seen.has(pool.id));
+  if (!carried.length) return next;
+  const pools = [...next.pools, ...carried].sort((a, b) => b.volume24hUsd - a.volume24hUsd);
   return {
     ...next,
     pools,
-    degraded: carried.length ? [...next.degraded, `Kept the previous ${carried.join(" and ")} sweep from ${previous.asOf}.`] : next.degraded,
+    degraded: [...next.degraded, `Carried ${carried.length} pool${carried.length === 1 ? "" : "s"} forward from the ${previous.asOf} sweep.`],
   };
 }
 

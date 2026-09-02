@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { catalogFallbackSnapshot, fetchCuratedPools, mergePoolSnapshots } from "../../lib/portfolio-server";
 
 export const runtime = "nodejs";
@@ -40,14 +40,16 @@ async function refresh(): Promise<Snapshot> {
 export async function GET() {
   try {
     if (snapshot && Date.now() < expiresAt) return respond(snapshot);
+    // `after` keeps the function alive until the sweep settles; serverless
+    // runtimes freeze background promises once the response is sent.
+    const sweep = refresh();
+    after(sweep.catch(() => undefined));
     if (snapshot) {
       // Stale but present: answer now, refresh in the background.
-      void refresh().catch((error) => console.error("[wizzy-pools-refresh]", error instanceof Error ? error.message : "unknown"));
       return respond(snapshot);
     }
-    // Cold instance: start the sweep and tell the client to come back rather than blocking on it.
-    void refresh().catch((error) => console.error("[wizzy-pools-refresh]", error instanceof Error ? error.message : "unknown"));
-    const settled = await Promise.race([inflight, new Promise<null>((resolve) => setTimeout(() => resolve(null), 4_000))]);
+    // Cold instance: give the sweep a few seconds, then tell the client to come back.
+    const settled = await Promise.race([sweep, new Promise<null>((resolve) => setTimeout(() => resolve(null), 6_000))]);
     if (settled) return respond(settled);
     return NextResponse.json({ pools: [], asOf: "", scanned: 0, excluded: 0, degraded: [], warming: true }, { status: 202, headers: { "Cache-Control": "no-store" } });
   } catch (error) {

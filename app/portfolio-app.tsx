@@ -126,7 +126,7 @@ export function PortfolioApp() {
       const payload = await readJsonPayload(response) as PoolsPayload & { error?: string; warming?: boolean };
       if (response.status === 202 && payload.warming) {
         // A cold instance is still sweeping. Poll until the first snapshot lands.
-        if (attempt < 20) window.setTimeout(() => void loadPools(attempt + 1), 4_000);
+        if (attempt < 45) window.setTimeout(() => void loadPools(attempt + 1), 4_000);
         else setPoolsState("error");
         return;
       }

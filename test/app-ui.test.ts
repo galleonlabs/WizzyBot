@@ -99,6 +99,7 @@ describe("meme yield curator surface", () => {
     expect(poolsRoute).toContain("snapshot = mergePoolSnapshots(snapshot, next)");
     expect(poolsRoute).toContain("Stale but present: answer now, refresh in the background.");
     expect(poolsRoute).toContain("warming: true");
+    expect(poolsRoute).toContain("after(sweep.catch(() => undefined))");
     expect(portfolio).toContain("if (response.status === 202 && payload.warming)");
     expect(discovery).toContain("export function mergeSnapshots");
   });

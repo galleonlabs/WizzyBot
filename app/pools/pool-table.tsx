@@ -14,18 +14,18 @@ type SortKey = "volume" | "apr" | "liquidity" | "age";
 const PAGE_SIZE = 12;
 
 const FLAG_COPY: Record<PoolFlag, { label: string; tone: "good" | "info" | "warn"; title: string }> = {
-  reviewed: { label: "Reviewed", tone: "good", title: "Hand-reviewed by the Wizzy curator" },
-  new: { label: "New", tone: "info", title: "Pool is under three days old. Early liquidity earns more and risks more." },
-  thin: { label: "Thin", tone: "info", title: "Under $50k of liquidity. Prices move fast here." },
-  quiet: { label: "Quiet", tone: "info", title: "Under $1k traded in the last day." },
-  unchecked: { label: "Unchecked", tone: "warn", title: "No security scan available for this token" },
-  unverified: { label: "Unverified", tone: "warn", title: "Token contract source is not verified" },
-  mintable: { label: "Mintable", tone: "warn", title: "Owner can mint more supply" },
-  pausable: { label: "Pausable", tone: "warn", title: "Transfers can be paused by the owner" },
-  blacklist: { label: "Blacklist", tone: "warn", title: "Contract can blacklist addresses" },
-  "hidden-owner": { label: "Hidden owner", tone: "warn", title: "Ownership is obscured" },
-  proxy: { label: "Proxy", tone: "warn", title: "Upgradeable contract" },
-  tax: { label: "Tax", tone: "warn", title: "Buy or sell tax under 10%" },
+  reviewed: { label: "Curated", tone: "good", title: "Listed by Wizzy's curator agent, which re-reviews both chains every six hours" },
+  new: { label: "New", tone: "info", title: "Pool is under three days old. Early liquidity earns the most fees and carries the most risk" },
+  thin: { label: "Thin", tone: "info", title: "Under $50k of liquidity, so prices move fast and exits can slip" },
+  quiet: { label: "Quiet", tone: "info", title: "Under $1k traded in the last day, so fee income is small for now" },
+  unchecked: { label: "Unchecked", tone: "warn", title: "No contract security scan exists for this token yet, so rug checks could not run" },
+  unverified: { label: "Unverified", tone: "warn", title: "Contract source is not verified, so nobody can audit what it does" },
+  mintable: { label: "Mintable", tone: "warn", title: "The owner can mint more supply and dilute holders" },
+  pausable: { label: "Pausable", tone: "warn", title: "The owner can pause transfers, which would trap liquidity" },
+  blacklist: { label: "Blacklist", tone: "warn", title: "The contract can blacklist addresses from trading" },
+  "hidden-owner": { label: "Hidden owner", tone: "warn", title: "Ownership is obscured, so renouncement cannot be verified" },
+  proxy: { label: "Proxy", tone: "warn", title: "Upgradeable contract, so its rules can change after you deposit" },
+  tax: { label: "Tax", tone: "warn", title: "The token charges a buy or sell tax under 10%, which eats into every swap" },
 };
 
 export function PoolTable({ pools, state, onSelect, onRetry }: {
@@ -70,7 +70,7 @@ export function PoolTable({ pools, state, onSelect, onRetry }: {
           <div className="market-filters" aria-label="Filter pools by venue">
             {(["all", "uniswap", "aerodrome"] as const).map((option) => <button key={option} type="button" className={venue === option ? "is-active" : ""} aria-pressed={venue === option} onClick={() => { setVenue(option); reset(); }}>{option === "all" ? "All venues" : option === "uniswap" ? "Uniswap" : "Aerodrome"}</button>)}
           </div>
-          <button type="button" className={`pool-toggle ${reviewedOnly ? "is-active" : ""}`} aria-pressed={reviewedOnly} onClick={() => { setReviewedOnly((current) => !current); reset(); }}>Reviewed only</button>
+          <button type="button" className={`pool-toggle ${reviewedOnly ? "is-active" : ""}`} aria-pressed={reviewedOnly} onClick={() => { setReviewedOnly((current) => !current); reset(); }}>Curated only</button>
         </div>
         <div className="pool-toolbar-right">
           <label className="pool-sort"><span>Sort</span><select value={sort} onChange={(event) => { setSort(event.target.value as SortKey); reset(); }} aria-label="Sort pools">
@@ -121,9 +121,9 @@ function PoolRow({ pool, onSelect }: { pool: CuratedPool; onSelect: () => void }
     <td>{formatAge(pool.ageDays)}</td>
     <td>
       <span className="pool-flags">
-        {pool.reviewed ? <i className="is-good" title={FLAG_COPY.reviewed.title}>Reviewed</i> : null}
-        {flags.map((flag) => <i key={flag} className={`is-${FLAG_COPY[flag].tone}`} title={FLAG_COPY[flag].title}>{FLAG_COPY[flag].label}</i>)}
-        {!pool.reviewed && !flags.length ? <i className="is-good" title="Security scan clean, healthy liquidity and volume">Clean</i> : null}
+        {pool.reviewed ? <Flag tone="good" label={FLAG_COPY.reviewed.label} tip={FLAG_COPY.reviewed.title} /> : null}
+        {flags.map((flag) => <Flag key={flag} tone={FLAG_COPY[flag].tone} label={FLAG_COPY[flag].label} tip={FLAG_COPY[flag].title} />)}
+        {!pool.reviewed && !flags.length ? <Flag tone="good" label="Clean" tip="Security scan came back clean, with healthy liquidity and volume" /> : null}
       </span>
     </td>
     <td>
@@ -133,6 +133,10 @@ function PoolRow({ pool, onSelect }: { pool: CuratedPool; onSelect: () => void }
       </span>
     </td>
   </tr>;
+}
+
+function Flag({ tone, label, tip }: { tone: "good" | "info" | "warn"; label: string; tip: string }) {
+  return <i className={`tip is-${tone}`} data-tip={tip} tabIndex={0} aria-label={`${label}: ${tip}`}>{label}</i>;
 }
 
 export function formatFee(pips: number): string {

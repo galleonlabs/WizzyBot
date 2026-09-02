@@ -6,9 +6,9 @@ const appPage = readFileSync("app/app/page.tsx", "utf8");
 const portfolio = readFileSync("app/portfolio-app.tsx", "utf8");
 const poolTable = readFileSync("app/pools/pool-table.tsx", "utf8");
 const lpSheet = readFileSync("app/pools/lp-sheet.tsx", "utf8");
-const positionCard = readFileSync("app/positions/position-card.tsx", "utf8");
+const positionRow = readFileSync("app/positions/position-row.tsx", "utf8");
 const actionSheet = readFileSync("app/positions/action-sheet.tsx", "utf8");
-const rangeChart = readFileSync("app/positions/range-chart.tsx", "utf8");
+const rangeStrip = readFileSync("app/positions/range-chart.tsx", "utf8");
 const sendEthDialog = readFileSync("app/send-eth-dialog.tsx", "utf8");
 const css = readFileSync("app/globals.css", "utf8");
 const layout = readFileSync("app/layout.tsx", "utf8");
@@ -57,13 +57,18 @@ describe("meme yield curator surface", () => {
     expect(portfolio).toContain("<h1>Meme yield, curated.</h1>");
     expect(portfolio).toContain("<PoolTable pools={pools.pools}");
     expect(portfolio).toContain('setLpTarget({ kind: "new", pool })');
-    expect(portfolio).toContain("Wizzy adds a 0.3% fee inside each Relay quote");
     expect(portfolio).not.toMatch(/planAllocation|allocate|ZapPanel|MarketLedger|rebalance/);
     expect(poolTable).toContain("LP this pool");
     expect(poolTable).toContain('<th>Pool</th><th>Fee APR · 24h</th><th>Volume · 24h</th><th>Liquidity</th><th>Age</th><th>Checks</th><th>Action</th>');
-    expect(poolTable).toContain('reviewed: { label: "Reviewed", tone: "good"');
+    expect(poolTable).toContain('reviewed: { label: "Curated", tone: "good", title: "Listed by Wizzy\'s curator agent');
     expect(poolTable).toContain('unverified: { label: "Unverified", tone: "warn"');
-    expect(poolTable).toContain("Reviewed only");
+    expect(poolTable).toContain("Curated only");
+    expect(poolTable).toContain('className={`tip is-${tone}`} data-tip={tip} tabIndex={0}');
+    expect(poolTable).not.toContain("title={");
+    expect(portfolio).toContain("curated by the agent");
+    expect(portfolio).not.toMatch(/hand-reviewed|Wizzy adds a 0\.3% fee inside each Relay quote/);
+    expect(css).toContain(".tip::after {");
+    expect(css).toContain("content: attr(data-tip);");
     expect(poolTable).toContain('<option value="apr">Fee APR</option>');
   });
 
@@ -119,12 +124,15 @@ describe("meme yield curator surface", () => {
     expect(positionActions).toContain("export function atomicActionsFor");
     expect(positionActions).toContain("atomic: true");
     expect(positionActions).not.toMatch(/quoteRebalanceSwap|buildIncreaseFromEthPlan|planRangeSwap|exactInV3Tx/);
-    expect(positionCard).toContain('const singleTx = open && (view.protocol === "V4" || (view.protocol === "V3" && view.venue !== "aerodrome-slipstream"))');
-    expect(positionCard).toContain('className="lp-manage"');
-    expect(positionCard).toContain("This takes more than one transaction, so it happens on ${venue}");
-    expect(positionCard).toContain("<dt>Position value</dt>");
-    expect(positionCard).toContain("<dt>Unclaimed fees</dt>");
-    expect(positionCard).toContain("<RangeChart view={view} ethUsd={ethUsd} />");
+    expect(positionRow).toContain('const singleTx = open && (view.protocol === "V4" || (view.protocol === "V3" && view.venue !== "aerodrome-slipstream"))');
+    expect(positionRow).toContain("<RangeStrip view={view} ethUsd={ethUsd} />");
+    expect(positionRow).toContain('className={`row-action tip ${className}`} data-kind={kind} data-tip={tip} aria-label={tip}');
+    expect(positionRow).toContain("takes more than one transaction");
+    expect(portfolio).toContain('<thead><tr><th>Position</th><th>Value</th><th>Unclaimed fees</th><th>Range</th><th>Pool APR · 24h</th><th>Actions</th></tr></thead>');
+    expect(portfolio).toContain('className="positions-stats"');
+    expect(portfolio).not.toMatch(/lp-card|PositionCard|portfolio-summary/);
+    expect(existsSync("app/positions/position-card.tsx")).toBe(false);
+    expect(css).not.toMatch(/\.lp-card|\.range-chart-canvas/);
     expect(actionSheet).toContain('collect: "Collect fees"');
     expect(actionSheet).toContain('decrease: "Reduce position"');
     expect(actionSheet).toContain('withdraw: "Exit position"');
@@ -132,7 +140,8 @@ describe("meme yield curator surface", () => {
     expect(actionSheet).toContain("<dt>Wallet steps</dt><dd>1 transaction</dd>");
     expect(portfolio).toContain('setLpTarget({ kind: "sell", position, token, image })');
     expect(portfolio).toContain('setLpTarget({ kind: "add", position, meme:');
-    expect(rangeChart).toContain("const flip = quoteIsToken0 === true");
+    expect(rangeStrip).toContain("const flip = quoteIsToken0 === true");
+    expect(rangeStrip).toContain('className="range-strip-price"');
     expect(hostedSurface).toContain("address0: snap.token0.address");
     expect(portfolioTypes).toContain('export type PositionActionKind = "collect" | "decrease" | "withdraw"');
   });
@@ -140,7 +149,7 @@ describe("meme yield curator surface", () => {
   it("loads each chain independently so one slow RPC never hides the other", () => {
     expect(portfolio).toContain("await loadPositionRows(address, fetch, 25_000, ({ chain, rows, ethUsd }) =>");
     expect(portfolio).toContain("setPositions((current) => [...current.filter((position) => position.chain !== chain), ...next])");
-    expect(portfolio).toContain('className="lp-card is-skeleton"');
+    expect(portfolio).toContain('<tr className="skeleton-row" key={chain} aria-live="polite"');
   });
 
   it("lets wallets pay from five networks and keeps the CSP in step", () => {
@@ -161,7 +170,8 @@ describe("meme yield curator surface", () => {
   it("uses deliberate mobile layouts instead of shrinking desktop rows", () => {
     expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(css).toContain(".pool-table td:nth-child(7) { grid-column: 1 / -1; }");
-    expect(css).toContain(".lp-body { grid-template-columns: minmax(0, 1fr); gap: 18px; }");
+    expect(css).toContain('.positions-table td:nth-child(2)::before { content: "Value"; }');
+    expect(css).toContain(".row-action { width: 48px; height: 48px; flex-basis: 48px; }");
     expect(css).toContain(".sheet { width: 100%; max-height: calc(100dvh - 16px);");
     expect(css).toContain(".portfolio-empty .empty-symbol { display: none; }");
     expect(css).toContain(".market-link-label { display: none; }");

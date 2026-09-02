@@ -7,7 +7,7 @@ import type { PositionActionKind, PositionActionPlan } from "../lib/portfolio-ty
 import { compactRaw, compactTokenAmount, money } from "../lib/format";
 import { positionOrientation } from "../lib/position-math";
 import { CheckIcon, CloseIcon, TokenIcon } from "../ui/icons";
-import { hasCollectibleFees, positionFeesLabel, venueLabel } from "./position-card";
+import { hasCollectibleFees, positionFeesLabel, venueLabel } from "./position-row";
 
 /**
  * In-app actions are single wallet transactions: collect, reduce, exit.

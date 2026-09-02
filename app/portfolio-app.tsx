@@ -17,7 +17,7 @@ import { AchievementCenter } from "./achievement-center";
 import { SendEthDialog } from "./send-eth-dialog";
 import type { AchievementActionEvidence } from "./lib/achievements";
 import { ActionSheet, type ActionRequest, type BalanceState, type PlanState } from "./positions/action-sheet";
-import { PositionCard, positionKey, type CardAction } from "./positions/position-card";
+import { PositionRow, positionKey, type CardAction } from "./positions/position-row";
 import { PoolTable } from "./pools/pool-table";
 import { LpSheet, type LpTarget } from "./pools/lp-sheet";
 import { BRAND_ASSETS, ChevronIcon, DisconnectIcon, ExternalLinkIcon, SendIcon, ThemeIcon, WalletIcon, XIcon } from "./ui/icons";
@@ -443,9 +443,8 @@ export function PortfolioApp() {
                 <span className="network-name"><small>Curating</small><b>Base + Robinhood</b></span>
               </span>
             </header>
-            {poolsState === "ready" ? <p className="pool-meta">{pools.pools.length} pools listed · {pools.pools.filter((pool) => pool.reviewed).length} hand-reviewed · {pools.excluded} filtered out{pools.degraded.length ? " · partial sweep" : ""}{pools.asOf ? ` · updated ${relativeTime(pools.asOf)}` : ""}</p> : null}
+            {poolsState === "ready" ? <p className="pool-meta">{pools.pools.length} pools listed · {pools.pools.filter((pool) => pool.reviewed).length} curated by the agent · {pools.excluded} filtered out{pools.degraded.length ? " · partial sweep" : ""}{pools.asOf ? ` · updated ${relativeTime(pools.asOf)}` : ""}</p> : null}
             <PoolTable pools={pools.pools} state={poolsState} onSelect={openPool} onRetry={() => void loadPools()} />
-            <p className="pool-footnote">Wizzy adds a 0.3% fee inside each Relay quote. Nothing is charged on collecting, reducing, or exiting, and Wizzy never holds your funds.</p>
           </section>
         ) : (
           <PositionsPage
@@ -513,6 +512,7 @@ function PositionsPage({ authenticated, positions, chainState, ethUsdFor, poolFo
   const settled = !loading && chainState.base !== "idle";
   const summary = summarizePositions(positions);
   const sorted = [...positions].sort((a, b) => (b.positionUsd ?? 0) - (a.positionUsd ?? 0));
+  const showTable = authenticated && (positions.length > 0 || loading);
   return <section className="positions-page" id="positions">
     <header className="page-head">
       <div>
@@ -523,31 +523,36 @@ function PositionsPage({ authenticated, positions, chainState, ethUsdFor, poolFo
       </div>
       {authenticated ? <button className="page-cta" type="button" onClick={onNew}>Find a pool</button> : null}
     </header>
-    {authenticated && positions.length ? <dl className="portfolio-summary" aria-label="Portfolio summary">
-      <div><dt>Total value</dt><dd>{summary.priced ? money(summary.valueUsd) : "—"}</dd></div>
-      <div><dt>Unclaimed fees</dt><dd className={summary.feesUsd > 0 ? "positive" : ""}>{summary.priced ? money(summary.feesUsd) : "—"}</dd></div>
-      <div><dt>In range</dt><dd>{summary.inRange} of {summary.total}</dd></div>
-    </dl> : null}
     {!authenticated ? <EmptyState title="See your positions" body="Connect to view value, fees, ranges, and one-transaction actions in one place." action="Connect wallet" onAction={onConnect} /> : null}
     {authenticated && settled && !positions.length && !failed.length ? <EmptyState title="No positions yet" body="Pick a curated pool, swap into its tokens, and open your first one on the venue." action="Browse pools" onAction={onNew} /> : null}
     {authenticated && failed.length ? <EmptyState variant="error" title={`Could not read ${failed.map((chain) => chain === "base" ? "Base" : "Robinhood").join(" or ")}`} body="The network did not answer in time. Positions on that chain are hidden until it does." action="Try again" onAction={onRetry} /> : null}
-    <div className="position-grid">
-      {sorted.map((position) => <PositionCard
-        key={positionKey(position)}
-        view={position}
-        ethUsd={ethUsdFor(position.chain)}
-        poolApr={poolFor(position)?.feeApr24hPct ?? null}
-        image={poolFor(position)?.token.imageUrl}
-        busy={busy}
-        onAction={(action) => onAction(position, action)}
-      />)}
-      {authenticated && loading ? (["base", "robinhood"] as const).filter((chain) => chainState[chain] === "loading").map((chain) => (
-        <div className="lp-card is-skeleton" key={chain} aria-live="polite" aria-label={`Reading ${chain === "base" ? "Base" : "Robinhood"} positions`}>
-          <span className="lp-skeleton-line is-title" /><span className="lp-skeleton-line" /><span className="lp-skeleton-line is-chart" />
-          <small>Reading {chain === "base" ? "Base" : "Robinhood"}…</small>
-        </div>
-      )) : null}
-    </div>
+    {showTable ? <section className="market-table-wrap positions-panel">
+      <div className="market-toolbar positions-toolbar">
+        <dl className="positions-stats" aria-label="Portfolio summary">
+          <div><dt>Total value</dt><dd>{summary.priced ? money(summary.valueUsd) : "—"}</dd></div>
+          <div><dt>Unclaimed fees</dt><dd className={summary.feesUsd > 0 ? "positive" : ""}>{summary.priced ? money(summary.feesUsd) : "—"}</dd></div>
+          <div><dt>In range</dt><dd>{summary.inRange} of {summary.total}</dd></div>
+        </dl>
+        <span className="positions-note">In-app actions settle in one transaction. Anything multi-step opens on the venue.</span>
+      </div>
+      <table className="market-table positions-table">
+        <thead><tr><th>Position</th><th>Value</th><th>Unclaimed fees</th><th>Range</th><th>Pool APR · 24h</th><th>Actions</th></tr></thead>
+        <tbody>
+          {sorted.map((position) => <PositionRow
+            key={positionKey(position)}
+            view={position}
+            ethUsd={ethUsdFor(position.chain)}
+            poolApr={poolFor(position)?.feeApr24hPct ?? null}
+            image={poolFor(position)?.token.imageUrl}
+            busy={busy}
+            onAction={(action) => onAction(position, action)}
+          />)}
+          {loading ? (["base", "robinhood"] as const).filter((chain) => chainState[chain] === "loading").map((chain) => (
+            <tr className="skeleton-row" key={chain} aria-live="polite" aria-label={`Reading ${chain === "base" ? "Base" : "Robinhood"} positions`}><td colSpan={6}><i /></td></tr>
+          )) : null}
+        </tbody>
+      </table>
+    </section> : null}
   </section>;
 }
 

@@ -203,7 +203,13 @@ function numOrNull(value: unknown): number | null | undefined {
 }
 
 export function lightRowToView(row: Record<string, unknown>): PositionView | null {
-  if (isPositionView(row.view)) return { ...row.view, liquidityProfile: asLiquidityProfile(row.liquidityProfile) };
+  if (isPositionView(row.view)) {
+    return {
+      ...row.view,
+      marketId: typeof row.marketId === "string" ? row.marketId : row.view.marketId,
+      liquidityProfile: asLiquidityProfile(row.liquidityProfile),
+    };
+  }
   if (typeof row.pair !== "string") return null;
   const fee = typeof row.fee === "number" ? row.fee : Number(row.fee ?? 0);
   const protocol = asProtocol(row.protocol);

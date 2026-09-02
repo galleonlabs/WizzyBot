@@ -23,17 +23,13 @@ export class V3Adapter implements ProtocolAdapter {
       functionName: "balanceOf",
       args: [owner],
     });
-    const refs: PositionRef[] = [];
-    for (let i = 0n; i < balance; i++) {
-      const tokenId = await this.client.readContract({
-        address: addrs.nfpm,
-        abi: nfpmAbi,
-        functionName: "tokenOfOwnerByIndex",
-        args: [owner, i],
-      });
-      refs.push({ protocol: "V3", chainId, tokenId });
-    }
-    return refs;
+    const tokenIds = await Promise.all(Array.from({ length: Number(balance) }, (_, index) => this.client.readContract({
+      address: addrs.nfpm,
+      abi: nfpmAbi,
+      functionName: "tokenOfOwnerByIndex",
+      args: [owner, BigInt(index)],
+    })));
+    return tokenIds.map((tokenId): PositionRef => ({ protocol: "V3", chainId, tokenId }));
   }
 
   async importViaLogs(owner: Address, fromBlock?: bigint): Promise<bigint[]> {

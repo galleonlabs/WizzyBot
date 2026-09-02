@@ -4,7 +4,7 @@ import { loadConfig, policyFor } from "../config/policy.js";
 import { makePublicClient } from "../signer/broadcast.js";
 import { AerodromeSlipstreamAdapter } from "../aerodrome/positions.js";
 import { AERODROME_DEPLOYMENTS } from "../aerodrome/deployments.js";
-import { snapshotUsd, usdPricesForPosition } from "../chain/prices.js";
+import { snapshotUsd, tokenUsd, usdPricesForPosition } from "../chain/prices.js";
 import { adapterFor } from "../core/protocols.js";
 import { formatReceipt, planCompound, planExit, planRerange, type PlanContext } from "../core/actions.js";
 import { buildCard, formatCard } from "../core/card.js";
@@ -26,6 +26,8 @@ import {
 import { addressesFor, parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
 import { scoutMarkets as getMarketScout } from "../markets/scout.js";
 import { readLiquidityProfile } from "../portfolio/liquidity-profile.js";
+import { chainCatalog } from "../markets/catalog.js";
+import { positionPoolIsConfigured } from "../portfolio/position-actions.js";
 
 export type WriteFlags = {
   live?: boolean;
@@ -153,10 +155,12 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
       adapters.push({ adapter: new AerodromeSlipstreamAdapter(client, deployment), venue: "aerodrome-slipstream" });
     }
   }
+  const ethUsdPromise = within(tokenUsd(client, addressesFor(slug).weth, 18, env.ethUsd), 3_500, env.ethUsd ?? 0);
   const discovered = await Promise.all(adapters.map(async (descriptor) => ({
     descriptor,
     refs: await descriptor.adapter.listPositions(owner).catch(() => []),
   })));
+  const catalogMarkets = chainCatalog(slug).markets;
   const out = await Promise.all(discovered.flatMap(({ descriptor, refs }) => refs.map(async (ref): Promise<Record<string, unknown>> => {
     const { adapter } = descriptor;
       try {
@@ -173,6 +177,7 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
           venue: snap.venue ?? snap.ref.venue,
           venueLabel: (snap.venue ?? snap.ref.venue) === "aerodrome-slipstream" ? "Aerodrome" : undefined,
           positionManager: snap.positionManager ?? snap.ref.positionManager,
+          marketId: catalogMarkets.find((market) => positionPoolIsConfigured(snap, [market]))?.id,
         };
         try {
           const { view, liquidityProfile } = await liveViewFor(snap, client, env.ethUsd, { readHistory: false, timeoutMs: 3_500 });
@@ -202,7 +207,8 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
         };
       }
   })));
-  return jsonSafe({ owner, chain: slug, count: out.length, positions: out });
+  const ethUsd = await ethUsdPromise;
+  return jsonSafe({ owner, chain: slug, count: out.length, positions: out, ethUsd: ethUsd > 0 ? ethUsd : undefined });
 }
 
 export async function statusPosition(

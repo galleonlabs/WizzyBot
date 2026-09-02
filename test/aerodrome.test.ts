@@ -95,7 +95,7 @@ describe("Aerodrome Slipstream", () => {
       tickSpacing: brett.tickSpacing,
     });
 
-    expect(plan.range).toEqual({
+    expect(plan.range).toMatchObject({
       tickLower: 200,
       tickUpper: 1000,
       currentTick: 600,

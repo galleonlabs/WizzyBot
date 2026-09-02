@@ -164,8 +164,10 @@ export type AllocationPlan = {
   };
 };
 
+export type PositionActionKind = "collect" | "compound" | "increase" | "decrease" | "rebalance" | "withdraw";
+
 export type PositionActionPlan = {
-  kind: "collect" | "compound" | "increase" | "rebalance" | "withdraw";
+  kind: PositionActionKind;
   owner: `0x${string}`;
   chain: ChainSlug;
   chainId: number;
@@ -191,9 +193,12 @@ export type PositionActionPlan = {
     currentTick: number;
     previousTickLower: number;
     previousTickUpper: number;
-    preset: "focused" | "balanced" | "wide";
+    preset?: "focused" | "balanced" | "wide";
+    swap?: { tokenIn: string; tokenOut: string; amountIn: string; minimumAmountOut: string };
   };
+  removal?: { percent: number; amount0: string; amount1: string; burn: boolean };
   settlement?: { asset: "ETH"; minimumAmountWei: string; marketSymbol: string };
+  tokens?: { symbol0: string; decimals0: number; symbol1: string; decimals1: number };
   transactions: WalletTransaction[];
   allowedTargets: `0x${string}`[];
   createdAt: string;

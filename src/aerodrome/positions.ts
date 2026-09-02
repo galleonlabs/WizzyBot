@@ -22,23 +22,19 @@ export class AerodromeSlipstreamAdapter implements ProtocolAdapter {
       functionName: "balanceOf",
       args: [owner],
     });
-    const refs: PositionRef[] = [];
-    for (let index = 0n; index < balance; index++) {
-      const tokenId = await this.client.readContract({
-        address: deployment.positionManager,
-        abi: slipstreamNfpmAbi,
-        functionName: "tokenOfOwnerByIndex",
-        args: [owner, index],
-      });
-      refs.push({
-        protocol: "V3",
-        chainId: 8453,
-        tokenId,
-        venue: "aerodrome-slipstream",
-        positionManager: deployment.positionManager,
-      });
-    }
-    return refs;
+    const tokenIds = await Promise.all(Array.from({ length: Number(balance) }, (_, index) => this.client.readContract({
+      address: deployment.positionManager,
+      abi: slipstreamNfpmAbi,
+      functionName: "tokenOfOwnerByIndex",
+      args: [owner, BigInt(index)],
+    })));
+    return tokenIds.map((tokenId): PositionRef => ({
+      protocol: "V3",
+      chainId: 8453,
+      tokenId,
+      venue: "aerodrome-slipstream",
+      positionManager: deployment.positionManager,
+    }));
   }
 
   async readPosition(tokenId: bigint): Promise<PositionSnapshot> {

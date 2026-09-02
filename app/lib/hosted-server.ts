@@ -13,6 +13,7 @@ export type HostedSurface = {
     count?: number;
     positions?: unknown[];
     chain?: string;
+    ethUsd?: number;
   }>;
   statusPosition: (tokenId: string, chain?: ChainSlug, protocol?: EvmProtocol, positionManager?: string) => Promise<unknown>;
 };
@@ -48,6 +49,7 @@ export async function fetchPositionList(owner?: string, chain: ChainSlug = "base
       chain,
       count: typeof result.count === "number" ? result.count : positions.length,
       positions,
+      ethUsd: typeof result.ethUsd === "number" && result.ethUsd > 0 ? result.ethUsd : undefined,
     };
   } catch (err) {
     console.error("[wizzy-position-list-error]", err instanceof Error ? err.name : "UnknownError");

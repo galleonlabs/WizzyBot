@@ -46,12 +46,16 @@ type HostedPortfolioSurface = {
     owner: string;
     chain: "base" | "robinhood";
     tokenId: bigint;
-    action: "collect" | "compound" | "increase" | "rebalance" | "withdraw";
+    action: "collect" | "compound" | "increase" | "decrease" | "rebalance" | "withdraw";
     amountWei?: bigint;
+    percent?: number;
     protocol?: "V2" | "V3" | "V4";
     venue?: "uniswap-v3" | "aerodrome-slipstream";
     positionManager?: string;
     rangePreset?: "focused" | "balanced" | "wide";
+    tickLower?: number;
+    tickUpper?: number;
+    settle?: "eth" | "tokens";
   }) => Promise<unknown>;
   quoteBaseToRobinhoodEth: (input: { owner: string; amountInWei: bigint }) => Promise<unknown>;
   quoteEthToRobinhood: (input: { owner: string; amountInWei: bigint; originChainId: number }) => Promise<unknown>;

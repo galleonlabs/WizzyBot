@@ -3,7 +3,19 @@ import { getAddress } from "viem";
 import { TickMath } from "@uniswap/v3-sdk";
 import { addressesFor } from "../src/chains.js";
 import { activeMarkets } from "../src/markets/catalog.js";
-import { buildIncreasePositionActionPlan, buildPositionActionPlan, buildRebalancePositionActionPlan, positionPoolIsConfigured } from "../src/portfolio/position-actions.js";
+import {
+  buildDecreasePositionActionPlan,
+  buildEthSettlement,
+  buildIncreaseFromEthPlan,
+  buildIncreasePositionActionPlan,
+  buildPositionActionPlan,
+  buildRebalancePositionActionPlan,
+  planRangeSwap,
+  poolContext,
+  positionPoolIsConfigured,
+  supportsEthSettlement,
+  targetRangeFromTicks,
+} from "../src/portfolio/position-actions.js";
 import { TREASURY } from "../src/constants.js";
 import type { PositionSnapshot } from "../src/types.js";
 import type { AllocationPlan } from "../src/portfolio/allocation.js";
@@ -203,7 +215,7 @@ describe("self-custodial position actions", () => {
 
     expect(plan.kind).toBe("rebalance");
     expect(plan.atomic).toBe(false);
-    expect(plan.range).toEqual({
+    expect(plan.range).toMatchObject({
       tickLower: 400,
       tickUpper: 800,
       currentTick: 600,
@@ -294,6 +306,152 @@ describe("self-custodial position actions", () => {
       pool: addressesFor("base").v4PoolManager,
     });
     expect(positionPoolIsConfigured(position, [market])).toBe(true);
+  });
+});
+
+describe("position management 2.0", () => {
+  it("removes a chosen share of a V3 position and keeps the NFT", () => {
+    const plan = buildDecreasePositionActionPlan(snapshot(), owner, "base", 40);
+    expect(plan.kind).toBe("decrease");
+    expect(plan.removal).toEqual({ percent: 40, amount0: "400000", amount1: "800000", burn: false });
+    expect(plan.transactions).toHaveLength(1);
+    expect(plan.transactions[0]?.description).toBe("NFPM.decreaseLiquidity 40%");
+    expect(plan.transactions[0]?.to).toBe(addressesFor("base").nfpm);
+    expect(plan.serviceFeeBps).toBe(0);
+    expect(() => buildDecreasePositionActionPlan(snapshot(), owner, "base", 100)).toThrow("between 1% and 99%");
+    expect(() => buildDecreasePositionActionPlan(snapshot(), owner, "base", 0)).toThrow("between 1% and 99%");
+  });
+
+  it("scales Aerodrome and V4 partial removals by liquidity share", () => {
+    const manager = "0x827922686190790b37229fd06084350E74485b72" as const;
+    const aerodrome = snapshot({ venue: "aerodrome-slipstream", positionManager: manager, ref: { protocol: "V3", chainId: 8453, tokenId: 12n, venue: "aerodrome-slipstream", positionManager: manager } });
+    const aeroPlan = buildDecreasePositionActionPlan(aerodrome, owner, "base", 25);
+    expect(aeroPlan.transactions.map((tx) => tx.description)).toEqual(["Aerodrome decreaseLiquidity 25%", "Aerodrome collect"]);
+    expect(aeroPlan.transactions.every((tx) => tx.to === manager)).toBe(true);
+    const v4Plan = buildDecreasePositionActionPlan(snapshot({ ref: { protocol: "V4", chainId: 8453, tokenId: 88n } }), owner, "base", 50);
+    expect(v4Plan.transactions).toHaveLength(1);
+    expect(v4Plan.transactions[0]?.description).toContain("decrease");
+    expect(v4Plan.transactions[0]?.to).toBe(addressesFor("base").v4PositionManager);
+    expect(() => buildDecreasePositionActionPlan(snapshot({ ref: { protocol: "V2", chainId: 8453, tokenId: 1n } }), owner, "base", 50)).toThrow("V2");
+  });
+
+  it("repositions into an explicit range snapped to the pool spacing", () => {
+    const position = snapshot();
+    const target = targetRangeFromTicks(position, 130, 1_030);
+    expect(target).toEqual({ tickLower: 200, tickUpper: 1_000 });
+    const plan = buildRebalancePositionActionPlan(position, owner, "base", undefined, undefined, target);
+    expect(plan.range).toMatchObject({ tickLower: 200, tickUpper: 1_000, previousTickLower: -200, previousTickUpper: 200, currentTick: 0 });
+    expect(plan.range?.preset).toBeUndefined();
+    expect(plan.notices[0]).toContain("custom range");
+    expect(plan.transactions.at(-1)?.description).toBe("NFPM.mint");
+    expect(() => targetRangeFromTicks(position, 400, 200)).toThrow("minimum price must be below");
+    expect(() => targetRangeFromTicks(position, -200, 200)).toThrow("differs from the current one");
+  });
+
+  it("sizes the rebalance swap from the target range instead of always halving", () => {
+    const position = snapshot();
+    const centred = planRangeSwap(position, 1_000_000n, 1_000_000n, -200, 200);
+    expect(centred).toBeUndefined();
+    const above = planRangeSwap(position, 1_000_000n, 1_000_000n, 200, 600);
+    expect(above?.tokenIn).toBe(1);
+    expect(above?.amountIn).toBeGreaterThan(990_000n);
+    const below = planRangeSwap(position, 1_000_000n, 1_000_000n, -600, -200);
+    expect(below?.tokenIn).toBe(0);
+    expect(below?.amountIn).toBeGreaterThan(990_000n);
+    const oneSided = planRangeSwap(position, 0n, 2_000_000n, -200, 200);
+    expect(oneSided?.tokenIn).toBe(1);
+    expect(oneSided!.amountIn).toBeGreaterThan(950_000n);
+    expect(oneSided!.amountIn).toBeLessThan(1_050_000n);
+  });
+
+  it("prices a reposition mint at the post-swap pool price", () => {
+    const position = snapshot();
+    const shifted = BigInt(TickMath.getSqrtRatioAtTick(120).toString());
+    const plan = buildRebalancePositionActionPlan(position, owner, "base", {
+      venue: "uniswap-v3",
+      router: addressesFor("base").swapRouter02,
+      tokenIn: position.token1.address,
+      tokenOut: position.token0.address,
+      amountIn: 500_000n,
+      minimumAmountOut: 400_000n,
+      fee: position.fee,
+      postSwapSqrtPriceX96: shifted,
+    }, undefined, { tickLower: 0, tickUpper: 400 });
+    expect(plan.range?.swap).toEqual({ tokenIn: position.token1.symbol, tokenOut: position.token0.symbol, amountIn: "500000", minimumAmountOut: "400000" });
+    expect(plan.range?.currentTick).toBe(0);
+    expect(plan.notices[2]).toContain("swapped so both tokens fit");
+  });
+
+  it("settles a Base V3 exit to native ETH through the position's own pool", () => {
+    const position = snapshot();
+    const context = poolContext(position, "base");
+    expect(context.quoteIsToken0).toBe(true);
+    expect(supportsEthSettlement(position, context)).toBe(true);
+    const plan = buildEthSettlement(buildPositionActionPlan(position, owner, "base", "withdraw"), position, context, { memeToSwap: 1_500_000n, minimumSwapOut: 700_000n });
+    const descriptions = plan.transactions.map((tx) => tx.description);
+    expect(descriptions[0]).toContain("decreaseLiquidity 100%");
+    expect(descriptions.some((entry) => entry.startsWith("ERC20.approve"))).toBe(true);
+    expect(descriptions.some((entry) => entry.includes("exact-in"))).toBe(true);
+    expect(descriptions.at(-1)).toContain("WETH.withdraw");
+    expect(plan.settlement).toEqual({ asset: "ETH", minimumAmountWei: String(((1_000_000n + 10_000n) * 9_850n) / 10_000n + 700_000n), marketSymbol: position.token1.symbol });
+    expect(plan.allowedTargets).toContain(addressesFor("base").swapRouter02);
+  });
+
+  it("settles an Aerodrome exit through the Slipstream router", () => {
+    const manager = "0x827922686190790b37229fd06084350E74485b72" as const;
+    const position = snapshot({ venue: "aerodrome-slipstream", positionManager: manager, ref: { protocol: "V3", chainId: 8453, tokenId: 12n, venue: "aerodrome-slipstream", positionManager: manager } });
+    const context = poolContext(position, "base");
+    expect(context.aerodrome?.id).toBe("legacy");
+    const plan = buildEthSettlement(buildPositionActionPlan(position, owner, "base", "withdraw"), position, context, { memeToSwap: 1_500_000n, minimumSwapOut: 700_000n });
+    expect(plan.transactions.some((tx) => tx.description.startsWith("Aerodrome exact-in"))).toBe(true);
+    expect(plan.transactions.at(-1)?.description).toContain("WETH.withdraw");
+    expect(plan.allowedTargets).toContain("0xBE6D8f0d05cC4be24d5167a3eF062215bE6D18a5");
+  });
+
+  it("does not offer ETH settlement to V4 or non-ETH pairs", () => {
+    const v4 = snapshot({ ref: { protocol: "V4", chainId: 8453, tokenId: 88n } });
+    expect(supportsEthSettlement(v4, poolContext(v4, "base"))).toBe(false);
+    const usdc = addressesFor("base").usdc!;
+    const stable = snapshot({ token0: { address: usdc, symbol: "USDC", decimals: 6 } });
+    const context = poolContext(stable, "base");
+    expect(context.quoteIsToken0).toBeUndefined();
+    expect(supportsEthSettlement(stable, context)).toBe(false);
+  });
+
+  it("zaps fresh ETH into any V3 position through its own pool", () => {
+    const position = snapshot();
+    const context = poolContext(position, "base");
+    const plan = buildIncreaseFromEthPlan(position, owner, "base", context, 1_000_000n, { amountIn: 500_000n, minimumAmountOut: 480_000n, postSwapSqrtPriceX96: position.sqrtPriceX96 });
+    const descriptions = plan.transactions.map((tx) => tx.description);
+    expect(descriptions[0]).toContain("exact-in");
+    expect(BigInt(plan.transactions[0]!.value)).toBe(500_000n);
+    expect(descriptions.at(-1)).toBe("NFPM.increaseLiquidity");
+    expect(BigInt(plan.transactions.at(-1)!.value)).toBeGreaterThan(0n);
+    expect(plan.funding).toMatchObject({ amountWei: "1000000", quoteSymbol: "ETH", memeSymbol: position.token1.symbol });
+    expect(plan.transactions.some((tx) => tx.to === addressesFor("base").weth)).toBe(false);
+    expect(plan.allowedTargets).toContain(addressesFor("base").swapRouter02);
+  });
+
+  it("zaps fresh ETH into an Aerodrome position by wrapping first", () => {
+    const manager = "0x827922686190790b37229fd06084350E74485b72" as const;
+    const position = snapshot({ venue: "aerodrome-slipstream", positionManager: manager, ref: { protocol: "V3", chainId: 8453, tokenId: 12n, venue: "aerodrome-slipstream", positionManager: manager } });
+    const context = poolContext(position, "base");
+    const plan = buildIncreaseFromEthPlan(position, owner, "base", context, 1_000_000n, { amountIn: 500_000n, minimumAmountOut: 480_000n, postSwapSqrtPriceX96: position.sqrtPriceX96 });
+    const descriptions = plan.transactions.map((tx) => tx.description);
+    expect(descriptions[0]).toContain("WETH.deposit");
+    expect(descriptions.some((entry) => entry.startsWith("Aerodrome exact-in"))).toBe(true);
+    expect(descriptions.at(-1)).toBe("Aerodrome increaseLiquidity");
+    expect(plan.funding?.quoteSymbol).toBe("WETH");
+  });
+
+  it("does not require the catalog to manage a position", () => {
+    const stranger = snapshot({ token1: { address: "0x3333333333333333333333333333333333333333", symbol: "STRANGER", decimals: 18 }, pool: "0x4444444444444444444444444444444444444444" });
+    expect(positionPoolIsConfigured(stranger, activeMarkets("base"))).toBe(false);
+    expect(buildPositionActionPlan(stranger, owner, "base", "collect").transactions).toHaveLength(1);
+    expect(buildDecreasePositionActionPlan(stranger, owner, "base", 10).kind).toBe("decrease");
+    const context = poolContext(stranger, "base");
+    expect(context.swapRoute?.venue).toBe("uniswap-v3");
+    expect(supportsEthSettlement(stranger, context)).toBe(true);
   });
 });
 

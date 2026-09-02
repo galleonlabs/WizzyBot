@@ -179,17 +179,13 @@ export class V4Protocol implements ProtocolAdapter {
       functionName: "balanceOf",
       args: [owner],
     });
-    const refs: PositionRef[] = [];
-    for (let i = 0n; i < balance; i++) {
-      const tokenId = await this.client.readContract({
-        address: pm,
-        abi: v4PositionManagerAbi,
-        functionName: "tokenOfOwnerByIndex",
-        args: [owner, i],
-      });
-      refs.push({ protocol: "V4", chainId, tokenId });
-    }
-    return refs;
+    const tokenIds = await Promise.all(Array.from({ length: Number(balance) }, (_, index) => this.client!.readContract({
+      address: pm,
+      abi: v4PositionManagerAbi,
+      functionName: "tokenOfOwnerByIndex",
+      args: [owner, BigInt(index)],
+    })));
+    return tokenIds.map((tokenId): PositionRef => ({ protocol: "V4", chainId, tokenId }));
   }
 
   async readPosition(tokenId: bigint): Promise<PositionSnapshot> {

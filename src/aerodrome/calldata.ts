@@ -129,6 +129,7 @@ export function decreaseSlipstreamTx(args: {
   amount0Min: bigint;
   amount1Min: bigint;
   deadlineSec: number;
+  percent?: number;
 }): PlannedTx {
   return {
     to: args.positionManager,
@@ -144,7 +145,7 @@ export function decreaseSlipstreamTx(args: {
       }],
     }),
     value: 0n,
-    description: "Aerodrome decreaseLiquidity 100%",
+    description: `Aerodrome decreaseLiquidity ${args.percent ?? 100}%`,
   };
 }
 

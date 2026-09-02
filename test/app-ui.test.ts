@@ -467,6 +467,9 @@ describe("meme market maker UI", () => {
     expect(positionActionRoute).toContain('z.enum(["collect", "compound", "increase", "rebalance", "withdraw"])');
     expect(positionActionRoute).toContain('rangePreset: z.enum(["focused", "balanced", "wide"]).optional()');
     expect(portfolio).toContain('className="position-manager" id={id} aria-label={`Manage ${position.pair}`}');
+    expect(portfolio).not.toContain('className="position-manager-value"');
+    expect(css).toContain("grid-template-columns: minmax(0, 1fr) minmax(270px, 320px)");
+    expect(css).toContain("border-left: 1px solid var(--line)");
     expect(portfolio).toContain('className={`position-list-item ${expanded ? "is-expanded" : ""}`}');
     expect(portfolio).toContain('aria-expanded={expanded} aria-controls={managerId}');
     expect(portfolio).not.toContain('className="position-manager-backdrop"');

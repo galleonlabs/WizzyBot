@@ -934,20 +934,14 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
 .position-range-status.is-closed { color: var(--muted); }
 .position-range-status.is-closed i { background: var(--muted-2); box-shadow: none; }
 
-.position-manager { display: grid; margin: 0 12px 12px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 13px; background: var(--canvas); animation: panel-open 220ms var(--motion-out) both; }
-.position-manager-scroll { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); align-items: start; gap: 12px; padding: 16px; }
-.position-manager-value { position: relative; display: grid; gap: 4px; padding-right: 90px; }
-.position-manager-scroll > .position-manager-value,
+.position-manager { display: grid; grid-template-columns: minmax(0, 1fr) minmax(270px, 320px); align-items: stretch; margin: 0 12px 12px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 13px; background: var(--canvas); }
+.position-manager-scroll { display: grid; grid-template-columns: minmax(220px, .72fr) minmax(280px, 1fr); align-items: start; gap: 10px; min-width: 0; padding: 14px; }
+.position-manager:not(:has(.position-manager-actions)) .position-manager-scroll { grid-column: 1 / -1; }
 .position-manager-scroll > .action-preview { grid-column: 1 / -1; }
 .position-manager-scroll > .position-range-chart,
-.position-manager-scroll > .position-range-planner { grid-column: 1; grid-row: 2 / span 2; margin-top: 0; }
-.position-manager-scroll > .position-manager-stats,
+.position-manager-scroll > .position-range-planner { grid-column: 1 / -1; margin-top: 0; }
+.position-manager-scroll > .position-manager-stats { grid-column: 1; margin-top: 0; }
 .position-manager-scroll > .position-composition { grid-column: 2; margin-top: 0; }
-.position-manager-value > small { color: var(--muted); font-size: 10px; font-weight: 700; }
-.position-manager-value > strong { color: var(--ink); font-family: var(--font-display); font-size: 30px; line-height: 1.15; letter-spacing: -.045em; }
-.range-status { position: absolute; top: 4px; right: 0; padding: 6px 8px; border-radius: 7px; background: color-mix(in srgb, var(--mint) 10%, var(--surface-2)); color: var(--mint); font-size: 9px; font-weight: 800; }
-.range-status.is-oor { background: color-mix(in srgb, var(--orange) 10%, var(--surface-2)); color: var(--orange); }
-.range-status.is-closed { background: var(--surface-2); color: var(--muted); }
 .position-range-chart { margin-top: 16px; padding: 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
 .position-range-chart > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .position-range-chart > header > div { display: grid; gap: 4px; }
@@ -1026,24 +1020,25 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
 .position-manager .action-preview > span { justify-self: start; }
 .position-manager .action-buttons { width: 100%; }
 .position-manager .action-buttons .small-primary { flex: 1; }
-.position-manager-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; border-top: 1px solid var(--line); background: var(--surface); }
-.position-manager-actions p { width: 100%; margin: 0 0 2px; color: var(--muted); font-size: 9px; line-height: 1.45; }
-.position-manager-actions button { min-height: 42px; flex: 1; padding: 0 13px; border-radius: 9px; background: var(--surface-3); color: var(--ink-soft); font-size: 10px; font-weight: 800; }
-.position-manager-actions > .position-primary-action { flex-basis: 100%; background: var(--coral); color: var(--coral-ink); }
+.position-manager-actions { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 16px; border-left: 1px solid var(--line); background: var(--surface); }
+.position-manager-actions p { margin: 0 0 4px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.position-manager-actions button { min-height: 42px; width: 100%; padding: 0 13px; border-radius: 9px; background: var(--surface-3); color: var(--ink-soft); font-size: 10px; font-weight: 800; }
+.position-manager-actions > .position-primary-action { background: var(--coral); color: var(--coral-ink); }
 .position-add-liquidity .position-primary-action { background: var(--coral); color: var(--coral-ink); }
-.position-secondary-actions { display: contents; }
+.position-secondary-actions { display: grid; gap: 8px; }
 .position-more-action { display: none; }
 .position-manager-actions .position-withdraw-action { color: var(--orange); }
-.position-manager-actions.is-adding { display: block; }
-.position-add-liquidity { display: grid; width: 100%; gap: 9px; }
-.position-add-liquidity > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.position-add-liquidity > header b { color: var(--ink); font-size: 11px; }
-.position-add-liquidity > header small { color: var(--muted); font-size: 9px; }
-.position-add-amount { display: flex; min-height: 54px; align-items: center; gap: 10px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--canvas); }
+.position-manager-actions.is-adding { display: grid; }
+.position-add-liquidity { display: grid; width: 100%; gap: 12px; }
+.position-add-liquidity > header { display: grid; gap: 3px; padding-bottom: 2px; }
+.position-add-liquidity > header small { color: var(--muted-2); font-size: 8px; font-weight: 750; text-transform: uppercase; }
+.position-add-liquidity > header b { color: var(--ink); font-family: var(--font-display); font-size: 20px; letter-spacing: -.025em; }
+.position-add-liquidity > header span { color: var(--muted); font-size: 9px; }
+.position-add-amount { display: flex; min-height: 62px; align-items: center; gap: 10px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--canvas); }
 .position-add-amount:focus-within { outline: 2px solid var(--coral); outline-offset: 0; }
 .position-add-amount input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-family: var(--font-display); font-size: 27px; font-weight: 650; }
 .position-add-amount > b { color: var(--muted); font-size: 11px; }
-.position-add-liquidity > div { display: grid; grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr); gap: 8px; }
+.position-add-liquidity > div { display: grid; gap: 8px; }
 .position-manager-actions .position-add-fund { width: 100%; color: var(--coral); }
 
 .action-preview { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; margin-bottom: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); animation: panel-open 300ms var(--motion-out) both; }
@@ -1151,6 +1146,10 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
   .market-link-label { display: none; }
   .market-link.zap-link { width: auto; min-width: 0; }
   .market-link.zap-link .market-link-label { display: inline; font-size: 10px; }
+  .position-manager { grid-template-columns: minmax(0, 1fr); }
+  .position-manager-actions { border-top: 1px solid var(--line); border-left: 0; }
+  .position-manager-actions.is-adding { justify-items: end; }
+  .position-add-liquidity { max-width: 340px; }
 }
 
 @media (max-width: 640px) {
@@ -1291,14 +1290,11 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
   .empty-action { width: 100%; min-height: 48px; font-size: 13px; }
   .position-manager { margin: 0 8px 8px; }
   .position-manager-scroll { grid-template-columns: minmax(0, 1fr); padding: 16px; }
-  .position-manager-scroll > .position-manager-value,
   .position-manager-scroll > .position-range-chart,
   .position-manager-scroll > .position-range-planner,
   .position-manager-scroll > .position-manager-stats,
   .position-manager-scroll > .position-composition,
   .position-manager-scroll > .action-preview { grid-column: 1; grid-row: auto; }
-  .position-manager-value > small { font-size: 11px; }
-  .position-manager-value > strong { font-size: 28px; }
   .position-range-chart { padding: 14px; }
   .position-range-chart > header b,
   .position-range-chart > header strong { font-size: 12px; }
@@ -1319,8 +1315,10 @@ a.pool-activity-item:focus-visible svg { opacity: 1; }
   .position-manager-actions p { grid-column: 1 / -1; }
   .position-manager-actions button { min-height: 48px; font-size: 12px; }
   .position-manager-actions > .position-primary-action { grid-column: 1; }
-  .position-add-liquidity > header b { font-size: 12px; }
-  .position-add-liquidity > header small { font-size: 10px; }
+  .position-add-liquidity > header b { font-size: 20px; }
+  .position-add-liquidity > header small,
+  .position-add-liquidity > header span { font-size: 10px; }
+  .position-add-liquidity { max-width: none; }
   .position-add-amount { min-height: 58px; }
   .position-add-amount input { font-size: 30px; }
   .position-more-action { display: block; min-width: 72px; }

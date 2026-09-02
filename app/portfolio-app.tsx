@@ -1136,11 +1136,6 @@ function PositionManager({ id, position, actionPlan, actionState, onAction, onEx
   }, [actionPlan?.kind, actionState.kind]);
   return <section className="position-manager" id={id} aria-label={`Manage ${position.pair}`}>
       <div className="position-manager-scroll">
-        <section className="position-manager-value">
-          <small>Position value</small>
-          <strong>{positionValueLabel(position)}</strong>
-          <span className={`range-status is-${position.status}`}>{position.status === "in-range" ? "In range" : position.status === "oor" ? "Out of range" : "Closed"}</span>
-        </section>
         {rangePreview ? <PositionRangePlanner position={position} preset={rangePreset} preview={rangePreview} previousTickLower={plannedRange?.previousTickLower ?? position.tickLower} previousTickUpper={plannedRange?.previousTickUpper ?? position.tickUpper} disabled={actionBusy} onPreset={(next) => { if (next === rangePreset) return; onCancel(); setRangePreset(next); }} /> : <PositionRangeChart position={position} />}
         <dl className="position-manager-stats" aria-label="Position performance">
           <div><dt>Fees ready</dt><dd className={hasCollectibleFees(position) ? "positive" : ""}>{positionFeesLabel(position)}</dd></div>
@@ -1155,13 +1150,13 @@ function PositionManager({ id, position, actionPlan, actionState, onAction, onEx
       </div>
       {actionState.kind === "idle" ? <footer className={`position-manager-actions ${addOpen ? "is-adding" : ""}`}>
         {addOpen ? <div className="position-add-liquidity">
-          <header><b>Add to this position</b><small>{balance?.kind === "ready" && balance.balanceWei !== undefined ? `${formatWalletBalance(balance.balanceWei)} ETH available` : fundingChain ? `Uses ${chainLabel(fundingChain)} ETH` : "ETH balance unavailable"}</small></header>
+          <header><small>Manage position</small><b>Add liquidity</b><span>{balance?.kind === "ready" && balance.balanceWei !== undefined ? `${formatWalletBalance(balance.balanceWei)} ETH available` : fundingChain ? `Uses ${chainLabel(fundingChain)} ETH` : "ETH balance unavailable"}</span></header>
           <label className="position-add-amount">
             <input autoFocus type="text" inputMode="decimal" enterKeyHint="done" name="position-add-amount" value={addAmount} onChange={(event) => setAddAmount(event.target.value)} aria-label="ETH to add" />
             <b>ETH</b>
           </label>
           {addNeedsFunding && fundingChain ? <button className="position-add-fund" type="button" onClick={() => onFund(fundingChain)}>Get {chainLabel(fundingChain)} ETH</button> : null}
-          <div><button type="button" onClick={() => setAddOpen(false)}>Cancel</button><button className="position-primary-action" type="button" disabled={!addAmountValid || addNeedsFunding} onClick={() => onAction(position, "increase", undefined, addAmount)}>Review</button></div>
+          <div><button className="position-primary-action" type="button" disabled={!addAmountValid || addNeedsFunding} onClick={() => onAction(position, "increase", undefined, addAmount)}>Review</button><button type="button" onClick={() => setAddOpen(false)}>Cancel</button></div>
         </div> : <>
           {position.protocol === "V2" ? <p><b>Full range by design.</b> V2 fees stay invested in the LP token automatically.</p> : null}
           {canAdd ? <button className="position-primary-action" type="button" onClick={() => setAddOpen(true)} disabled={actionBusy}>Add to this position</button> : null}

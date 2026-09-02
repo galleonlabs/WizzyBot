@@ -1,6 +1,6 @@
 {
-  "version": 7,
-  "updatedAt": "2026-09-01",
+  "version": 8,
+  "updatedAt": "2026-09-02",
   "policy": {
     "snapshotMinutes": 360,
     "historyDays": 30,
@@ -26,15 +26,15 @@
       "feePips": 10000,
       "risk": "experimental",
       "identity": "watch",
-      "chain": "base",
-      "token": "0x3ec2156d4c0a9cbdab4a016633b7bcf6a8d68ea2",
-      "pool": "0x5116773e18a9c7bb03ebb961b38678e45e238923",
-      "protocol": "V3",
       "sources": [
         "https://www.geckoterminal.com/base/pools/0x5116773e18a9c7bb03ebb961b38678e45e238923",
         "https://basescan.org/token/0x3ec2156d4c0a9cbdab4a016633b7bcf6a8d68ea2",
         "https://bio.site/drbtaskforce"
-      ]
+      ],
+      "chain": "base",
+      "token": "0x3ec2156D4c0A9CBdAB4a016633b7BcF6a8d68Ea2",
+      "pool": "0x5116773e18A9C7bB03EBB961b38678E45E238923",
+      "protocol": "V3"
     },
     {
       "id": "base-bnkr",
@@ -42,16 +42,16 @@
       "symbol": "BNKR",
       "feePips": 10000,
       "risk": "experimental",
-      "identity": "watch",
-      "chain": "base",
-      "token": "0x22af33fe49fd1fa80c7149773dde5890d3c76f3b",
-      "pool": "0xaec085e5a5ce8d96a7bdd3eb3a62445d4f6ce703",
-      "protocol": "V3",
+      "identity": "reviewed",
       "sources": [
         "https://www.geckoterminal.com/base/pools/0xaec085e5a5ce8d96a7bdd3eb3a62445d4f6ce703",
         "https://basescan.org/token/0x22af33fe49fd1fa80c7149773dde5890d3c76f3b",
         "https://bankr.bot"
-      ]
+      ],
+      "chain": "base",
+      "token": "0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b",
+      "pool": "0xAEC085E5A5CE8d96A7bDd3eB3A62445d4f6CE703",
+      "protocol": "V3"
     },
     {
       "id": "robinhood-microduck",

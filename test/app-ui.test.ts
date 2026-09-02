@@ -21,6 +21,9 @@ const ghostDark = readFileSync("public/brand/wizzy-ghost-dark.svg", "utf8");
 const socialCard = readFileSync("public/brand/wizzy-social-unbounded-v1.png");
 const nextConfig = readFileSync("next.config.ts", "utf8");
 const poolsRoute = readFileSync("app/api/pools/route.ts", "utf8");
+const cronRoute = readFileSync("app/api/cron/pools/route.ts", "utf8");
+const snapshotStore = readFileSync("app/lib/pool-snapshot-server.ts", "utf8");
+const vercelConfig = JSON.parse(readFileSync("vercel.json", "utf8")) as { crons?: Array<{ path: string; schedule: string }> };
 const relayQuoteRoute = readFileSync("app/api/relay/quote/route.ts", "utf8");
 const poolActivityRoute = readFileSync("app/api/pool-activity/route.ts", "utf8");
 const apiBoundary = readFileSync("app/lib/api-request-server.ts", "utf8");
@@ -52,7 +55,6 @@ describe("meme yield curator surface", () => {
     expect(portfolio).toContain('useState<ViewTab>("pools")');
     expect(portfolio).toContain('{ id: "pools", label: "Pools" }, { id: "positions", label: "Positions" }');
     expect(portfolio).toContain("<h1>Meme yield, curated.</h1>");
-    expect(portfolio).toContain('fetch("/api/pools", { cache: "no-cache" })');
     expect(portfolio).toContain("<PoolTable pools={pools.pools}");
     expect(portfolio).toContain('setLpTarget({ kind: "new", pool })');
     expect(portfolio).toContain("Wizzy adds a 0.3% fee inside each Relay quote");
@@ -93,14 +95,21 @@ describe("meme yield curator surface", () => {
     expect(discovery).toContain("minLiquidityUsd: 10_000");
     expect(discovery).toContain("api.gopluslabs.io");
     expect(discovery).toContain("api.geckoterminal.com");
-    expect(discovery).toContain('"trending_pools?page=1"');
-    expect(discovery).toContain('"new_pools?page=1"');
+    expect(discovery).toContain('{ chain: "robinhood", path: "trending_pools?page=1" }');
+    expect(discovery).toContain('{ chain: "base", path: "new_pools?page=1" }');
     expect(discovery).toContain("Reviewed markets always make the menu");
-    expect(poolsRoute).toContain("snapshot = mergePoolSnapshots(snapshot, next)");
-    expect(poolsRoute).toContain("Stale but present: answer now, refresh in the background.");
-    expect(poolsRoute).toContain("warming: true");
-    expect(poolsRoute).toContain("after(sweep.catch(() => undefined))");
-    expect(portfolio).toContain("if (response.status === 202 && payload.warming)");
+    expect(poolsRoute).toContain("Read path only. The cron at /api/cron/pools is the single writer");
+    expect(poolsRoute).toContain("s-maxage=60, stale-while-revalidate=300");
+    expect(poolsRoute).not.toMatch(/warming|after\(/);
+    expect(cronRoute).toContain('request.headers.get("authorization") !== `Bearer ${secret}`');
+    expect(cronRoute).toContain("mergePoolSnapshots(previous ?? undefined, next)");
+    expect(cronRoute).toContain("writeSnapshot(merged");
+    expect(snapshotStore).toContain('export const SNAPSHOT_PATHNAME = "pools/latest.json"');
+    expect(snapshotStore).toContain("allowOverwrite: true");
+    expect(vercelConfig.crons).toEqual([{ path: "/api/cron/pools", schedule: "*/5 * * * *" }]);
+    expect(portfolio).toContain('fetch("/api/pools", { cache: "default" })');
+    expect(portfolio).toContain('document.addEventListener("visibilitychange", onVisible)');
+    expect(portfolio).not.toMatch(/warming|setTimeout\(\(\) => void loadPools/);
     expect(discovery).toContain("export function mergeSnapshots");
   });
 
@@ -143,6 +152,10 @@ describe("meme yield curator surface", () => {
     expect(nextConfig).not.toContain("connect-src *");
     expect(portfolioTypes).toContain("{ id: 4663, label: \"Robinhood Chain\", slug: \"robinhood\" }");
     expect(lpSheet).toContain("RELAY_CHAINS.map((chain) => <option");
+    expect(lpSheet).toContain("fetch(`/api/balance?${params.toString()}`");
+    expect(lpSheet).not.toMatch(/wagmi\/actions/);
+    expect(balanceRoute).toContain("if (chainId === 1) return { chain: mainnet");
+    expect(balanceRoute).toContain('functionName: "balanceOf"');
   });
 
   it("uses deliberate mobile layouts instead of shrinking desktop rows", () => {

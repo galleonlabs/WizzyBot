@@ -1,65 +1,61 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { catalogFallbackSnapshot, fetchCuratedPools, mergePoolSnapshots } from "../../lib/portfolio-server";
+import { readSnapshot, snapshotStoreConfigured } from "../../lib/pool-snapshot-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Snapshot = Awaited<ReturnType<typeof fetchCuratedPools>>;
 
-// GeckoTerminal allows roughly thirty requests a minute, so each instance
-// sweeps at most once per window and serves the last snapshot meanwhile.
-// A degraded sweep keeps the previous good pools and retries sooner.
-const FRESH_MS = 10 * 60_000;
-const DEGRADED_MS = 2 * 60_000;
-let snapshot: Snapshot | undefined;
-let expiresAt = 0;
-let inflight: Promise<Snapshot> | null = null;
-
-async function refresh(): Promise<Snapshot> {
-  if (!inflight) {
-    inflight = fetchCuratedPools()
-      .then((next) => {
-        snapshot = mergePoolSnapshots(snapshot, next);
-        expiresAt = Date.now() + (snapshot.degraded.length ? DEGRADED_MS : FRESH_MS);
-        return snapshot;
-      })
-      .catch((error) => {
-        // Every upstream failed. Reviewed markets still make a usable menu.
-        console.error("[wizzy-pools-refresh]", error instanceof Error ? error.message : "unknown");
-        snapshot = snapshot ?? catalogFallbackSnapshot();
-        expiresAt = Date.now() + DEGRADED_MS;
-        return snapshot;
-      })
-      .finally(() => {
-        inflight = null;
-      });
-  }
-  return inflight;
-}
+// Read path only. The cron at /api/cron/pools is the single writer; this route
+// serves its snapshot from the Blob store with a short CDN cache. Without a
+// store (local dev) it sweeps once per process instead.
+const MEMO_MS = 30_000;
+const LOCAL_SWEEP_MS = 10 * 60_000;
+let memo: { snapshot: Snapshot; expiresAt: number } | undefined;
+let localSweep: Promise<Snapshot> | null = null;
 
 export async function GET() {
   try {
-    if (snapshot && Date.now() < expiresAt) return respond(snapshot);
-    // `after` keeps the function alive until the sweep settles; serverless
-    // runtimes freeze background promises once the response is sent.
-    const sweep = refresh();
-    after(sweep.catch(() => undefined));
-    if (snapshot) {
-      // Stale but present: answer now, refresh in the background.
-      return respond(snapshot);
+    if (memo && Date.now() < memo.expiresAt) return respond(memo.snapshot);
+    if (snapshotStoreConfigured()) {
+      const stored = await readSnapshot();
+      if (stored) {
+        memo = { snapshot: stored as Snapshot, expiresAt: Date.now() + MEMO_MS };
+        return respond(stored as Snapshot);
+      }
+      // First deploy before the cron has run: reviewed markets keep the page useful.
+      return NextResponse.json(catalogFallbackSnapshot(), { headers: { "Cache-Control": "no-store" } });
     }
-    // Cold instance: give the sweep a few seconds, then tell the client to come back.
-    const settled = await Promise.race([sweep, new Promise<null>((resolve) => setTimeout(() => resolve(null), 6_000))]);
-    if (settled) return respond(settled);
-    return NextResponse.json({ pools: [], asOf: "", scanned: 0, excluded: 0, degraded: [], warming: true }, { status: 202, headers: { "Cache-Control": "no-store" } });
+    return respond(await localSnapshot());
   } catch (error) {
     console.error("[wizzy-pools-error]", error instanceof Error ? error.message : "unknown");
-    return NextResponse.json({ error: "Pool discovery is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    if (memo) return respond(memo.snapshot);
+    return NextResponse.json(catalogFallbackSnapshot(), { headers: { "Cache-Control": "no-store" } });
   }
+}
+
+async function localSnapshot(): Promise<Snapshot> {
+  if (!localSweep) {
+    localSweep = fetchCuratedPools()
+      .then((next) => {
+        const merged = mergePoolSnapshots(memo?.snapshot, next) as Snapshot;
+        memo = { snapshot: merged, expiresAt: Date.now() + LOCAL_SWEEP_MS };
+        return merged;
+      })
+      .catch((error) => {
+        if (memo) return memo.snapshot;
+        throw error;
+      })
+      .finally(() => {
+        localSweep = null;
+      });
+  }
+  return localSweep;
 }
 
 function respond(payload: Snapshot) {
   return NextResponse.json(payload, {
-    headers: { "Cache-Control": "public, max-age=0, s-maxage=120, stale-while-revalidate=600" },
+    headers: { "Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300" },
   });
 }

@@ -17,6 +17,10 @@ No application, curator, CLI, keeper, or ordinary deployment path may:
 
 Token graduation and any later opt-in market listing are separate releases governed by the [token and treasury plan](TOKEN_FLYWHEEL.md).
 
+## Pool discovery
+
+`/api/cron/pools` is the only code that calls GeckoTerminal and GoPlus. Vercel Cron triggers it every five minutes (`vercel.json`); it sweeps both chains, merges a degraded sweep into the last good snapshot, and writes `pools/latest.json` to the `wizzy-pools` Blob store. `/api/pools` only reads that snapshot and serves it with a one-minute CDN cache, so browsers never touch an upstream and cold instances answer instantly. Trigger a refresh by hand with `curl -H "Authorization: Bearer $CRON_SECRET" https://wizzy.meme/api/cron/pools`.
+
 ## Pool activity
 
 `GET /api/pool-activity` reports Uniswap V3 `Mint` and `Burn` events from the reviewed Robinhood pools; it does not imply that Wizzy vaults user funds. The 2.0 positions surface no longer renders the scrolling rail, but the endpoint stays available to agents and future surfaces under the same budget.
@@ -128,6 +132,9 @@ Set these in `.env` locally or in the Vercel project `wizzy`. Values here are pu
 | `UNABOT_ETH_USD` | Optional USD/ETH fallback for skip math. |
 | `TELEGRAM_BOT_TOKEN` | Telegram surface. Never commit. |
 | `UNABOT_KEEPER_OWNER` | Wallet address the hosted keeper scans. Unset, the schedule logs a skip and does nothing. |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob store `wizzy-pools`. The cron sweep writes `pools/latest.json`; `/api/pools` reads it. Without it the API sweeps once per process (local dev). |
+| `CRON_SECRET` | Bearer token Vercel Cron sends to `/api/cron/pools` every five minutes. The route refuses other callers when it is set. |
+| `ETHEREUM_RPC_URL`, `ARBITRUM_RPC_URL`, `OPTIMISM_RPC_URL` | Optional server RPCs for pay-from balances on the extra Relay networks. Public endpoints are the default. |
 | `WIZZY_APP_FEE_BPS` | Optional override for the Relay app fee (default 30 bps, capped at 500). Paid to `UNABOT_TREASURY` or the built-in treasury. |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. Or link the Vercel project and use `VERCEL_OIDC_TOKEN`. |
 | `EVE_ALLOW_ANON` | Set to `1` to admit anonymous eve HTTP in production. Default fail-closed. |

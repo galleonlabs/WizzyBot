@@ -119,25 +119,33 @@ export function PortfolioApp() {
     }
   }
 
-  const loadPools = useCallback(async (attempt = 0) => {
-    if (attempt === 0) setPoolsState("loading");
+  const poolsLoadedAtRef = useRef(0);
+  const loadPools = useCallback(async (options: { silent?: boolean } = {}) => {
+    if (!options.silent) setPoolsState("loading");
     try {
-      const response = await fetch("/api/pools", { cache: "no-cache" });
-      const payload = await readJsonPayload(response) as PoolsPayload & { error?: string; warming?: boolean };
-      if (response.status === 202 && payload.warming) {
-        // A cold instance is still sweeping. Poll until the first snapshot lands.
-        if (attempt < 45) window.setTimeout(() => void loadPools(attempt + 1), 4_000);
-        else setPoolsState("error");
-        return;
-      }
+      // One cached read from our API; the cron sweep behind it refreshes every five minutes.
+      const response = await fetch("/api/pools", { cache: "default" });
+      const payload = await readJsonPayload(response) as PoolsPayload & { error?: string };
       if (!response.ok || !Array.isArray(payload.pools)) throw new Error(payload.error ?? "Could not load pools");
       setPools(payload);
       setPoolsState("ready");
+      poolsLoadedAtRef.current = Date.now();
     } catch (error) {
-      setPoolsState("error");
+      if (!options.silent) setPoolsState("error");
       reportClientError("markets", error);
     }
   }, []);
+
+  // Coming back to the tab after a while picks up the latest snapshot without polling.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || previewMode) return;
+      if (Date.now() - poolsLoadedAtRef.current < 60_000) return;
+      void loadPools({ silent: true });
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadPools, previewMode]);
 
   const loadPositions = useCallback(async () => {
     const requestId = ++positionsRequestRef.current;

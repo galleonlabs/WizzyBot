@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatEther, formatUnits, parseEther, parseUnits } from "viem";
-import { getBalance, readContract } from "wagmi/actions";
 import { useConfig } from "wagmi";
 import type { PositionView } from "../lib/cards";
 import type { ChainSlug } from "../lib/chains";
@@ -30,7 +29,6 @@ type Leg = { label: string; quote: RelaySwapQuote };
 const NATIVE = "0x0000000000000000000000000000000000000000";
 const STATUS_POLL_MS = 3_000;
 const STATUS_TIMEOUT_MS = 6 * 60_000;
-const ERC20_BALANCE_ABI = [{ type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "owner", type: "address" }], outputs: [{ type: "uint256" }] }] as const;
 
 export function LpSheet({ target, owner, onClose, onCompleted }: {
   target: LpTarget;
@@ -67,29 +65,29 @@ export function LpSheet({ target, owner, onClose, onCompleted }: {
     };
   }, [executing]);
 
-  // Live wallet balance on the pay-from network, read through the app's own RPC transports.
+  // Live wallet balance on the pay-from network, read through our own API so the browser never talks to an RPC directly.
   useEffect(() => {
     if (!owner) return;
     let active = true;
     setBalance(null);
-    getBalance(config, { address: owner, chainId: originChainId as 8453 })
-      .then((result) => { if (active) setBalance({ chainId: originChainId, wei: result.value }); })
+    readBalance(owner, originChainId)
+      .then((wei) => { if (active) setBalance({ chainId: originChainId, wei }); })
       .catch(() => { if (active) setBalance(null); });
     return () => { active = false; };
-  }, [config, owner, originChainId]);
+  }, [owner, originChainId]);
 
   useEffect(() => {
     if (!owner || target.kind !== "sell") return;
     let active = true;
-    readContract(config, { address: target.token.address as `0x${string}`, abi: ERC20_BALANCE_ABI, functionName: "balanceOf", args: [owner], chainId: destination.chainId as 8453 })
-      .then((result) => {
+    readBalance(owner, destination.chainId, target.token.address)
+      .then((wei) => {
         if (!active) return;
-        setTokenBalance(result);
-        setAmount(trimUnits(formatUnits(result, target.token.decimals)));
+        setTokenBalance(wei);
+        setAmount(trimUnits(formatUnits(wei, target.token.decimals)));
       })
       .catch(() => { if (active) setTokenBalance(null); });
     return () => { active = false; };
-  }, [config, owner, target, destination.chainId]);
+  }, [owner, target, destination.chainId]);
 
   const amountWei = useMemo(() => {
     try {
@@ -315,6 +313,15 @@ function deliveredSummary(target: LpTarget, legs: Leg[], amountWei: bigint, shar
 function formatOut(quote: RelaySwapQuote): string {
   const amount = quote.currencyOut.address.toLowerCase() === NATIVE ? ethValue(Number(formatEther(BigInt(quote.expectedAmountOut)))) : `${compactRaw(quote.expectedAmountOut, quote.currencyOut.decimals)} ${quote.currencyOut.symbol}`;
   return quote.amountOutUsd ? `${amount} · ${money(Number(quote.amountOutUsd))}` : amount;
+}
+
+async function readBalance(owner: string, chainId: number, token?: string): Promise<bigint> {
+  const params = new URLSearchParams({ address: owner, chainId: String(chainId) });
+  if (token) params.set("token", token);
+  const response = await fetch(`/api/balance?${params.toString()}`, { cache: "no-store" });
+  const payload = await readJsonPayload(response) as { balanceWei?: string; error?: string };
+  if (!response.ok || payload.balanceWei === undefined) throw new Error(payload.error ?? "Could not read balance");
+  return BigInt(payload.balanceWei);
 }
 
 function maxSpendable(balanceWei: bigint): string {

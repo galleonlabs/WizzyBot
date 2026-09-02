@@ -139,24 +139,24 @@ const VENUE_LABELS: Record<PoolVenue, string> = {
   "aerodrome-slipstream": "Aerodrome Slipstream",
 };
 
-/** Sweeps per chain, in priority order. Kept small: GeckoTerminal allows ~30 requests a minute. */
-const SWEEPS: Record<ChainSlug, string[]> = {
-  base: [
-    "dexes/uniswap-v3-base/pools?page=1&sort=h24_volume_usd_desc",
-    "dexes/uniswap-v3-base/pools?page=2&sort=h24_volume_usd_desc",
-    "dexes/aerodrome-slipstream/pools?page=1&sort=h24_volume_usd_desc",
-    "dexes/uniswap-v2-base/pools?page=1&sort=h24_volume_usd_desc",
-    "trending_pools?page=1",
-    "new_pools?page=1",
-  ],
-  robinhood: [
-    "dexes/uniswap-v3-robinhood/pools?page=1&sort=h24_volume_usd_desc",
-    "dexes/uniswap-v3-robinhood/pools?page=2&sort=h24_volume_usd_desc",
-    "dexes/uniswap-v2-robinhood/pools?page=1&sort=h24_volume_usd_desc",
-    "trending_pools?page=1",
-    "new_pools?page=1",
-  ],
-};
+/**
+ * Sweep order, interleaved across chains so a rate limit part-way through
+ * still leaves both networks represented. GeckoTerminal allows roughly thirty
+ * requests a minute, so the list stays short.
+ */
+const SWEEPS: Array<{ chain: ChainSlug; path: string }> = [
+  { chain: "robinhood", path: "dexes/uniswap-v3-robinhood/pools?page=1&sort=h24_volume_usd_desc" },
+  { chain: "base", path: "dexes/uniswap-v3-base/pools?page=1&sort=h24_volume_usd_desc" },
+  { chain: "robinhood", path: "trending_pools?page=1" },
+  { chain: "base", path: "dexes/aerodrome-slipstream/pools?page=1&sort=h24_volume_usd_desc" },
+  { chain: "robinhood", path: "new_pools?page=1" },
+  { chain: "base", path: "trending_pools?page=1" },
+  { chain: "robinhood", path: "dexes/uniswap-v2-robinhood/pools?page=1&sort=h24_volume_usd_desc" },
+  { chain: "base", path: "new_pools?page=1" },
+  { chain: "robinhood", path: "dexes/uniswap-v3-robinhood/pools?page=2&sort=h24_volume_usd_desc" },
+  { chain: "base", path: "dexes/uniswap-v2-base/pools?page=1&sort=h24_volume_usd_desc" },
+  { chain: "base", path: "dexes/uniswap-v3-base/pools?page=2&sort=h24_volume_usd_desc" },
+];
 
 /** Not memes: stables, majors, liquid staking, and tokenised stocks. Symbols are upper-cased before matching. */
 const NOT_MEME_SYMBOLS = new Set([
@@ -496,14 +496,14 @@ export async function fetchCuratedPools(): Promise<PoolsSnapshot> {
     await sleep(RATE_LIMIT_BACKOFF_MS);
     return sweep(chain, path);
   };
-  for (const chain of ["base", "robinhood"] as const) {
-    for (const path of SWEEPS[chain]) {
-      try {
-        await sweep(chain, path);
-      } catch (error) {
-        degraded.push(`GeckoTerminal ${chain} sweep failed: ${error instanceof Error ? error.message : "unknown"}`);
-      }
+  for (const { chain, path } of SWEEPS) {
+    try {
+      await sweep(chain, path);
+    } catch (error) {
+      degraded.push(`GeckoTerminal ${chain} sweep failed: ${error instanceof Error ? error.message : "unknown"}`);
     }
+  }
+  for (const chain of ["robinhood", "base"] as const) {
     // Reviewed markets always make the menu, even when the sweep missed them.
     const missing = [...catalog.values()].filter((market) => market.chain === chain && !raw.some((row) => row.chain === chain && row.pool.toLowerCase() === market.pool.toLowerCase()));
     if (missing.length) {

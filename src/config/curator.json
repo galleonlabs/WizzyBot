@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "updatedAt": "2026-09-02",
   "policy": {
     "snapshotMinutes": 360,
@@ -25,7 +25,7 @@
       "symbol": "DRB",
       "feePips": 10000,
       "risk": "experimental",
-      "identity": "watch",
+      "identity": "reviewed",
       "sources": [
         "https://www.geckoterminal.com/base/pools/0x5116773e18a9c7bb03ebb961b38678e45e238923",
         "https://basescan.org/token/0x3ec2156d4c0a9cbdab4a016633b7bcf6a8d68ea2",
@@ -112,6 +112,25 @@
       "token": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
       "pool": "6e7V9eegCHw997T72MxgwwJipZ6GJyZF8NvjkzT1rvpN",
       "protocol": "Meteora DLMM"
+    },
+    {
+      "id": "robinhood-index-56910d",
+      "name": "The Index",
+      "symbol": "Index",
+      "feePips": 10000,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "chain": "robinhood",
+      "token": "0x56910D4409F3a0C78C64DD8D0545FF0705389870",
+      "pool": "0xD29893fFac8b29eC4Db2cfE0CDB3FE1377c028Ff",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/robinhood/pools/0xd29893ffac8b29ec4db2cfe0cdb3fe1377c028ff",
+        "https://robinhoodchain.blockscout.com/token/0x56910D4409F3a0C78C64DD8D0545FF0705389870",
+        "https://theindex.finance/",
+        "https://support.hibt.com/hc/en-us/articles/16871787800719-Hibt-Announcement-on-the-Upcoming-Listing-of-INDEX-The-Index"
+      ]
     }
   ]
 }

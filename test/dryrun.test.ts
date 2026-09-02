@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getAddress } from "viem";
-import { ADDRESSES, TREASURY } from "../src/constants.js";
+import { ADDRESSES } from "../src/constants.js";
 import { planCompound, planExit, planRerange, type PlanContext } from "../src/core/actions.js";
 import type { PositionSnapshot } from "../src/types.js";
 
@@ -35,35 +35,30 @@ function snap(over: Partial<PositionSnapshot> = {}): PositionSnapshot {
 const ctx: PlanContext = {
   owner,
   dryRun: true,
-  noFee: false,
+  noFee: true,
   feeSource: "fees",
   minFeeUsd: 1,
   minPositionUsd: 50,
   feesUsd: 25,
   notionalUsd: 4000,
   gasUsd: 0.2,
-  takeBps: 200,
+  takeBps: 0,
 };
 
 describe("mocked dry-run receipts", () => {
-  it("compound: collect → treasury take → increase, no broadcast", () => {
+  it("compound: collect → increase, with no product fee or broadcast", () => {
     const receipt = planCompound(snap({ tickCurrent: 0, inRange: true }), ctx);
     expect(receipt.dryRun).toBe(true);
     expect(receipt.skipped).toBe(false);
     expect(receipt.from).toBe(owner);
-    expect(receipt.to).toContain(TREASURY);
     expect(receipt.to).toContain(ADDRESSES.nfpm);
-    expect(receipt.actions.map((a) => a.kind)).toEqual(
-      expect.arrayContaining(["collect", "transfer", "increase"]),
-    );
-    expect(receipt.treasuryFee?.recipient).toBe(TREASURY);
-    expect(receipt.treasuryFee?.amount0).toBe(20_000_000_000_000n);
-    expect(receipt.treasuryFee?.amount1).toBe(100_000n);
-    expect(receipt.treasuryFee?.bps).toBe(200);
+    expect(receipt.actions.map((a) => a.kind)).toEqual(expect.arrayContaining(["collect", "increase"]));
+    expect(receipt.actions.some((a) => a.kind === "transfer")).toBe(false);
+    expect(receipt.treasuryFee).toBeNull();
     expect(receipt.hash).toBeUndefined();
   });
 
-  it("re-range: decrease, collect, treasury, mint, leftovers to owner", () => {
+  it("re-range: decrease, collect, mint, leftovers to owner", () => {
     const receipt = planRerange(snap(), ctx, { oorPercent: 0 });
     expect(receipt.dryRun).toBe(true);
     expect(receipt.skipped).toBe(false);
@@ -71,26 +66,26 @@ describe("mocked dry-run receipts", () => {
       expect.arrayContaining(["decrease", "collect", "transfer", "mint"]),
     );
     expect(receipt.actions.some((a) => a.description.includes("leftover"))).toBe(true);
-    expect(receipt.treasuryFee?.recipient).toBe(TREASURY);
+    expect(receipt.treasuryFee).toBeNull();
+    expect(receipt.actions.some((a) => a.recipient && a.recipient !== owner)).toBe(false);
     expect(receipt.from).toBe(owner);
-    expect(receipt.to).toEqual(expect.arrayContaining([owner, TREASURY, ADDRESSES.nfpm]));
+    expect(receipt.to).toEqual(expect.arrayContaining([owner, ADDRESSES.nfpm]));
   });
 
-  it("exit: decrease, collect, treasury, optional swap, burn", () => {
+  it("exit: decrease, collect, optional swap, burn", () => {
     const receipt = planExit(snap(), ctx, { swapTo: ADDRESSES.usdc });
     expect(receipt.dryRun).toBe(true);
     expect(receipt.skipped).toBe(false);
-    expect(receipt.actions.map((a) => a.kind)).toEqual(
-      expect.arrayContaining(["decrease", "collect", "transfer", "swap", "burn"]),
-    );
+    expect(receipt.actions.map((a) => a.kind)).toEqual(expect.arrayContaining(["decrease", "collect", "swap", "burn"]));
+    expect(receipt.actions.some((a) => a.kind === "transfer")).toBe(false);
     expect(receipt.actions.find((a) => a.kind === "swap")?.tx?.to).toBe(ADDRESSES.universalRouter);
-    expect(receipt.treasuryFee?.recipient).toBe(TREASURY);
+    expect(receipt.treasuryFee).toBeNull();
     expect(receipt.hash).toBeUndefined();
   });
 
-  it("does not emit a treasury take when --no-fee", () => {
-    const receipt = planCompound(snap({ tickCurrent: 0 }), { ...ctx, noFee: true });
-    expect(receipt.treasuryFee?.skipped).toBe(true);
+  it("does not emit a treasury take even when legacy noFee input is false", () => {
+    const receipt = planCompound(snap({ tickCurrent: 0 }), { ...ctx, noFee: false });
+    expect(receipt.treasuryFee).toBeNull();
     expect(receipt.actions.filter((a) => a.kind === "transfer")).toHaveLength(0);
   });
 });

@@ -11,7 +11,7 @@ export const BASE_RPC_DEFAULT = "https://base-rpc.publicnode.com";
 export const LP_API_URL = "https://liquidity.api.uniswap.org";
 export const TRADE_API_URL = "https://trade-api.gateway.uniswap.org/v1";
 
-/** All product fees. Do not change without an explicit treasury rotation. */
+/** Dedicated treasury reserved for separately reviewed token operations. */
 export const TREASURY: Address = getAddress(
   "0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42",
 );
@@ -45,13 +45,12 @@ export const SIGNER_ALLOWLIST: readonly Address[] = [
   ADDRESSES.universalRouter,
   ADDRESSES.v2Router,
   ADDRESSES.v4PositionManager,
-  TREASURY,
 ];
 
 export const FEE_TIER = {
-  compoundBps: 200, // 2% of compounded fees
-  rangeExitFeeBps: 200, // 2% of uncollected fees
-  notionalBps: 15, // 0.15% of position notional
+  compoundBps: 0,
+  rangeExitFeeBps: 0,
+  notionalBps: 0,
 } as const;
 
 export const BPS_DENOMINATOR = 10_000n;

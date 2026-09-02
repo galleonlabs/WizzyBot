@@ -14,19 +14,16 @@ export function bpsOf(amount: bigint, bps: number): bigint {
   return (amount * BigInt(bps)) / BPS_DENOMINATOR;
 }
 
-/** 2% of compounded / uncollected fees. */
-export function takeFromFees(amount0: bigint, amount1: bigint, bps = COMPOUND_FEE_BPS) {
+/** Apply an explicit basis-point amount. Product action fees default to zero. */
+export function takeFromFees(amount0: bigint, amount1: bigint, bps: number = COMPOUND_FEE_BPS) {
   return { amount0: bpsOf(amount0, bps), amount1: bpsOf(amount1, bps) };
 }
 
-/**
- * 0.15% of each token's current position amount.
- * That is proportional to the bag; both-zero takes nothing.
- */
+/** Apply an explicit basis-point amount to each position token. */
 export function takeFromNotional(
   amount0: bigint,
   amount1: bigint,
-  bps = NOTIONAL_FEE_BPS,
+  bps: number = NOTIONAL_FEE_BPS,
 ): { amount0: bigint; amount1: bigint } {
   return { amount0: bpsOf(amount0, bps), amount1: bpsOf(amount1, bps) };
 }
@@ -78,52 +75,13 @@ export function resolveActionFee(args: {
   token0: Address;
   token1: Address;
 }): TreasuryFee {
-  if (args.noFee) {
-    return buildTreasuryFee({
-      source: args.feeSource,
-      bps: 0,
-      skipped: true,
-      token0: args.token0,
-      token1: args.token1,
-      amount0: 0n,
-      amount1: 0n,
-    });
-  }
-
-  if (args.action === "compound") {
-    const take = takeFromFees(args.uncollected0, args.uncollected1, COMPOUND_FEE_BPS);
-    return buildTreasuryFee({
-      source: "fees",
-      bps: COMPOUND_FEE_BPS,
-      skipped: false,
-      token0: args.token0,
-      token1: args.token1,
-      amount0: take.amount0,
-      amount1: take.amount1,
-    });
-  }
-
-  if (args.feeSource === "notional") {
-    const take = takeFromNotional(args.notional0, args.notional1, NOTIONAL_FEE_BPS);
-    return buildTreasuryFee({
-      source: "notional",
-      bps: NOTIONAL_FEE_BPS,
-      skipped: false,
-      token0: args.token0,
-      token1: args.token1,
-      amount0: take.amount0,
-      amount1: take.amount1,
-    });
-  }
-
-  const take = takeFromFees(args.uncollected0, args.uncollected1, RANGE_EXIT_FEE_BPS);
   return buildTreasuryFee({
-    source: "fees",
-    bps: RANGE_EXIT_FEE_BPS,
-    skipped: false,
+    source: args.action === "compound" ? "fees" : args.feeSource,
+    bps: 0,
+    skipped: true,
     token0: args.token0,
     token1: args.token1,
-    amount0: take.amount0,
-    amount1: take.amount1,
+    amount0: 0n,
+    amount1: 0n,
   });
 }

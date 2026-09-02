@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getAddress } from "viem";
-import { ADDRESSES, TREASURY } from "../src/constants.js";
+import { ADDRESSES } from "../src/constants.js";
 import { planCompound, planRerange, type PlanContext } from "../src/core/actions.js";
 import { resolveActionFee } from "../src/core/fees.js";
 import { availableAfterUnwind, hydrateCalldata } from "../src/core/hydrate.js";
@@ -37,44 +37,41 @@ function snap(over: Partial<PositionSnapshot> = {}): PositionSnapshot {
 const ctx: PlanContext = {
   owner,
   dryRun: true,
-  noFee: false,
+  noFee: true,
   feeSource: "notional",
   minFeeUsd: 1,
   minPositionUsd: 50,
   feesUsd: 25,
   notionalUsd: 4000,
   gasUsd: 0.2,
-  takeBps: 15,
+  takeBps: 0,
   takeBaseUsd: 4000,
 };
 
-describe("hydrate leftover vs treasury take", () => {
-  it("unwinds principal+fees for rerange so a notional take does not overflow uncollected", () => {
+describe("hydrate no-fee actions", () => {
+  it("unwinds principal and fees for rerange without a treasury take", () => {
     const position = snap();
     const available = availableAfterUnwind(position, true);
     expect(available.amount0).toBe(1_001_000n);
     expect(available.amount1).toBe(2_002_000n);
 
     const receipt = planRerange(position, ctx, { oorPercent: 0 });
-    expect(receipt.treasuryFee?.source).toBe("notional");
-    expect(receipt.treasuryFee?.amount0).toBe(1_500n); // 0.15% of 1_000_000
-    expect(receipt.treasuryFee!.amount0).toBeGreaterThan(position.uncollected0);
+    expect(receipt.treasuryFee).toBeNull();
 
     const filled = hydrateCalldata(receipt, position, owner);
     const mint = filled.actions.find((a) => a.kind === "mint");
     expect(mint?.tx?.data && mint.tx.data !== "0x").toBe(true);
-    const transfer = filled.actions.find((a) => a.kind === "transfer" && a.recipient === TREASURY);
-    expect(transfer?.tx?.data && transfer.tx.data !== "0x").toBe(true);
+    expect(filled.actions.some((a) => a.kind === "transfer" && a.recipient !== owner)).toBe(false);
   });
 
-  it("compounds leftover = uncollected minus 2% take", () => {
+  it("reinvests all uncollected fees", () => {
     const position = snap({ tickCurrent: 0, inRange: true, uncollected0: 10_000n, uncollected1: 10_000n });
     const receipt = planCompound(position, { ...ctx, feeSource: "fees", takeBps: 200, takeBaseUsd: 25 });
     expect(receipt.skipped).toBe(false);
     const filled = hydrateCalldata(receipt, position, owner);
     const increase = filled.actions.find((a) => a.kind === "increase");
     expect(increase?.tx?.description).toMatch(/increaseLiquidity/);
-    expect(increase?.amountIn).toBe(9_800n);
+    expect(increase?.amountIn).toBe(10_000n);
   });
 
   it("does not attach a 0-min-out swap", () => {
@@ -91,7 +88,7 @@ describe("hydrate leftover vs treasury take", () => {
       token0: position.token0.address,
       token1: position.token1.address,
     });
-    expect(fee.amount0).toBe(1_500n);
+    expect(fee.amount0).toBe(0n);
     const filled = hydrateCalldata(receipt, position, owner);
     const swap = filled.actions.find((a) => a.kind === "swap");
     if (swap?.tx) {

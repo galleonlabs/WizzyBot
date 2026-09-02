@@ -56,12 +56,6 @@ const ChainMarketSchema = z.object({
 const CatalogSchema = z.object({
   version: z.number().int().positive(),
   updatedAt: z.string().date(),
-  fees: z.object({
-    allocateBps: z.number().int().min(0).max(10_000),
-    withdrawBps: z.number().int().min(0).max(10_000),
-    rebalanceBps: z.number().int().min(0).max(10_000),
-    compoundBps: z.number().int().min(0).max(10_000),
-  }),
   chains: z.array(ChainMarketSchema).length(2),
 }).superRefine((catalog, ctx) => {
   const ids = new Set<string>();

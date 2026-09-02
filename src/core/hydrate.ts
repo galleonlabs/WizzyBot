@@ -2,11 +2,9 @@ import type { Address } from "viem";
 import { slugForChainId } from "../chains.js";
 import { Token } from "@uniswap/sdk-core";
 import { Pool, Position } from "@uniswap/v3-sdk";
-import { TREASURY } from "../constants.js";
-import { collectCalldata, decreaseCalldata, erc20TransferTx, increaseCalldata, mintCalldata, nativeTransferTx } from "../uniswap/calldata.js";
+import { collectCalldata, decreaseCalldata, increaseCalldata, mintCalldata } from "../uniswap/calldata.js";
 import { v2AddFromPosition, v2RemoveFromPosition } from "../uniswap/v2-calldata.js";
 import { poolKeyFromPosition, v4BurnTx, v4ClaimFeesTx, v4DecreaseTx, v4IncreaseTx, v4MintTx } from "../uniswap/v4-calldata.js";
-import { netAfterTake } from "./fees.js";
 import { recenterSameWidth } from "./ticks.js";
 import type { ActionReceipt, PlannedTx, PositionSnapshot } from "../types.js";
 
@@ -28,8 +26,8 @@ export function availableAfterUnwind(
   return { amount0: position.uncollected0, amount1: position.uncollected1 };
 }
 
-export function liquidityForAmounts(position: PositionSnapshot, add0: bigint, add1: bigint, tickLower = position.tickLower, tickUpper = position.tickUpper): bigint {
-  if (add0 === 0n && add1 === 0n) return 0n;
+export function fittedLiquidityAmounts(position: PositionSnapshot, add0: bigint, add1: bigint, tickLower = position.tickLower, tickUpper = position.tickUpper): { liquidity: bigint; amount0: bigint; amount1: bigint } {
+  if (add0 === 0n && add1 === 0n) return { liquidity: 0n, amount0: 0n, amount1: 0n };
   const t0 = new Token(position.ref.chainId, position.token0.address, position.token0.decimals, position.token0.symbol);
   const t1 = new Token(position.ref.chainId, position.token1.address, position.token1.decimals, position.token1.symbol);
   const pool = new Pool(t0, t1, position.fee, position.sqrtPriceX96.toString(), "0", position.tickCurrent);
@@ -41,7 +39,15 @@ export function liquidityForAmounts(position: PositionSnapshot, add0: bigint, ad
     amount1: add1.toString(),
     useFullPrecision: false,
   });
-  return BigInt(next.liquidity.toString());
+  return {
+    liquidity: BigInt(next.liquidity.toString()),
+    amount0: BigInt(next.amount0.quotient.toString()),
+    amount1: BigInt(next.amount1.quotient.toString()),
+  };
+}
+
+export function liquidityForAmounts(position: PositionSnapshot, add0: bigint, add1: bigint, tickLower = position.tickLower, tickUpper = position.tickUpper): bigint {
+  return fittedLiquidityAmounts(position, add0, add1, tickLower, tickUpper).liquidity;
 }
 
 /** Replace placeholder 0x txs with protocol calldata (v2 Router02 / v3 NFPM / v4 PositionManager). Never attach a 0-min-out swap. */
@@ -49,9 +55,7 @@ export function hydrateCalldata(receipt: ActionReceipt, position: PositionSnapsh
   if (receipt.skipped) return receipt;
   const includePrincipal = receipt.action === "rerange" || receipt.action === "exit";
   const available = availableAfterUnwind(position, includePrincipal);
-  const leftover = receipt.treasuryFee
-    ? netAfterTake(available.amount0, available.amount1, receipt.treasuryFee.amount0, receipt.treasuryFee.amount1)
-    : available;
+  const leftover = available;
 
   const protocol = position.ref.protocol;
 
@@ -112,13 +116,6 @@ export function hydrateCalldata(receipt: ActionReceipt, position: PositionSnapsh
       if (protocol === "V2") return { ...action, tx: undefined };
       if (protocol === "V4") return { ...action, tx: v4BurnTx(position, owner) };
       return action;
-    }
-    if (action.kind === "transfer" && action.recipient === (receipt.treasuryFee?.recipient ?? TREASURY) && action.tokenIn && action.amountIn) {
-      const nativeToken = [position.token0, position.token1].find((token) => token.address.toLowerCase() === action.tokenIn!.toLowerCase());
-      if (protocol === "V4" && nativeToken?.symbol === "ETH") {
-        return { ...action, tx: nativeTransferTx(action.recipient, action.amountIn) };
-      }
-      return { ...action, tx: erc20TransferTx(action.tokenIn, action.recipient, action.amountIn) };
     }
     if (action.kind === "swap") {
       // Do not build exact-in with amountOutMin=0 (sandwich). Live path skips placeholder calldata.

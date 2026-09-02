@@ -12,7 +12,7 @@ export function isAllowedTarget(to: Address, extra: Address[] = [], chain: Chain
 export function assertAllowedTarget(to: Address, extra: Address[] = [], chain: ChainSlug = "base"): void {
   if (!isAllowedTarget(to, extra, chain)) {
     throw new Error(
-      `Refusing send to ${to}. Allowlist: NFPM, Permit2, Universal Router, treasury, plus the position tokens.`,
+      `Refusing send to ${to}. Allowlist: NFPM, Permit2, Universal Router, plus the position tokens.`,
     );
   }
 }

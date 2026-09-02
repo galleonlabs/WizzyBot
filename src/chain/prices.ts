@@ -1,5 +1,5 @@
 import { encodeFunctionData, type Address, type PublicClient } from "viem";
-import { ADDRESSES } from "../constants.js";
+import { addressesFor, slugOfClient } from "../chains.js";
 import { poolAbi, factoryAbi } from "./abi.js";
 import { rawToUsd } from "../core/pnl.js";
 import type { PositionSnapshot } from "../types.js";
@@ -36,8 +36,10 @@ export async function usdPricesForPosition(
   position: PositionSnapshot,
   ethUsdFallback?: number,
 ): Promise<{ price0Usd: number; price1Usd: number }> {
-  const p0 = await tokenUsd(client, position.token0.address, position.token0.decimals, ethUsdFallback);
-  const p1 = await tokenUsd(client, position.token1.address, position.token1.decimals, ethUsdFallback);
+  const [p0, p1] = await Promise.all([
+    tokenUsd(client, position.token0.address, position.token0.decimals, ethUsdFallback),
+    tokenUsd(client, position.token1.address, position.token1.decimals, ethUsdFallback),
+  ]);
   return { price0Usd: p0, price1Usd: p1 };
 }
 
@@ -47,21 +49,22 @@ export async function tokenUsd(
   decimals: number,
   ethUsdFallback?: number,
 ): Promise<number> {
-  const usdc = ADDRESSES.usdc;
-  const weth = ADDRESSES.weth;
-  if (token.toLowerCase() === usdc.toLowerCase()) return 1;
-  if (token.toLowerCase() === ADDRESSES.usdBc.toLowerCase()) return 1;
+  const addresses = addressesFor(slugOfClient(client));
+  const weth = addresses.weth;
+  const stableQuotes = [addresses.usdc, addresses.usdBc, addresses.usdg]
+    .filter((address): address is Address => Boolean(address));
+  if (stableQuotes.some((quote) => token.toLowerCase() === quote.toLowerCase())) return 1;
 
-  const viaUsdc = await midPriceUsd(client, token, decimals, usdc, 6);
-  if (viaUsdc !== undefined) return viaUsdc;
+  for (const quote of stableQuotes) {
+    const viaStable = await midPriceUsd(client, addresses.factory, token, decimals, quote, 6);
+    if (viaStable !== undefined) return viaStable;
+  }
 
-  if (token.toLowerCase() === weth.toLowerCase() || token.toLowerCase() === ADDRESSES.nativeEth.toLowerCase()) {
-    const wethUsdc = await midPriceUsd(client, weth, 18, usdc, 6);
-    if (wethUsdc !== undefined) return wethUsdc;
+  if (token.toLowerCase() === weth.toLowerCase() || token.toLowerCase() === addresses.nativeEth.toLowerCase()) {
     return ethUsdFallback ?? 0;
   }
 
-  const viaWeth = await midPriceUsd(client, token, decimals, weth, 18);
+  const viaWeth = await midPriceUsd(client, addresses.factory, token, decimals, weth, 18);
   if (viaWeth !== undefined) {
     const wethUsd = await tokenUsd(client, weth, 18, ethUsdFallback);
     return viaWeth * wethUsd;
@@ -71,6 +74,7 @@ export async function tokenUsd(
 
 async function midPriceUsd(
   client: PublicClient,
+  factory: Address,
   token: Address,
   tokenDecimals: number,
   quote: Address,
@@ -79,12 +83,12 @@ async function midPriceUsd(
   for (const fee of [500, 3000, 100, 10000]) {
     try {
       const pool = await client.readContract({
-        address: ADDRESSES.factory,
+        address: factory,
         abi: factoryAbi,
         functionName: "getPool",
         args: [token, quote, fee],
       });
-      if (pool === ADDRESSES.nativeEth) continue;
+      if (pool === "0x0000000000000000000000000000000000000000") continue;
       const [slot0, token0] = await Promise.all([
         client.readContract({ address: pool, abi: poolAbi, functionName: "slot0" }),
         client.readContract({ address: pool, abi: poolAbi, functionName: "token0" }),

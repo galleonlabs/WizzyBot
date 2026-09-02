@@ -26,7 +26,7 @@ const defaultsSchema = z.object({
   autoRange: z.boolean().default(true),
   autoExit: z.boolean().default(false),
   feeSource: feeSource.default("fees"),
-  noFee: z.boolean().default(false),
+  noFee: z.boolean().default(true),
   exitPrice: z.number().positive().optional(),
   exitToken: z.string().optional(),
   protocol: protocol.optional(),
@@ -54,7 +54,7 @@ export const DEFAULT_POLICY: PolicyDefaults = {
   autoRange: true,
   autoExit: false,
   feeSource: "fees" as FeeSource,
-  noFee: false,
+  noFee: true,
 };
 
 export function homeConfigPath(): string {

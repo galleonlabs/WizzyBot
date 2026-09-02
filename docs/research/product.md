@@ -15,7 +15,7 @@ Not a trading desk, not an Aerodrome yield vault, not a bot that silent-signs fr
 - Writes go through the official Uniswap LP API (https://liquidity.api.uniswap.org) when an API key is present, or through SDK + viem calldata when it is not. Swaps (rebalance legs only) use https://trade-api.gateway.uniswap.org/v1.
 - Default is **dry-run**. --live broadcasts and requires typing yes.
 
-Treasury (all product fees): 0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42 (TREASURY in src/constants.ts). Optional override: UNABOT_TREASURY.
+The dedicated treasury address remains in configuration for future token operations. Direct LP actions do not route product fees to it.
 
 ## 3. What it is not
 
@@ -23,25 +23,18 @@ Treasury (all product fees): 0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42 (TREASUR
 | --- | --- |
 | A trading desk | No market-making, no perps, no Polymarket, no tokenized stocks, no buy 5 of X. Rebalance swaps exist only to restore the range ratio. No extra swap take. |
 | Aerodrome yield | Different NPM, gauges, AERO emissions. Revert Jan 2026 hole lived on that stack. Out of scope. |
-| A Revert clone that takes the NFT | We copy Revert jobs and fees, not v1 Compoundor custody and not Lend. |
+| A Revert clone that takes the NFT | We copy useful Revert job mechanics, not v1 Compoundor custody, its fee design, or Lend. |
 | Silent-sign from X | Bankr May 2026. No social scanner that can reach the signer. Chat is local CLI / MCP. |
 | A no-IL product | Concentrated liquidity diverges from HOLD. The position card must show it. |
 | A token launchpad | A token is a separate future decision governed by [the token and index plan](../TOKEN_FLYWHEEL.md). This repo does not deploy one in the initial application release. |
 
 ## 4. Fee schedule
 
-Mirrors Revert published numbers. Encoded in src/constants.ts as FEE_TIER.
+All direct LP actions have a zero Wizzy fee. Their wallet-confirmed steps are not atomic, so a separate treasury transfer would be avoidable and could also succeed when the requested LP action later failed. A future fee requires an atomic executor and a separate reviewed release.
 
-| Action | Default take | Alternate | Recipient |
-| --- | --- | --- | --- |
-| Auto-compound | 2% of compounded fees (compoundBps = 200) | --no-fee owner self-compound = 0% | Treasury |
-| Auto-range | 2% of uncollected fees (rangeExitFeeBps = 200) | --fee-source notional -> 0.15% of position notional (notionalBps = 15) | Treasury |
-| Auto-exit | Same as auto-range | Same | Treasury |
-| Rebalance swap | None | — | Pool fee only |
+Users still pay network gas and the selected pool's trading fee when a swap is required. There is no Bankr-style user-swap fee.
 
-No Bankr-style user-swap fee. The stale 0.8% figure must not appear in UnaBot pricing.
-
-Keeper should skip when fees do not cover gas + take (minFeeUsd, default $1; Revert v1 heuristic was about 100x gas). spendCapUsd (default 10_000) and maxPriceImpactBps (default 50) bound a live run.
+The keeper should skip when fees do not cover gas (minFeeUsd, default $1). `spendCapUsd` (default 10,000) and `maxPriceImpactBps` (default 50) bound a live run.
 
 ## 5. Surfaces
 
@@ -53,7 +46,7 @@ Keeper should skip when fees do not cover gas + take (minFeeUsd, default $1; Rev
 | Skill | skills/unabot-lp/SKILL.md | For Cursor / Claude Code / other skills hosts |
 | Config | ~/.unabot/config.json merged with ./unabot.config.json | Per-tokenId rules |
 
-Global flags: --live, --no-fee, --fee-source fees|notional.
+The old `--no-fee` and `--fee-source` controls were removed with the non-atomic fee path.
 
 Env: BASE_RPC_URL (default https://mainnet.base.org), UNISWAP_API_KEY, UNABOT_PRIVATE_KEY (never logged), UNABOT_TREASURY, UNABOT_ETH_USD.
 
@@ -92,7 +85,7 @@ Without an API key the agent still does full read / PnL / dry-run and builds cal
 ### Boundaries that must hold
 
 1. UnaBot never takes the position. No deposit into a Compoundor, vault, or strategy contract. Operator-style approvals of NFPM to Uniswap contracts are fine; approvals to UnaBot-the-contract do not exist because there is no such contract.
-2. Signer allowlist: NFPM, Permit2, Universal Router, treasury, plus the position tokens for the in-flight fee/approval. A leaked key can still drain allowlisted targets — say that out loud.
+2. Signer allowlist: NFPM, Permit2, Universal Router, and the position tokens required for the in-flight approval. A leaked key can still drain allowlisted targets — say that out loud.
 3. Dry-run is default. Live requires --live and a typed yes. MCP tools that would broadcast must honor the same gate.
 4. The LLM is not an authorizer. Natural language may propose a plan; the policy file + allowlist + --live confirmation authorize it. A prompt that says send the NFT to an attacker address must fail the allowlist.
 5. No social ingress that can reach the signer. If a later surface exists, it can report (status, PnL) but must not broadcast. Bankr 4 May and 19 May 2026 are the worked examples.
@@ -100,7 +93,7 @@ Without an API key the agent still does full read / PnL / dry-run and builds cal
 7. No Aerodrome / Lend path. v4 hooks and gauge-transform flows are how the NFT still exists but the value is gone happens. Review hooks before entering a hooked pool.
 8. Fee-on-transfer / rebase tokens are unsupported (Revert states this; we inherit it).
 9. API key stays off the client. A leaked key cannot steal the position; it can burn rate limit or, if we ever set integratorFee, redirect a swap take. Do not put the key in a browser skill.
-10. Treasury is a fee sink, not a custodian. Users should never send the position or principal to 0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42.
+10. The treasury is not part of direct LP action plans. Users should never send the position or principal to it.
 
 ### Residual risk (accepted)
 
@@ -112,7 +105,7 @@ Without an API key the agent still does full read / PnL / dry-run and builds cal
 
 1. UnaBot is Uniswap LP on autopilot; the user holds the position.
 2. The product is three jobs — compound, re-range, exit — not a DEX front-end.
-3. Fees are Revert-shaped (2% compound; 0.15% notional or 2% of fees on range/exit) and settle to treasury.
+3. Direct LP actions have no Wizzy fee until an atomic executor can enforce success and payment together.
 4. Surfaces are CLI, local NL, MCP, and a skill — Bankr good shape without Bankr social signer.
 5. v2, v3, and v4. v3 NFTs are enumerable; v4 hooks are untrusted code until reviewed; v2 fees are realized via decrease.
 6. Official Uniswap LP + Trading APIs at 6 RPS, x-api-key, no integrator swap take.

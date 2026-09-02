@@ -80,19 +80,12 @@ export type MarketEvaluation = {
   summary: MarketHistorySummary;
 };
 
-export type ReplacementProposal = {
+export type AdmissionProposal = {
   chain: CuratorChain;
   candidateMarketId: string;
   candidateSymbol: string;
-  incumbentMarketId: string;
-  incumbentSymbol: string;
-  candidateFeeAprPct: number;
-  incumbentFeeAprPct: number;
-  aprMultiple: number;
-  candidateQualityScore: number;
-  incumbentQualityScore: number;
-  qualityAdvantage: number;
-  liquidityRatio: number;
+  qualityScore: number;
+  estimatedCapacityUsd: number | null;
 };
 
 function finite(values: Array<number | null>): number[] {
@@ -262,50 +255,15 @@ export function evaluateMarket(observations: CuratorObservation[], policy: Curat
   return { marketId: latest.marketId, chain: latest.chain, symbol: latest.symbol, risk: latest.risk, incumbent: latest.incumbent, recommendation, estimatedCapacityUsd, quality, reasons, summary };
 }
 
-function riskRank(risk: CuratorRisk): number {
-  return risk === "established" ? 0 : risk === "emerging" ? 1 : 2;
-}
-
-export function proposeReplacements(evaluations: MarketEvaluation[], policy: CuratorPolicy): ReplacementProposal[] {
-  const proposals: ReplacementProposal[] = [];
-  for (const candidate of evaluations.filter((row) => !row.incumbent && row.recommendation === "eligible" && row.summary.medianFeeAprPct !== null)) {
-    const incumbent = evaluations
-      .filter((row) => row.incumbent
-        && row.chain === candidate.chain
-        && row.summary.medianFeeAprPct !== null
-        && row.recommendation !== "pause"
-        && riskRank(row.risk) >= riskRank(candidate.risk))
-      .sort((a, b) => {
-        if (a.recommendation !== b.recommendation) return a.recommendation === "review" ? -1 : 1;
-        if (a.quality.score !== b.quality.score) return a.quality.score - b.quality.score;
-        return a.summary.medianFeeAprPct! - b.summary.medianFeeAprPct!;
-      })[0];
-    if (!incumbent) continue;
-    const candidateFeeAprPct = candidate.summary.medianFeeAprPct!;
-    const incumbentFeeAprPct = incumbent.summary.medianFeeAprPct!;
-    const aprMultiple = candidateFeeAprPct / Math.max(0.01, incumbentFeeAprPct);
-    const candidateLiquidity = candidate.summary.medianLiquidityUsd ?? 0;
-    const incumbentLiquidity = incumbent.summary.medianLiquidityUsd ?? 0;
-    const liquidityRatio = incumbentLiquidity > 0 ? candidateLiquidity / incumbentLiquidity : 0;
-    const qualityAdvantage = candidate.quality.score - incumbent.quality.score;
-    if (liquidityRatio < policy.minimumReplacementLiquidityRatio) continue;
-    const requiredQualityAdvantage = incumbent.recommendation === "review" ? 0 : policy.replacementQualityAdvantage;
-    if (qualityAdvantage < requiredQualityAdvantage) continue;
-    if (incumbent.recommendation !== "review" && aprMultiple < policy.replacementAprMultiplier) continue;
-    proposals.push({
+export function proposeAdmissions(evaluations: MarketEvaluation[]): AdmissionProposal[] {
+  return evaluations
+    .filter((row) => !row.incumbent && row.recommendation === "eligible")
+    .map((candidate) => ({
       chain: candidate.chain,
       candidateMarketId: candidate.marketId,
       candidateSymbol: candidate.symbol,
-      incumbentMarketId: incumbent.marketId,
-      incumbentSymbol: incumbent.symbol,
-      candidateFeeAprPct,
-      incumbentFeeAprPct,
-      aprMultiple,
-      candidateQualityScore: candidate.quality.score,
-      incumbentQualityScore: incumbent.quality.score,
-      qualityAdvantage,
-      liquidityRatio,
-    });
-  }
-  return proposals;
+      qualityScore: candidate.quality.score,
+      estimatedCapacityUsd: candidate.estimatedCapacityUsd,
+    }))
+    .sort((a, b) => b.qualityScore - a.qualityScore || a.candidateMarketId.localeCompare(b.candidateMarketId));
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Command } from "commander";
-import { buildProgram, feeSourceFlag, liveFlag, noFeeFlag, protocolFlag, PRODUCT_LINE } from "../src/cli/index.js";
+import { buildProgram, liveFlag, protocolFlag, PRODUCT_LINE } from "../src/cli/index.js";
 import { MCP_TOOLS } from "../src/mcp/server.js";
 import { PRODUCT_VERBS } from "../src/copy.js";
 
@@ -41,24 +41,16 @@ describe("CLI --help smoke", () => {
     expect(help).toMatch(/Import existing positions \(v2, v3, v4\)/);
   });
 
-  it("advertises --live, --no-fee, --fee-source", () => {
+  it("advertises live execution without obsolete fee controls", () => {
     const help = buildProgram().helpInformation();
     expect(help).toContain("--live");
-    expect(help).toContain("--no-fee");
-    expect(help).toContain("--fee-source");
+    expect(help).not.toContain("--no-fee");
+    expect(help).not.toContain("--fee-source");
   });
 
-  it("parses --live, --no-fee, --fee-source helpers", () => {
+  it("parses the live helper", () => {
     expect(liveFlag({})).toBe(false);
     expect(liveFlag({ live: true })).toBe(true);
-    expect(noFeeFlag({ fee: true })).toBe(false);
-    expect(noFeeFlag({ fee: false })).toBe(true);
-    expect(noFeeFlag({ noFee: true })).toBe(true);
-    expect(noFeeFlag({})).toBe(false);
-    expect(feeSourceFlag({})).toBe("fees");
-    expect(feeSourceFlag({ feeSource: "fees" })).toBe("fees");
-    expect(feeSourceFlag({ feeSource: "notional" })).toBe("notional");
-    expect(() => feeSourceFlag({ feeSource: "bogus" })).toThrow(/fees\|notional/);
   });
 
   it("parses --protocol v2|v3|v4 and defaults to v3", () => {

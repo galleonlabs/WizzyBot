@@ -21,8 +21,13 @@ const CandidateLiquidityVenueSchema = z.discriminatedUnion("protocol", [
 const PolicySchema = z.object({
   snapshotMinutes: z.number().int().min(15).max(1_440),
   historyDays: z.number().int().min(14).max(365),
-  candidateProofDays: z.number().int().min(7),
-  minimumPoolAgeDays: z.number().int().min(7),
+  discoveryPages: z.number().int().min(1).max(10),
+  discoveryLimitPerChain: z.number().int().min(12).max(200),
+  discoveryMinimumPoolAgeDays: z.number().int().min(0),
+  discoveryMinimumLiquidityUsd: z.number().nonnegative(),
+  discoveryMinimumVolume24hUsd: z.number().nonnegative(),
+  candidateProofDays: z.number().int().min(1),
+  minimumPoolAgeDays: z.number().int().min(1),
   minimumLiquidityUsd: z.number().positive(),
   incumbentLiquidityUsd: z.number().positive(),
   minimumVolume24hUsd: z.number().positive(),
@@ -31,9 +36,6 @@ const PolicySchema = z.object({
   maximumTopHolderPct: z.number().positive().max(100),
   minimumQualityScore: z.number().int().min(0).max(100),
   maximumPoolAllocationBps: z.number().int().positive().max(1_000),
-  replacementAprMultiplier: z.number().min(1).max(10),
-  replacementQualityAdvantage: z.number().int().min(0).max(100),
-  minimumReplacementLiquidityRatio: z.number().positive().max(1),
 });
 
 const CandidateBase = z.object({
@@ -43,6 +45,7 @@ const CandidateBase = z.object({
   feePips: z.number().int().positive(),
   risk: z.enum(["established", "emerging", "experimental"]),
   identity: z.enum(["reviewed", "watch"]),
+  tokenDecimals: z.number().int().min(0).max(36).default(18),
   sources: z.array(z.string().url()).min(2).max(12).optional(),
 });
 
@@ -79,6 +82,15 @@ const CuratorConfigSchema = z.object({
 }).superRefine((config, ctx) => {
   if (config.policy.incumbentLiquidityUsd > config.policy.minimumLiquidityUsd) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["policy", "incumbentLiquidityUsd"], message: "incumbent floor must not exceed candidate floor" });
+  }
+  if (config.policy.discoveryMinimumLiquidityUsd > config.policy.minimumLiquidityUsd) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["policy", "discoveryMinimumLiquidityUsd"], message: "discovery floor must not exceed activation floor" });
+  }
+  if (config.policy.discoveryMinimumVolume24hUsd > config.policy.minimumVolume24hUsd) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["policy", "discoveryMinimumVolume24hUsd"], message: "discovery volume floor must not exceed activation floor" });
+  }
+  if (config.policy.discoveryMinimumPoolAgeDays > config.policy.minimumPoolAgeDays) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["policy", "discoveryMinimumPoolAgeDays"], message: "discovery age floor must not exceed activation floor" });
   }
   const ids = new Set<string>();
   for (const [index, candidate] of config.candidates.entries()) {

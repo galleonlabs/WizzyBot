@@ -13,14 +13,18 @@ import { assertAllowedTarget } from "./allowlist.js";
 import { viemChainFor, type ChainSlug } from "../chains.js";
 import type { PlannedTx } from "../types.js";
 
-export function makePublicClient(rpcUrl: string, chain: Chain = base) {
+export function makePublicClient(
+  rpcUrl: string,
+  chain: Chain = base,
+  transportOptions: { retryCount?: number; timeoutMs?: number } = {},
+) {
   return createPublicClient({
     chain,
     transport: http(rpcUrl, {
       batch: { batchSize: 20, wait: 10 },
-      retryCount: 6,
+      retryCount: transportOptions.retryCount ?? 6,
       retryDelay: 500,
-      timeout: 15_000,
+      timeout: transportOptions.timeoutMs ?? 15_000,
     }),
   });
 }

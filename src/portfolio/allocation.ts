@@ -8,15 +8,13 @@ import {
 import { addressesFor, chainOf, type ChainSlug } from "../chains.js";
 import { poolAbi, quoterV2Abi } from "../chain/abi.js";
 import { loadEnv } from "../config/env.js";
-import { TREASURY } from "../constants.js";
-import { bpsOf } from "../core/fees.js";
 import { loadV2Pair, planMint, quoteMintFromPool, quoteMintV2, snapshotFromQuote } from "../core/mint.js";
 import { loadV4Pool } from "../chain/v4.js";
 import { makePublicClient } from "../signer/broadcast.js";
 import type { PlannedTx, TokenRef } from "../types.js";
-import { erc20ApproveTx, mintCalldata, nativeTransferTx, wrapEthTx } from "../uniswap/calldata.js";
+import { erc20ApproveTx, mintCalldata, wrapEthTx } from "../uniswap/calldata.js";
 import { exactInV3Tx } from "../uniswap/router.js";
-import { activeMarkets, chainCatalog, getMarketCatalog, type CuratedMarket } from "../markets/catalog.js";
+import { activeMarkets, chainCatalog, type CuratedMarket } from "../markets/catalog.js";
 import { slipstreamPoolAbi, slipstreamQuoterV2Abi } from "../aerodrome/abi.js";
 import { exactInSlipstreamTx, mintSlipstreamTx } from "../aerodrome/calldata.js";
 import { aerodromeDeployment } from "../aerodrome/deployments.js";
@@ -89,7 +87,6 @@ export async function planAllocation(input: {
   chain: ChainSlug;
   amountWei: bigint;
   marketId: string;
-  serviceFeeBps?: number;
   protocol?: "V2" | "V3" | "V4";
   client?: PublicClient;
 }): Promise<AllocationPlan> {
@@ -104,11 +101,7 @@ export async function planAllocation(input: {
   const market = markets[0];
   if (!market) throw new Error("Choose an active reviewed market");
 
-  const feeBps = input.serviceFeeBps ?? getMarketCatalog().fees.allocateBps;
-  if (!Number.isSafeInteger(feeBps) || feeBps < 0 || feeBps > 10_000) throw new Error("service fee must be valid basis points");
-  const serviceFee = bpsOf(input.amountWei, feeBps);
-  const net = input.amountWei - serviceFee;
-  if (net <= 0n) throw new Error("allocation is too small after fees");
+  const net = input.amountWei;
 
   const env = loadEnv();
   const client = input.client ?? makePublicClient(env.rpcByChain[input.chain], chain.viem);
@@ -120,11 +113,8 @@ export async function planAllocation(input: {
       market,
       amountWei: input.amountWei,
       net,
-      serviceFee,
-      feeBps,
       protocol: input.protocol,
       client,
-      treasury: env.treasury ?? TREASURY,
     });
   }
   const quotes: MarketQuote[] = [await quoteMarket(client, owner, chain.id, market, net)];
@@ -158,11 +148,9 @@ export async function planAllocation(input: {
     }
   }
   transactions.push(...quotes.map((quote) => quote.mint));
-  if (serviceFee > 0n) transactions.push(nativeTransferTx(env.treasury ?? TREASURY, serviceFee));
 
   const allowedTargets = uniqueAddresses([
     addresses.weth,
-    env.treasury ?? TREASURY,
     ...markets.map((market) => market.token),
     ...quotes.flatMap((quote) => [quote.swapSpender, quote.positionManager]),
     ...(uniswapQuotes.length ? [addresses.swapRouter02] : []),
@@ -176,8 +164,8 @@ export async function planAllocation(input: {
     chain: input.chain,
     chainId: chain.id,
     amountWei: input.amountWei.toString(),
-    serviceFeeBps: feeBps,
-    serviceFeeWei: serviceFee.toString(),
+    serviceFeeBps: 0,
+    serviceFeeWei: "0",
     netAllocationWei: net.toString(),
     expectedConfirmations: 1,
     execution: "wallet_transactions",
@@ -212,11 +200,8 @@ async function planAlternativeAllocation(input: {
   market: CuratedMarket;
   amountWei: bigint;
   net: bigint;
-  serviceFee: bigint;
-  feeBps: number;
   protocol: AlternativeProtocol;
   client: PublicClient;
-  treasury: Address;
 }): Promise<AllocationPlan> {
   const venue = liquidityVenueFor(input.market, input.protocol);
   const addresses = addressesFor(input.chain);
@@ -338,13 +323,11 @@ async function planAlternativeAllocation(input: {
     acquisition.swap,
     ...mintTransactions,
   ];
-  if (input.serviceFee > 0n) transactions.push(nativeTransferTx(input.treasury, input.serviceFee));
   const allowedTargets = uniqueAddresses([
     addresses.weth,
     input.market.token,
     acquisition.swapSpender,
     ...liquidityTargets,
-    input.treasury,
   ]);
   assertAllowedTransactions(transactions, allowedTargets);
   const now = new Date();
@@ -354,8 +337,8 @@ async function planAlternativeAllocation(input: {
     chain: input.chain,
     chainId: input.chainId,
     amountWei: input.amountWei.toString(),
-    serviceFeeBps: input.feeBps,
-    serviceFeeWei: input.serviceFee.toString(),
+    serviceFeeBps: 0,
+    serviceFeeWei: "0",
     netAllocationWei: input.net.toString(),
     expectedConfirmations: 1,
     execution: "wallet_transactions",

@@ -51,7 +51,7 @@ const audit = {
   appliedReviews: result.appliedReviews,
   appliedNominations: result.appliedNominations,
   appliedVenues: result.appliedVenues,
-  appliedReplacement: result.appliedReplacement,
+  appliedAdmissions: result.appliedAdmissions,
   appliedPauses: result.appliedPauses,
 };
 await writeAtomic(join(stateDir, "research-applied-latest.json"), `${JSON.stringify(audit, null, 2)}\n`);

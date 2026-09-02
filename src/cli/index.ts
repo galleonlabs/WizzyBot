@@ -19,7 +19,6 @@ import { extraAllowForMint, persistMintHold, runMintFlow } from "../core/mint-fl
 import { formatHoldNote, getHold, holdAmounts } from "../core/hold.js";
 import { importHoldForToken } from "../chain/mint-history.js";
 import { runTelegramLoop } from "../surfaces/telegram.js";
-import { COMPOUND_FEE_BPS, NOTIONAL_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
 import { rangeFromWidthPct, snapRange, tickSpacingForFee } from "../core/ticks.js";
 import { parseIntent, confirmPhrase, isWrite, protocolOf, type Intent } from "../agent/nlp.js";
 import { PRODUCT_LINE, PRODUCT_HELP } from "../copy.js";
@@ -37,8 +36,6 @@ program
   .version("1.0.0")
   .argument("[utterance...]", "natural-language command, e.g. unabot \"status 12345\"")
   .option("--live", "broadcast (default is dry-run)")
-  .option("--no-fee", "skip the take")
-  .option("--fee-source <source>", "fees | notional", "fees")
   .option("--chain <slug>", "base | robinhood (default base)", "base")
   .option("--config <path>", "policy file (merged over ~/.unabot/config.json)")
   .action(async (utterance: string[], opts) => {
@@ -51,21 +48,6 @@ program
 
 export function liveFlag(opts: { live?: boolean } = {}, cmd?: Command): boolean {
   return Boolean(opts.live || cmd?.optsWithGlobals?.().live || program.opts().live);
-}
-
-export function noFeeFlag(opts: { noFee?: boolean; fee?: boolean } = {}): boolean {
-  if (opts.noFee) return true;
-  if (opts.fee === false) return true;
-  const global = program.opts() as { noFee?: boolean; fee?: boolean };
-  if (global.noFee) return true;
-  if (global.fee === false) return true;
-  return false;
-}
-
-export function feeSourceFlag(opts: { feeSource?: string } = {}): "fees" | "notional" {
-  const v = opts.feeSource ?? (program.opts() as { feeSource?: string }).feeSource ?? "fees";
-  if (v !== "fees" && v !== "notional") throw new Error("--fee-source must be fees|notional");
-  return v;
 }
 
 export function protocolFlag(opts: { protocol?: string } = {}): Protocol {
@@ -543,20 +525,14 @@ async function planFor(
   const ctx: PlanContext = {
     owner,
     dryRun: !liveFlag(cmd.optsWithGlobals(), cmd),
-    noFee: noFeeFlag(program.opts()),
-    feeSource: feeSourceFlag(program.opts()),
+    noFee: true,
+    feeSource: "fees",
     minFeeUsd: policy.minFeeUsd,
     minPositionUsd: policy.minPositionUsd,
     feesUsd: usd.feesUsd,
     notionalUsd: usd.positionUsd,
     gasUsd: 0.15,
-    takeBps:
-      action === "compound"
-        ? COMPOUND_FEE_BPS
-        : feeSourceFlag(program.opts()) === "notional"
-          ? NOTIONAL_FEE_BPS
-          : RANGE_EXIT_FEE_BPS,
-    takeBaseUsd: feeSourceFlag(program.opts()) === "notional" ? usd.positionUsd : usd.feesUsd,
+    takeBps: 0,
   };
   if (action === "compound") return planCompound(snap, ctx);
   if (action === "rerange") return planRerange(snap, ctx, { oorPercent: extra.oorPercent ?? policy.oorPercent });

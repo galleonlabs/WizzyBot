@@ -40,6 +40,14 @@ function windowFor(latest: bigint, fromBlock?: bigint): { start: bigint; chunks:
   return { start, chunks: MAX_CHUNKS };
 }
 
+function historyUnavailable(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes("archive requests require")
+    || message.includes("archive data")
+    || message.includes("historical state")
+    || message.includes("missing trie node");
+}
+
 export async function fetchIncreaseLiquidity(
   client: PublicClient,
   tokenId: bigint,
@@ -77,7 +85,8 @@ export async function fetchIncreaseLiquidity(
           source: "increase-liquidity-log",
         };
       }
-    } catch {
+    } catch (error) {
+      if (historyUnavailable(error)) break;
       // public RPCs often reject large ranges — skip this chunk
     }
     cursor = to + 1n;
@@ -123,7 +132,8 @@ export async function fetchMintTransfer(
           };
         }
       }
-    } catch {
+    } catch (error) {
+      if (historyUnavailable(error)) break;
       // skip chunk
     }
     cursor = toBlock + 1n;

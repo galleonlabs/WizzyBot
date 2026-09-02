@@ -79,17 +79,16 @@ export class V2Protocol implements ProtocolAdapter {
     const chainId = chainIdOfClient(this.client);
     const slug = slugOfClient(this.client);
     const addrs = addressesFor(slug);
-    const refs: PositionRef[] = [];
     const seenPairs = new Set<string>();
-    for (const [a, b] of v2WatchPairsFor(slug)) {
+    const refs = await Promise.all(v2WatchPairsFor(slug).map(async ([a, b]): Promise<PositionRef | undefined> => {
       const pair = await this.client.readContract({
         address: addrs.v2Factory,
         abi: v2FactoryAbi,
         functionName: "getPair",
         args: [a, b],
       });
-      if (pair === addrs.nativeEth) continue;
-      if (seenPairs.has(pair.toLowerCase())) continue;
+      if (pair === addrs.nativeEth) return undefined;
+      if (seenPairs.has(pair.toLowerCase())) return undefined;
       seenPairs.add(pair.toLowerCase());
       const bal = await this.client.readContract({
         address: pair,
@@ -97,10 +96,10 @@ export class V2Protocol implements ProtocolAdapter {
         functionName: "balanceOf",
         args: [owner],
       });
-      if (bal === 0n) continue;
-      refs.push({ protocol: "V2", chainId, tokenId: BigInt(pair) });
-    }
-    return refs;
+      if (bal === 0n) return undefined;
+      return { protocol: "V2", chainId, tokenId: BigInt(pair) };
+    }));
+    return refs.filter((ref): ref is PositionRef => ref !== undefined);
   }
 
   async readPosition(tokenId: bigint): Promise<PositionSnapshot> {

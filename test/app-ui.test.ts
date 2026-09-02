@@ -40,10 +40,12 @@ describe("meme market maker UI", () => {
     expect(page).toContain("Coming soon");
     expect(page).not.toContain("PortfolioApp");
     expect(portfolio).toContain("Make Meme Markets");
-    expect(portfolio).toContain("Pick a market. Add ETH. Own the position.");
-    expect(portfolio).toContain("Wizzy handles the swap and liquidity range.");
+    expect(portfolio).toContain("Add ETH to any listed market. Wizzy selects the best eligible pool, handles the swap, and creates the LP position in your wallet.");
+    expect(portfolio).not.toContain("Pick a market. Add ETH. Own the position.");
+    expect(portfolio).not.toContain("hero-token-field");
     expect(portfolio).toContain("Make market");
-    expect(portfolio).not.toContain("<th>Fee APR</th>");
+    expect(portfolio).toContain("<th>24h fee APR</th>");
+    expect(portfolio).not.toContain("APY");
     expect(portfolio).not.toContain("Based on 24h fees");
     expect(portfolio).toContain("Meme markets");
     expect(portfolio).toContain("Reviewed every six hours.");
@@ -71,6 +73,7 @@ describe("meme market maker UI", () => {
     expect(portfolio).toContain("https://fomo.family/r/makemememarkets");
     expect(portfolio).toContain("Trade on Fomo");
     expect(portfolio).toContain("Trade ${market.symbol}/WETH on Fomo");
+    expect(portfolio).toContain("{zappable ? <a className=\"market-link fomo-link\"");
     expect(portfolio).not.toContain("market-link-external");
     expect(portfolio).not.toMatch(/app\.uniswap\.org|ReferenceLinks|uniswapSwapUrl/i);
     expect(portfolio).not.toMatch(/build your allocation|portfolio split|chain selector/i);
@@ -81,8 +84,8 @@ describe("meme market maker UI", () => {
   });
 
   it("uses deliberate mobile layouts instead of shrinking desktop rows", () => {
-    expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
-    expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(css).not.toContain("hero-token-field");
+    expect(css).toContain(".market-table tr { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(css).toContain(".position-list article { grid-template-columns: repeat(2, minmax(0, 1fr)) auto");
     expect(css).toContain(".zap-dialog { width: min(100%, 328px);");
     expect(css).toContain(".portfolio-empty .empty-symbol { display: none; }");
@@ -187,7 +190,7 @@ describe("meme market maker UI", () => {
     expect(css).toContain(".position-manager .action-preview");
     expect(css).toContain(".composition-track");
     expect(portfolio).toContain('className="position-composition"');
-    expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
+    expect(css).toContain(".market-pagination");
   });
 
   it("switches navigation immediately while keeping lightweight state motion", () => {
@@ -207,6 +210,8 @@ describe("meme market maker UI", () => {
     expect(portfolio).toContain("Base + Robinhood");
     expect(portfolio).toContain('chain === "base" || chain === "robinhood"');
     expect(portfolio).toContain("market-toolbar");
+    expect(portfolio).toContain('aria-label="Search markets"');
+    expect(portfolio).toContain("MARKETS_PER_PAGE");
     expect(portfolio).toContain("market.protocol");
     expect(portfolio).toContain('"Aerodrome Slipstream" : "Uniswap v3"');
     expect(portfolio).not.toContain("curated markets");
@@ -218,10 +223,22 @@ describe("meme market maker UI", () => {
     expect(portfolio).not.toContain("Your wallet owns the position</span>");
     expect(portfolio).toContain("Wizzy fee");
     expect(portfolio.match(/<dt>Wizzy fee<\/dt>/g)).toHaveLength(1);
-    expect(portfolio).toContain('aria-label="Pool version"');
-    expect(portfolio).toContain('protocol: zapProtocol');
+    expect(portfolio).not.toContain('aria-label="Pool version"');
+    expect(portfolio).not.toContain("protocolPickerOpen");
+    expect(portfolio).not.toContain('protocol: zapProtocol');
+    expect(portfolio).toContain("Best pool selected automatically");
+    expect(portfolio).toContain("selected automatically</dd>");
+    expect(portfolio).toContain("Add to this position");
+    expect(portfolio).toContain('aria-label="ETH to add"');
+    expect(portfolio).toContain('action === "increase"');
+    expect(positionActionRoute).toContain('"collect", "compound", "increase", "rebalance", "withdraw"');
+    expect(positionActionRoute).toContain("amountWei: z.string().regex(/^\\d+$/).optional()");
+    expect(allocationRoute).toContain("selectBestMarketVenue(body.chain, body.marketId)");
+    expect(allocationRoute).toContain('venueSelection.selectedKey === "V2" || venueSelection.selectedKey === "V4"');
+    expect(allocationRoute).not.toContain('protocol: z.enum(["V2", "V3", "V4"])');
+    expect(hostedBundle).toContain('selectBestMarketVenue } from "./markets/venue-observations.js"');
     expect(portfolio).toContain("planMarket.quoteSymbol");
-    expect(css).toContain(".zap-protocol");
+    expect(css).not.toContain(".zap-protocol");
     expect(portfolio).not.toContain("Service fee");
     expect(portfolio).toContain('useState("0.05")');
     expect(portfolio).not.toContain("v{markets.catalog.version}");
@@ -367,7 +384,9 @@ describe("meme market maker UI", () => {
 
   it("keeps custom RPC credentials on the server and caches the public market snapshot", () => {
     expect(marketsRoute).toContain("unstable_cache");
-    expect(marketsRoute).toContain("s-maxage=30, stale-while-revalidate=300");
+    expect(marketsRoute).toContain("max-age=0, s-maxage=30, stale-while-revalidate=60");
+    expect(marketsRoute).toContain('["wizzy-markets-v3", String(catalog.version)]');
+    expect(portfolio).toContain('fetch("/api/markets", { cache: "no-cache" })');
     expect(marketsRoute).not.toContain("index: indexState.policy");
     expect(marketsRoute).not.toContain("registry: indexState.registry");
     expect(marketsRoute).not.toContain("Robinhood index");
@@ -430,16 +449,16 @@ describe("meme market maker UI", () => {
     expect(portfolio).toContain("positionTokenImage(position, markets, stats)");
     expect(portfolio).toContain("market.pool.toLowerCase() === position.pool.toLowerCase()");
     expect(portfolio).toContain('const canAdjustRange = (position.protocol === "V3" || position.protocol === "V4") && position.chain !== "solana" && !position.closed');
-    expect(positionActionRoute).toContain('z.enum(["collect", "compound", "rebalance", "withdraw"])');
+    expect(positionActionRoute).toContain('z.enum(["collect", "compound", "increase", "rebalance", "withdraw"])');
     expect(positionActionRoute).toContain('rangePreset: z.enum(["focused", "balanced", "wide"]).optional()');
     expect(portfolio).toContain('role="dialog" aria-modal="true" aria-labelledby="position-manager-title"');
     expect(portfolio).toContain('onAction(position, "collect")');
     expect(portfolio).toContain('onAction(position, "rebalance", rangePreset)');
     expect(portfolio).toContain('role="group" aria-label="Range width"');
     expect(portfolio).toContain("Full range by design.");
-    expect(portfolio).toContain('actionState.kind === "idle" ? <footer className="position-manager-actions">');
+    expect(portfolio).toContain('actionState.kind === "idle" ? <footer className={`position-manager-actions ${addOpen ? "is-adding" : ""}`}>');
     expect(portfolio).toContain("positionRangePreviewForTicks(position, plannedRange.tickLower, plannedRange.tickUpper, plannedRange.currentTick)");
-    expect(portfolio).toContain('!canAdjustRange && !position.closed ? <button className="position-primary-action position-withdraw-action"');
+    expect(portfolio).toContain('!canAdjustRange && !canAdd && !position.closed ? <button className="position-primary-action position-withdraw-action"');
     expect(portfolio).toContain("Ticks {previousTickLower}–{previousTickUpper} → {preview.tickLower}–{preview.tickUpper}");
     expect(portfolio).not.toContain("same-width range centred");
     expect(shotFixture).toContain('fee: 2111');

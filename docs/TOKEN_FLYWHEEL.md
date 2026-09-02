@@ -12,14 +12,7 @@ Status: the product is a menu of individually reviewed meme markets. It does not
 
 ## Fees and token rights
 
-Current product fees route to the dedicated Wizzy treasury at `0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42`.
-
-| Action | Implemented charge | Destination |
-| --- | --- | --- |
-| Create a market position | 0.15% of the gross amount | Wizzy treasury |
-| Reinvest position fees | 2% of the fees being reinvested | Wizzy treasury |
-| Withdraw a position | 0.15% of the conservative withdrawal basis | Wizzy treasury |
-| Rebalance | 0.15% of the conservative rebalance basis | Wizzy treasury |
+Wizzy does not charge for creating, adding to, reinvesting, rebalancing, collecting, or withdrawing a position. The current wallet-confirmed flows are multi-transaction and therefore cannot enforce a product fee atomically. No product fee may be enabled until collection and the corresponding LP action succeed or revert together.
 
 WIZZY holders have no automatic claim on fees, revenue, treasury assets, buybacks, yield, or application governance. Changing that boundary requires separate implementation, independent legal review, explicit disclosure, and a new release.
 
@@ -44,7 +37,7 @@ The market must remain useful as an opt-in LP opportunity without being bundled 
 2. Complete the market-listing evidence record.
 3. Add WIZZY/WETH to `src/config/markets.json` as one ordinary reviewed market, with no weight or special sleeve flag.
 4. Run the complete test, typecheck, and production-build gate.
-5. Ship through the normal release path and verify the single WIZZY row, quote, LP recipient, fee disclosure, and position actions live.
+5. Ship through the normal release path and verify the single WIZZY row, quote, LP recipient, no-fee disclosure, and position actions live.
 6. Publish one canonical post with the contract, pool, supply disclosure, related-party status, treasury links, and anti-scam warning.
 
 Public-identity separation and launch checks are defined in [Launch privacy](LAUNCH_PRIVACY.md). Market review policy is defined in [Market curation](CURATION.md).

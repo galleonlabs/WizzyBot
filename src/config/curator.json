@@ -1,22 +1,24 @@
 {
-  "version": 9,
+  "version": 10,
   "updatedAt": "2026-09-02",
   "policy": {
     "snapshotMinutes": 360,
     "historyDays": 30,
-    "candidateProofDays": 7,
-    "minimumPoolAgeDays": 30,
-    "minimumLiquidityUsd": 250000,
-    "incumbentLiquidityUsd": 75000,
-    "minimumVolume24hUsd": 50000,
+    "discoveryPages": 10,
+    "discoveryLimitPerChain": 200,
+    "discoveryMinimumPoolAgeDays": 1,
+    "discoveryMinimumLiquidityUsd": 10000,
+    "discoveryMinimumVolume24hUsd": 1000,
+    "candidateProofDays": 2,
+    "minimumPoolAgeDays": 7,
+    "minimumLiquidityUsd": 50000,
+    "incumbentLiquidityUsd": 25000,
+    "minimumVolume24hUsd": 10000,
     "maximumLiquidityDrop24hPct": 50,
     "maximumPriceChange24hPct": 45,
     "maximumTopHolderPct": 20,
-    "minimumQualityScore": 65,
-    "maximumPoolAllocationBps": 100,
-    "replacementAprMultiplier": 1.5,
-    "replacementQualityAdvantage": 5,
-    "minimumReplacementLiquidityRatio": 0.75
+    "minimumQualityScore": 50,
+    "maximumPoolAllocationBps": 100
   },
   "candidates": [
     {

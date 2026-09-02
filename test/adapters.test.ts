@@ -192,6 +192,29 @@ describe("v4 calldata", () => {
 });
 
 describe("v2 adapter (mocked)", () => {
+  it("checks watched pairs concurrently", async () => {
+    let activePairReads = 0;
+    let maxConcurrentPairReads = 0;
+    const client = {
+      chain: { id: 8453 },
+      readContract: async ({ functionName }: { functionName: string }) => {
+        if (functionName === "getPair") {
+          activePairReads += 1;
+          maxConcurrentPairReads = Math.max(maxConcurrentPairReads, activePairReads);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          activePairReads -= 1;
+          return pair;
+        }
+        if (functionName === "balanceOf") return 0n;
+        throw new Error(functionName);
+      },
+    } as unknown as PublicClient;
+
+    await new V2Protocol(client).listPositions(owner);
+
+    expect(maxConcurrentPairReads).toBeGreaterThan(1);
+  });
+
   it("lists WETH/USDC when the owner holds LP", async () => {
     const client = mockClient({
       getPair: pair,

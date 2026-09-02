@@ -1,12 +1,6 @@
 {
-  "version": 5,
-  "updatedAt": "2026-08-31",
-  "fees": {
-    "allocateBps": 15,
-    "withdrawBps": 15,
-    "rebalanceBps": 15,
-    "compoundBps": 200
-  },
+  "version": 6,
+  "updatedAt": "2026-09-02",
   "chains": [
     {
       "slug": "base",
@@ -34,8 +28,18 @@
           "coingeckoId": "toshi",
           "color": "#76e7cf",
           "liquidityVenues": [
-            { "protocol": "V2", "pool": "0xF641ff99d18bAbd6fFa38FA5cBc09dD7DaB385C4" },
-            { "protocol": "V4", "poolId": "0x060eea2f3f474c5a9a53e8b806e180b7f770b305e332f008aefae77030fe8955", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+            {
+              "protocol": "V2",
+              "pool": "0xF641ff99d18bAbd6fFa38FA5cBc09dD7DaB385C4"
+            },
+            {
+              "protocol": "V4",
+              "poolId": "0x060eea2f3f474c5a9a53e8b806e180b7f770b305e332f008aefae77030fe8955",
+              "quoteSymbol": "ETH",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            }
           ]
         },
         {
@@ -58,8 +62,18 @@
           "coingeckoId": "based-brett",
           "color": "#6f96ff",
           "liquidityVenues": [
-            { "protocol": "V2", "pool": "0xb34380BA6a17B022782c7FC91e319C10c168FB98" },
-            { "protocol": "V4", "poolId": "0x27402edf3c6a6d6b5a279dfc7a2c8cbacebbfdfc3559f7c03d6971b09126a9f3", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+            {
+              "protocol": "V2",
+              "pool": "0xb34380BA6a17B022782c7FC91e319C10c168FB98"
+            },
+            {
+              "protocol": "V4",
+              "poolId": "0x27402edf3c6a6d6b5a279dfc7a2c8cbacebbfdfc3559f7c03d6971b09126a9f3",
+              "quoteSymbol": "ETH",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            }
           ]
         },
         {
@@ -81,8 +95,18 @@
           "coingeckoId": "degen-base",
           "color": "#b99aff",
           "liquidityVenues": [
-            { "protocol": "V2", "pool": "0x7C327d692B72f60b28AecEDbcC1BA784712fE7b2" },
-            { "protocol": "V4", "poolId": "0xee381526b93d418077a9d1b9c9b495a3d135410af9a58bc2a5f512fb7b61cbf7", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+            {
+              "protocol": "V2",
+              "pool": "0x7C327d692B72f60b28AecEDbcC1BA784712fE7b2"
+            },
+            {
+              "protocol": "V4",
+              "poolId": "0xee381526b93d418077a9d1b9c9b495a3d135410af9a58bc2a5f512fb7b61cbf7",
+              "quoteSymbol": "ETH",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            }
           ]
         },
         {
@@ -103,6 +127,120 @@
           "risk": "emerging",
           "coingeckoId": "basecat",
           "color": "#ff8f6b",
+          "liquidityVenues": []
+        },
+        {
+          "id": "base-stonkex-5ab000",
+          "name": "The Stonks Exchange",
+          "symbol": "STONKEX",
+          "token": "0x5ab000ff9B9FfE0349CE5ffA5fD86f217C3680F5",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x7692AcC1CDd771D09EbCae3663e1843b2911BEC7",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#5ef0b6",
+          "liquidityVenues": []
+        },
+        {
+          "id": "base-noice-9cb41f",
+          "name": "noice",
+          "symbol": "noice",
+          "token": "0x9Cb41FD9dC6891BAe8187029461bfAADF6CC0C69",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xeFF7f8Fe083d7a446717B992bf84391253e54789",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#f4c851",
+          "liquidityVenues": []
+        },
+        {
+          "id": "base-rei-6b2504",
+          "name": "Unit 00 - Rei",
+          "symbol": "REI",
+          "token": "0x6B2504A03ca4D43d0D73776F6aD46dAb2F2a4cFD",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xA213C82265cd3D94f972f735A4f5130e34dF81Bc",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#8ba8ff",
+          "liquidityVenues": []
+        },
+        {
+          "id": "base-clanker-1bc0c4",
+          "name": "tokenbot",
+          "symbol": "CLANKER",
+          "token": "0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xC1a6FBeDAe68E1472DbB91FE29B51F7a0Bd44F97",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#ff8a62",
+          "liquidityVenues": []
+        },
+        {
+          "id": "base-elonrwa-aa6ccc",
+          "name": "ElonRWA",
+          "symbol": "ElonRWA",
+          "token": "0xAa6Cccdce193698D33deb9ffd4be74eAa74c4898",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xD56f086E7B796b313d49f2BC926fAc4BDd2a2B0B",
+          "fee": 100,
+          "tickSpacing": 1,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#d39aff",
+          "liquidityVenues": []
+        },
+        {
+          "id": "base-doginme-6921b1",
+          "name": "doginme",
+          "symbol": "doginme",
+          "token": "0x6921B130D297cc43754afba22e5EAc0FBf8Db75b",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xADE9BcD4b968EE26Bed102dd43A55f6A8c2416df",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#ff6f83",
           "liquidityVenues": []
         }
       ]
@@ -133,8 +271,18 @@
           "coingeckoId": "cash-cat",
           "color": "#5ef0b6",
           "liquidityVenues": [
-            { "protocol": "V2", "pool": "0x0579fA41416101b66e202F66bF3B0de5101F5b9F" },
-            { "protocol": "V4", "poolId": "0x74739c7ee5dda3695d01575c32371eff16e7b831e37517d1a99b568749143e7a", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+            {
+              "protocol": "V2",
+              "pool": "0x0579fA41416101b66e202F66bF3B0de5101F5b9F"
+            },
+            {
+              "protocol": "V4",
+              "poolId": "0x74739c7ee5dda3695d01575c32371eff16e7b831e37517d1a99b568749143e7a",
+              "quoteSymbol": "ETH",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            }
           ]
         },
         {
@@ -156,8 +304,18 @@
           "coingeckoId": "pons",
           "color": "#f4c851",
           "liquidityVenues": [
-            { "protocol": "V2", "pool": "0x8018Ee3ad3c0321bE0e69536733CD28e29564dD4" },
-            { "protocol": "V4", "poolId": "0x6073975413484a350101c0c5d592a91ceb6c3ee881ad359613a08359fd1495a0", "quoteSymbol": "ETH", "fee": 3000, "tickSpacing": 60, "hooks": "0x0000000000000000000000000000000000000000" }
+            {
+              "protocol": "V2",
+              "pool": "0x8018Ee3ad3c0321bE0e69536733CD28e29564dD4"
+            },
+            {
+              "protocol": "V4",
+              "poolId": "0x6073975413484a350101c0c5d592a91ceb6c3ee881ad359613a08359fd1495a0",
+              "quoteSymbol": "ETH",
+              "fee": 3000,
+              "tickSpacing": 60,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            }
           ]
         },
         {
@@ -178,7 +336,10 @@
           "risk": "emerging",
           "color": "#8ba8ff",
           "liquidityVenues": [
-            { "protocol": "V2", "pool": "0xd0C29C64b039200C5Ec23be929665c092e2d39Fb" }
+            {
+              "protocol": "V2",
+              "pool": "0xd0C29C64b039200C5Ec23be929665c092e2d39Fb"
+            }
           ]
         },
         {
@@ -220,8 +381,18 @@
           "coingeckoId": "stonkbroker",
           "color": "#d39aff",
           "liquidityVenues": [
-            { "protocol": "V2", "pool": "0x49E7df6887615F18d83c4C93871B0fefC9C2CC61" },
-            { "protocol": "V4", "poolId": "0xd33c8fd38b06e989cdbd4dffdefab71c4bdd415b24964c8d69e38ff35b068f92", "quoteSymbol": "ETH", "fee": 10000, "tickSpacing": 200, "hooks": "0x0000000000000000000000000000000000000000" }
+            {
+              "protocol": "V2",
+              "pool": "0x49E7df6887615F18d83c4C93871B0fefC9C2CC61"
+            },
+            {
+              "protocol": "V4",
+              "poolId": "0xd33c8fd38b06e989cdbd4dffdefab71c4bdd415b24964c8d69e38ff35b068f92",
+              "quoteSymbol": "ETH",
+              "fee": 10000,
+              "tickSpacing": 200,
+              "hooks": "0x0000000000000000000000000000000000000000"
+            }
           ]
         },
         {
@@ -242,6 +413,239 @@
           "risk": "emerging",
           "imageUrl": "https://cdn.dexscreener.com/cms/images/VZsOJtVF3nDles33?width=800&height=800&quality=95&format=auto",
           "color": "#ff6f83",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-tendies-452423",
+          "name": "TENDIES",
+          "symbol": "TENDIES",
+          "token": "0x45242320DBB855EeA8Fd36804C6487E10E97FCF9",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x237609918F330ADD285b8bC5f8f2922283D1C4C5",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#76e7cf",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-mancer-c72f23",
+          "name": "Mancer",
+          "symbol": "MANCER",
+          "token": "0xc72F232a6869e6CF34dC06129AfFD07F8a2a246A",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x543127d6a1932689fAaCc1Afad4A81146d9ccF54",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#6f96ff",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-juggernaut-d73218",
+          "name": "The Juggernaut",
+          "symbol": "JUGGERNAUT",
+          "token": "0xD7321801CAae694090694Ff55A9323139F043B88",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x588b0785f50063260003B7790C42f1eF74902746",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#5ef0b6",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-pipedog-5cb6f1",
+          "name": "pipedog",
+          "symbol": "PIPEDOG",
+          "token": "0x5Cb6F181081301b44905F3ae15419112ecaBd8A6",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xB7f10f74B39291b9290b779978e19A7637C742D6",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#f4c851",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-pcc-bf3e53",
+          "name": "Pussy Cat Club",
+          "symbol": "PCC",
+          "token": "0xBF3e53713a53E9C3d5d1dDc25dd2C65669244663",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x01D861dCc34cb22d7B520c54BA147bAA9e8Df894",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#8ba8ff",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-pongo-edaee4",
+          "name": "PONGO",
+          "symbol": "PONGO",
+          "token": "0xedAee44320107CAa714BaAEc486261A87F27022d",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xdEc8F541FF159D2B4ABD3c3b041CD739BD7C486F",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#ff8a62",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-yolo-62c71c",
+          "name": "YOLO",
+          "symbol": "YOLO",
+          "token": "0x62C71cd34a52c30d894419CBcc55Db2aFA8032eA",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x52FcB1D83191E06ef2d2D9f460609CA22a923558",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#d39aff",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-hoodrat-8e62f2",
+          "name": "Hoodrat",
+          "symbol": "HOODRAT",
+          "token": "0x8e62F281f282686fCa6dCB39288069a93fC23F1c",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x9ada6e13ddA4Aff0Dc68EB822ccCB74582D8c56a",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#ff6f83",
+          "liquidityVenues": [
+            {
+              "protocol": "V2",
+              "pool": "0x451c0DA3b774045a822A129eeDcc5C667DcbfDD8"
+            }
+          ]
+        },
+        {
+          "id": "robinhood-blink-7b630f",
+          "name": "dont blink",
+          "symbol": "BLINK",
+          "token": "0x7b630F080807DF83908b4aDE46BA6396EE66b098",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x6E31E066Aa531BCb11133B4E7fe95A1A1eD50daA",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#76e7cf",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-good-5f62c5",
+          "name": "Good In The Hood",
+          "symbol": "GOOD",
+          "token": "0x5f62C57e5C537887117EeF828b7E3Ad41C009FEb",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x8EA7c66395fD7e25E9713Edd0B297d4ABE05C304",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#6f96ff",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-wallet-0339f5",
+          "name": "Robinhood Wallet",
+          "symbol": "WALLET",
+          "token": "0x0339f5459FC690aC85F1782e15782A151b4A9E1b",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x9501A20Bedb8beA0798FE5D4c411f5e270965D49",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#5ef0b6",
+          "liquidityVenues": []
+        },
+        {
+          "id": "robinhood-wishbone-775810",
+          "name": "WISHBONE",
+          "symbol": "WISHBONE",
+          "token": "0x77581054581B9c525E7dd7a0155DE43867532d03",
+          "tokenDecimals": 18,
+          "quoteToken": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x6Ec89bFF5E684C2561d0a88e185D8D4eb4b3AA30",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#f4c851",
           "liquidityVenues": []
         }
       ]

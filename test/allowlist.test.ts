@@ -4,18 +4,17 @@ import { ADDRESSES, SIGNER_ALLOWLIST, TREASURY } from "../src/constants.js";
 import { allowlistWithTokens, assertAllowedTarget, isAllowedTarget } from "../src/signer/allowlist.js";
 
 describe("signer allowlist", () => {
-  it("allows NFPM, Permit2, Universal Router, and treasury", () => {
+  it("allows reviewed protocol targets but not the treasury", () => {
     expect(isAllowedTarget(ADDRESSES.nfpm)).toBe(true);
     expect(isAllowedTarget(ADDRESSES.permit2)).toBe(true);
     expect(isAllowedTarget(ADDRESSES.universalRouter)).toBe(true);
     expect(isAllowedTarget(ADDRESSES.swapRouter02)).toBe(true);
-    expect(isAllowedTarget(TREASURY)).toBe(true);
+    expect(isAllowedTarget(TREASURY)).toBe(false);
     expect(SIGNER_ALLOWLIST).toEqual(
       expect.arrayContaining([
         ADDRESSES.nfpm,
         ADDRESSES.permit2,
         ADDRESSES.universalRouter,
-        TREASURY,
       ]),
     );
   });
@@ -23,7 +22,7 @@ describe("signer allowlist", () => {
   it("rejects an arbitrary address and mentions the allowlist", () => {
     const random = getAddress("0x1111111111111111111111111111111111111111");
     expect(isAllowedTarget(random)).toBe(false);
-    expect(() => assertAllowedTarget(random)).toThrow(/NFPM, Permit2, Universal Router, treasury/);
+    expect(() => assertAllowedTarget(random)).toThrow(/NFPM, Permit2, Universal Router/);
     try {
       assertAllowedTarget(random);
     } catch (err) {

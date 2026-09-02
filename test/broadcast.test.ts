@@ -60,14 +60,13 @@ describe("broadcast safety", () => {
     ).rejects.toThrow(/Refusing send/);
   });
 
-  it("treats treasury as an allowed destination", async () => {
-    const sent = await sendPlannedTx({
+  it("refuses direct treasury transfers", async () => {
+    await expect(sendPlannedTx({
       rpcUrl: "https://mainnet.base.org",
       account,
       tx: { ...nfpmTx, to: TREASURY },
       extraAllow: [],
       live: false,
-    });
-    expect(sent.dryRun).toBe(true);
+    })).rejects.toThrow(/Refusing send/);
   });
 });

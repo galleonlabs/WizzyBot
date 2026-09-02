@@ -5,6 +5,8 @@ import { ETH_FUNDING_CHAINS, fetchMarketStats, fetchSolanaMarketStats, getMarket
 export const runtime = "nodejs";
 export const revalidate = 30;
 
+const catalog = getMarketCatalog() as { version: number };
+
 const getMarketsPayload = unstable_cache(async () => {
   const solana = getSolanaMarketCatalog();
   const [evmStats, solanaStats] = await Promise.all([
@@ -12,16 +14,16 @@ const getMarketsPayload = unstable_cache(async () => {
     fetchSolanaMarketStats().catch(() => []),
   ]);
   return {
-    catalog: getMarketCatalog(),
+    catalog,
     solana,
     fundingChains: ETH_FUNDING_CHAINS,
     stats: [...evmStats as unknown[], ...solanaStats as unknown[]],
     source: "version-controlled market catalog + live pool data",
   };
-}, ["wizzy-markets-v2"], { revalidate: 30, tags: ["markets"] });
+}, ["wizzy-markets-v3", String(catalog.version)], { revalidate: 30, tags: ["markets"] });
 
 export async function GET() {
   return NextResponse.json(await getMarketsPayload(), {
-    headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=300" },
+    headers: { "Cache-Control": "public, max-age=0, s-maxage=30, stale-while-revalidate=60" },
   });
 }

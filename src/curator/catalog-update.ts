@@ -1,5 +1,6 @@
 import { getAddress, isAddress } from "viem";
 import { z } from "zod";
+import { addressesFor } from "../chains.js";
 import type { MarketCatalog } from "../markets/catalog.js";
 import type { CuratorConfig } from "./config.js";
 import type { CuratorReport } from "./run.js";
@@ -31,22 +32,19 @@ const VenueAdditionSchema = z.object({
   sources: z.array(ResearchSourceSchema).min(3).max(12),
 });
 
+const MarketAdmissionSchema = z.object({
+  candidateMarketId: z.string().regex(/^[a-z0-9-]+$/),
+  rationale: z.array(z.string().min(1).max(500)).min(1).max(10),
+});
+
 export const CuratorResearchDecisionSchema = z.object({
-  schemaVersion: z.literal(1),
-  verdict: z.enum(["no_change", "replace"]),
+  schemaVersion: z.literal(2),
+  verdict: z.enum(["no_change", "update"]),
   summary: z.string().min(1).max(1_500),
   candidateReviews: z.array(CandidateReviewSchema).max(32),
   candidateNominations: z.array(CandidateNominationSchema).max(16),
   venueAdditions: z.array(VenueAdditionSchema).max(16),
-  replacement: z.object({
-    fromMarketId: z.string().regex(/^[a-z0-9-]+$/),
-    toMarketId: z.string().regex(/^[a-z0-9-]+$/),
-    rationale: z.array(z.string().min(1).max(500)).min(1).max(10),
-  }).nullable(),
-}).superRefine((decision, ctx) => {
-  if ((decision.verdict === "replace") !== Boolean(decision.replacement)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["replacement"], message: "replacement must match the verdict" });
-  }
+  marketAdmissions: z.array(MarketAdmissionSchema).max(32),
 });
 
 export type CuratorResearchDecision = z.infer<typeof CuratorResearchDecisionSchema>;
@@ -58,7 +56,7 @@ export type CentralizedCatalogUpdate = {
   appliedReviews: string[];
   appliedNominations: string[];
   appliedVenues: string[];
-  appliedReplacement: null | { fromMarketId: string; toMarketId: string };
+  appliedAdmissions: string[];
   appliedPauses: string[];
 };
 
@@ -70,7 +68,7 @@ export function planCentralizedCatalogUpdate(input: {
   today: string;
 }): CentralizedCatalogUpdate {
   const decision = CuratorResearchDecisionSchema.parse(input.decision);
-  if (decision.schemaVersion !== 1) throw new Error("Unsupported curator research decision");
+  if (decision.schemaVersion !== 2) throw new Error("Unsupported curator research decision");
   if (input.report.version !== 1 || input.report.role !== "curator") throw new Error("Invalid deterministic curator report");
   if (input.report.configVersion !== input.curatorConfig.version) throw new Error("Curator report does not match the current candidate registry");
 
@@ -104,6 +102,7 @@ export function planCentralizedCatalogUpdate(input: {
       feePips: discovery.feePips,
       risk: "experimental" as const,
       identity: nomination.identity,
+      tokenDecimals: discovery.tokenDecimals,
       chain: discovery.chain,
       token: discovery.token,
       pool: discovery.pool,
@@ -161,50 +160,47 @@ export function planCentralizedCatalogUpdate(input: {
     appliedVenues.push(`${market.id}:V2:${getAddress(discovery.pool)}`);
   }
 
-  let appliedReplacement: CentralizedCatalogUpdate["appliedReplacement"] = null;
-  if (decision.replacement) {
-    const replacement = input.report.replacements.find((proposal) =>
-      proposal.incumbentMarketId === decision.replacement!.fromMarketId
-      && proposal.candidateMarketId === decision.replacement!.toMarketId
-    );
-    if (!replacement) throw new Error("Agent replacement is not authorized by the deterministic curator report");
-    const candidate = input.curatorConfig.candidates.find((row) => row.id === replacement.candidateMarketId);
-    if (!candidate || candidate.chain !== replacement.chain || candidate.identity !== "reviewed") {
-      throw new Error("Replacement candidate was not reviewed before this curator run");
+  const appliedAdmissions: string[] = [];
+  for (const admission of decision.marketAdmissions) {
+    const proposal = input.report.admissions.find((candidate) => candidate.candidateMarketId === admission.candidateMarketId);
+    if (!proposal) throw new Error(`Market admission ${admission.candidateMarketId} is not authorized by the deterministic curator report`);
+    const candidate = input.curatorConfig.candidates.find((row) => row.id === admission.candidateMarketId);
+    if (!candidate || candidate.chain !== proposal.chain || candidate.identity !== "reviewed") {
+      throw new Error("Market admission requires a previously reviewed candidate");
     }
     if (candidate.chain === "solana") throw new Error("Solana candidates cannot be added to the EVM market catalog");
     const candidateEvaluation = evaluations.get(candidate.id);
-    if (candidateEvaluation?.recommendation !== "eligible") throw new Error("Replacement candidate is not policy-eligible");
-
-    const chain = catalog.chains.find((row) => row.slug === replacement.chain);
-    if (!chain) throw new Error(`${replacement.chain} catalog is missing`);
-    const outgoing = chain.markets.find((market) => market.id === replacement.incumbentMarketId);
-    if (!outgoing || outgoing.status !== "active") throw new Error("Replacement incumbent is not active");
-    if (chain.markets.some((market) => market.id === candidate.id)) throw new Error("Replacement candidate already exists in the catalog");
+    if (candidateEvaluation?.recommendation !== "eligible") throw new Error("Market admission candidate is not policy-eligible");
+    const chain = catalog.chains.find((row) => row.slug === candidate.chain);
+    if (!chain) throw new Error(`${candidate.chain} catalog is missing`);
+    if (chain.markets.some((market) => market.id === candidate.id || market.token.toLowerCase() === candidate.token.toLowerCase())) {
+      throw new Error("Market admission candidate already exists in the catalog");
+    }
+    const quote = chain.markets[0];
+    if (!quote) throw new Error(`${candidate.chain} catalog has no quote-asset configuration`);
     const tickSpacing = candidate.protocol === "AERODROME_SLIPSTREAM" ? candidate.tickSpacing : tickSpacingFor(candidate.feePips);
     if (!tickSpacing) throw new Error(`${candidate.id} is missing tick spacing`);
-    outgoing.status = "paused";
     chain.markets.push({
       id: candidate.id,
       name: candidate.name,
       symbol: candidate.symbol,
       token: candidate.token,
-      tokenDecimals: outgoing.tokenDecimals,
-      quoteToken: outgoing.quoteToken,
-      quoteSymbol: outgoing.quoteSymbol,
-      quoteDecimals: outgoing.quoteDecimals,
+      tokenDecimals: candidate.tokenDecimals,
+      quoteToken: addressesFor(candidate.chain).weth,
+      quoteSymbol: "WETH",
+      quoteDecimals: 18,
       protocol: candidate.protocol,
       ...(candidate.protocol === "AERODROME_SLIPSTREAM" ? { aerodromeDeployment: candidate.aerodromeDeployment } : {}),
       pool: candidate.pool,
       fee: candidate.feePips,
       tickSpacing,
-      rangeWidthPct: outgoing.rangeWidthPct,
+      rangeWidthPct: candidate.risk === "established" ? 30 : candidate.risk === "emerging" ? 40 : 50,
       status: "active",
       risk: candidate.risk,
       color: colorFor(candidate.id),
       liquidityVenues: candidate.liquidityVenues ?? [],
     });
-    appliedReplacement = { fromMarketId: outgoing.id, toMarketId: candidate.id };
+    appliedAdmissions.push(candidate.id);
   }
 
   const appliedPauses: string[] = [];
@@ -219,15 +215,15 @@ export function planCentralizedCatalogUpdate(input: {
     market.status = "paused";
     appliedPauses.push(`${market.id}:${evaluation.reasons.join("; ")}`);
   }
-  if (appliedVenues.length || appliedReplacement || appliedPauses.length) {
+  if (appliedVenues.length || appliedAdmissions.length || appliedPauses.length) {
     catalog.version = input.catalog.version + 1;
     catalog.updatedAt = input.today;
   }
 
   const changedFiles: CentralizedCatalogUpdate["changedFiles"] = [];
   if (appliedReviews.length || appliedNominations.length) changedFiles.push("src/config/curator.json");
-  if (appliedVenues.length || appliedReplacement || appliedPauses.length) changedFiles.push("src/config/markets.json");
-  return { curatorConfig, catalog, changedFiles, appliedReviews, appliedNominations, appliedVenues, appliedReplacement, appliedPauses };
+  if (appliedVenues.length || appliedAdmissions.length || appliedPauses.length) changedFiles.push("src/config/markets.json");
+  return { curatorConfig, catalog, changedFiles, appliedReviews, appliedNominations, appliedVenues, appliedAdmissions, appliedPauses };
 }
 
 function assertResearchEvidence(

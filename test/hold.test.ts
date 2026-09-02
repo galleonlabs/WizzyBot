@@ -12,6 +12,7 @@ import {
 } from "../src/core/hold.js";
 import { persistMintHold } from "../src/core/mint-flow.js";
 import { ADDRESSES } from "../src/constants.js";
+import { readHoldBaseline } from "../src/chain/mint-history.js";
 
 function tmpPath(): string {
   return join(mkdtempSync(join(tmpdir(), "unabot-hold-")), "positions.json");
@@ -68,5 +69,22 @@ describe("HOLD persistence", () => {
       path,
     );
     expect(getHold(0n, path)).toBeUndefined();
+  });
+
+  it("stops historical scans when the RPC says archive access is unavailable", async () => {
+    let scans = 0;
+    const client = {
+      chain: { id: 8453 },
+      getBlockNumber: async () => 100_000n,
+      getContractEvents: async () => {
+        scans += 1;
+        throw new Error("Archive requests require a personal token");
+      },
+    };
+
+    const baseline = await readHoldBaseline(client as never, 7n, { amount0: 5n, amount1: 6n });
+
+    expect(baseline.source).toBe("first-seen-import");
+    expect(scans).toBe(2);
   });
 });

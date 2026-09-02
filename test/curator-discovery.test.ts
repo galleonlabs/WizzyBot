@@ -1,14 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { getCuratorConfig } from "../src/curator/config.js";
 import { extractCuratorDiscoveries, type GeckoPoolsPayload } from "../src/curator/discovery.js";
+import { addressesFor } from "../src/chains.js";
 
 const observedAt = "2026-09-01T12:00:00.000Z";
 
 describe("curator discovery", () => {
-  it("emits only mature, liquid WETH pools on supported Uniswap versions that are not already tracked", () => {
+  it("indexes promising pools below the activation gates instead of hiding them", () => {
+    const payload = poolsPayload([
+      pool("0x1111111111111111111111111111111111111111", "EARLY / WETH 1%", "0x2222222222222222222222222222222222222222", "2026-08-30T00:00:00.000Z", 20_000, 2_000, "uniswap-v3-base"),
+    ]);
+
+    const [discovery] = extractCuratorDiscoveries([payload], "base", {
+      policy: getCuratorConfig().policy,
+      existingTokens: new Set(),
+      existingPools: new Set(),
+      observedAt,
+    });
+
+    expect(discovery).toMatchObject({ symbol: "MEME", executionReady: true, policyEligible: false });
+    expect(discovery?.eligibilityNotes).toContain("activation liquidity below $50,000");
+  });
+
+  it("indexes supported WETH pools and labels which ones clear activation policy", () => {
     const payload = poolsPayload([
       pool("0x1111111111111111111111111111111111111111", "MEME / WETH 1%", "0x2222222222222222222222222222222222222222", "2026-01-01T00:00:00.000Z", 900_000, 300_000, "uniswap-v3-base"),
-      pool("0x3333333333333333333333333333333333333333", "YOUNG / WETH 1%", "0x4444444444444444444444444444444444444444", "2026-08-20T00:00:00.000Z", 900_000, 300_000, "uniswap-v3-base"),
+      pool("0x3333333333333333333333333333333333333333", "YOUNG / WETH 1%", "0x4444444444444444444444444444444444444444", "2026-08-30T00:00:00.000Z", 900_000, 300_000, "uniswap-v3-base"),
       pool("0x5555555555555555555555555555555555555555", "OTHER / WETH 1%", "0x6666666666666666666666666666666666666666", "2026-01-01T00:00:00.000Z", 900_000, 300_000, "aerodrome-base"),
     ]);
     const discoveries = extractCuratorDiscoveries([payload], "base", {
@@ -17,14 +34,16 @@ describe("curator discovery", () => {
       existingPools: new Set(),
       observedAt,
     });
-    expect(discoveries).toHaveLength(1);
-    expect(discoveries[0]).toMatchObject({
+    expect(discoveries).toHaveLength(2);
+    expect(discoveries.find((row) => row.token.toLowerCase() === "0x2222222222222222222222222222222222222222")).toMatchObject({
       chain: "base",
       symbol: "MEME",
       protocol: "V3",
       feePips: 10_000,
       dexId: "uniswap-v3-base",
+      policyEligible: true,
     });
+    expect(discoveries.find((row) => row.token.toLowerCase() === "0x4444444444444444444444444444444444444444")).toMatchObject({ policyEligible: false });
   });
 
   it("deduplicates the same pool across feeds and keeps its strongest observation", () => {
@@ -101,6 +120,51 @@ describe("curator discovery", () => {
     });
     expect(discovery?.venues.map((venue) => venue.protocol).sort()).toEqual(["V2", "V4"]);
   });
+
+  it("indexes Aerodrome Slipstream pools without pretending unverified periphery is executable", () => {
+    const payload = poolsPayload([
+      pool("0x1111111111111111111111111111111111111111", "MEME / WETH 1%", "0x2222222222222222222222222222222222222222", "2026-01-01T00:00:00.000Z", 80_000, 20_000, "aerodrome-slipstream-3"),
+    ]);
+    const [discovery] = extractCuratorDiscoveries([payload], "base", {
+      policy: getCuratorConfig().policy,
+      existingTokens: new Set(),
+      existingPools: new Set(),
+      observedAt,
+    });
+    expect(discovery).toMatchObject({ protocol: "AERODROME_SLIPSTREAM", policyEligible: true, executionReady: false });
+  });
+
+  it("recognizes the configured Robinhood V2 factory feed", () => {
+    const payload = poolsPayload([
+      pool("0x1111111111111111111111111111111111111111", "MEME / WETH", "0x2222222222222222222222222222222222222222", "2026-01-01T00:00:00.000Z", 80_000, 20_000, "pons-v2-dex"),
+    ], "robinhood");
+    const [discovery] = extractCuratorDiscoveries([payload], "robinhood", {
+      policy: getCuratorConfig().policy,
+      existingTokens: new Set(),
+      existingPools: new Set(),
+      observedAt,
+    });
+    expect(discovery).toMatchObject({ protocol: "V2", policyEligible: true, executionReady: false });
+  });
+
+  it("returns a broad ranked inventory instead of truncating discovery to twelve tokens", () => {
+    const rows = Array.from({ length: 20 }, (_, index) => pool(
+      `0x${(index + 1).toString(16).padStart(40, "0")}`,
+      `MEME${index} / WETH 1%`,
+      `0x${(index + 101).toString(16).padStart(40, "0")}`,
+      "2026-01-01T00:00:00.000Z",
+      80_000 + index,
+      20_000 + index,
+      "uniswap-v3-base",
+    ));
+    const discoveries = extractCuratorDiscoveries([poolsPayload(rows)], "base", {
+      policy: getCuratorConfig().policy,
+      existingTokens: new Set(),
+      existingPools: new Set(),
+      observedAt,
+    });
+    expect(discoveries).toHaveLength(20);
+  });
 });
 
 function pool(
@@ -128,10 +192,18 @@ function pool(
   };
 }
 
-function poolsPayload(data: ReturnType<typeof pool>[]): GeckoPoolsPayload {
+function poolsPayload(data: ReturnType<typeof pool>[], chain = "base"): GeckoPoolsPayload {
+  const normalized = data.map((row) => ({
+    ...row,
+    relationships: {
+      ...row.relationships,
+      base_token: { data: { id: row.relationships.base_token.data.id.replace(/^base_/, `${chain}_`) } },
+      quote_token: { data: { id: `${chain}_${addressesFor(chain as "base" | "robinhood").weth.toLowerCase()}` } },
+    },
+  }));
   return {
-    data,
-    included: [...new Set(data.map((row) => row.relationships.base_token.data.id))].map((id) => ({
+    data: normalized,
+    included: [...new Set(normalized.map((row) => row.relationships.base_token.data.id))].map((id) => ({
       id,
       type: "token" as const,
       attributes: { address: id.slice(id.indexOf("_") + 1), name: "Meme", symbol: "MEME", decimals: 18 },

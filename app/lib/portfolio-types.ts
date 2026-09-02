@@ -2,7 +2,6 @@ import type { ChainSlug } from "./chains";
 import type { WalletTransaction } from "./wallet-calls";
 
 export type MarketRisk = "established" | "emerging" | "experimental";
-export type ProjectionConfidence = "illustrative" | "unstable" | "unavailable";
 
 export type CuratedMarket = {
   id: string;
@@ -37,12 +36,6 @@ export type CuratedChain = {
 export type MarketCatalog = {
   version: number;
   updatedAt: string;
-  fees: {
-    allocateBps: number;
-    withdrawBps: number;
-    rebalanceBps: number;
-    compoundBps: number;
-  };
   chains: CuratedChain[];
 };
 
@@ -56,9 +49,6 @@ export type MarketStats = {
   volume24hUsd: number | null;
   marketCapUsd: number | null;
   trailingFeeAprPct: number | null;
-  dailyFeesPer1000Usd: number | null;
-  projectedMonthlyFeesPer1000Usd: number | null;
-  projectionConfidence: ProjectionConfidence;
   poolAgeDays: number | null;
   energy: number | null;
   sourceUrl: string | null;
@@ -163,10 +153,19 @@ export type AllocationPlan = {
   transactions: WalletTransaction[];
   allowedTargets: `0x${string}`[];
   notices: string[];
+  venueSelection?: {
+    methodology: "venue-quality-v1";
+    selectedKey: "PRIMARY" | "V2" | "V4";
+    selectedProtocol: "V2" | "V3" | "V4" | "AERODROME_SLIPSTREAM";
+    selectedPoolReference: `0x${string}`;
+    switched: boolean;
+    confidence: "high" | "guarded" | "fallback";
+    decisionReasons: string[];
+  };
 };
 
 export type PositionActionPlan = {
-  kind: "collect" | "compound" | "rebalance" | "withdraw";
+  kind: "collect" | "compound" | "increase" | "rebalance" | "withdraw";
   owner: `0x${string}`;
   chain: ChainSlug;
   chainId: number;
@@ -177,6 +176,15 @@ export type PositionActionPlan = {
   expectedConfirmations: 1;
   serviceFeeBps: number;
   serviceFee: Array<{ token: `0x${string}`; symbol: string; amount: string }>;
+  funding?: {
+    amountWei: string;
+    serviceFeeWei: string;
+    netAmountWei: string;
+    quoteSymbol: "ETH" | "WETH";
+    quoteAmount: string;
+    memeSymbol: string;
+    memeAmount: string;
+  };
   range?: {
     tickLower: number;
     tickUpper: number;

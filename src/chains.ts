@@ -1,6 +1,6 @@
 import { defineChain, getAddress, type Address, type Chain } from "viem";
 import { base } from "viem/chains";
-import { ADDRESSES, BASE_RPC_DEFAULT, CHAIN_ID, SIGNER_ALLOWLIST, TREASURY } from "./constants.js";
+import { ADDRESSES, BASE_RPC_DEFAULT, CHAIN_ID, SIGNER_ALLOWLIST } from "./constants.js";
 
 export type ChainSlug = "base" | "robinhood";
 
@@ -72,7 +72,6 @@ const ROBINHOOD_ALLOWLIST: readonly Address[] = [
   ROBINHOOD_ADDRESSES.universalRouter,
   ROBINHOOD_ADDRESSES.v2Router,
   ROBINHOOD_ADDRESSES.v4PositionManager,
-  TREASURY,
 ];
 
 export const CHAINS: Record<ChainSlug, UnaChain> = {

@@ -33,51 +33,44 @@ describe("agentic centralized curator", () => {
     });
     expect(result.appliedReviews).toEqual(["robinhood-gg:reviewed"]);
     expect(result.curatorConfig.version).toBe(config.version + 1);
-    expect(result.appliedReplacement).toBeNull();
+    expect(result.appliedAdmissions).toEqual([]);
     expect(result.catalog).toEqual(getMarketCatalog());
   });
 
-  it("applies only the exact deterministic Robinhood replacement", () => {
+  it("adds an exact deterministic Robinhood admission without pausing another market", () => {
     const config = structuredClone(getCuratorConfig());
     const candidate = config.candidates.find((row) => row.id === "robinhood-gg")!;
     candidate.identity = "reviewed";
-    const incumbent = firstActiveMarket("robinhood");
+    const before = structuredClone(getMarketCatalog());
     const proposal = {
       chain: "robinhood" as const,
       candidateMarketId: candidate.id,
       candidateSymbol: candidate.symbol,
-      incumbentMarketId: incumbent.id,
-      incumbentSymbol: incumbent.symbol,
-      candidateFeeAprPct: 900,
-      incumbentFeeAprPct: 100,
-      aprMultiple: 9,
-      candidateQualityScore: 90,
-      incumbentQualityScore: 70,
-      qualityAdvantage: 20,
-      liquidityRatio: 1,
+      qualityScore: 90,
+      estimatedCapacityUsd: 10_000,
     };
     const result = planCentralizedCatalogUpdate({
-      report: { ...report([evaluation(candidate.id, "eligible", false)]), replacements: [proposal] },
+      report: { ...report([evaluation(candidate.id, "eligible", false)]), admissions: [proposal] },
       decision: decision({
-        verdict: "replace",
-        replacement: { fromMarketId: proposal.incumbentMarketId, toMarketId: proposal.candidateMarketId, rationale: ["policy proposal survived research"] },
+        verdict: "update",
+        marketAdmissions: [{ candidateMarketId: proposal.candidateMarketId, rationale: ["policy proposal survived research"] }],
       }),
       curatorConfig: config,
-      catalog: structuredClone(getMarketCatalog()),
+      catalog: before,
       today: "2026-08-30",
     });
     const parsed = parseMarketCatalog(result.catalog);
     const robinhood = parsed.chains.find((chain) => chain.slug === "robinhood")!;
-    const outgoing = robinhood.markets.find((market) => market.id === proposal.incumbentMarketId)!;
     const incoming = robinhood.markets.find((market) => market.id === proposal.candidateMarketId)!;
-    expect(outgoing.status).toBe("paused");
     expect(incoming.status).toBe("active");
     expect(incoming).not.toHaveProperty("weightBps");
-    expect(incoming.rangeWidthPct).toBe(outgoing.rangeWidthPct);
-    expect(result.appliedReplacement).toEqual({ fromMarketId: outgoing.id, toMarketId: incoming.id });
+    expect(robinhood.markets.filter((market) => market.status === "active")).toHaveLength(
+      getMarketCatalog().chains.find((chain) => chain.slug === "robinhood")!.markets.filter((market) => market.status === "active").length + 1,
+    );
+    expect(result.appliedAdmissions).toEqual([candidate.id]);
   });
 
-  it("applies an exact deterministic Base Aerodrome replacement", () => {
+  it("admits an independently eligible Base Aerodrome market", () => {
     const config = structuredClone(getCuratorConfig());
     const candidate = {
       id: "base-test-meme",
@@ -86,6 +79,7 @@ describe("agentic centralized curator", () => {
       feePips: 2_111,
       risk: "emerging" as const,
       identity: "reviewed" as const,
+      tokenDecimals: 18,
       chain: "base" as const,
       token: "0x1111111111111111111111111111111111111111" as const,
       pool: "0x2222222222222222222222222222222222222222" as const,
@@ -94,40 +88,31 @@ describe("agentic centralized curator", () => {
       tickSpacing: 200,
     };
     config.candidates.push(candidate);
-    const incumbent = firstActiveMarket("base");
     const proposal = {
       chain: "base" as const,
       candidateMarketId: candidate.id,
       candidateSymbol: candidate.symbol,
-      incumbentMarketId: incumbent.id,
-      incumbentSymbol: incumbent.symbol,
-      candidateFeeAprPct: 450,
-      incumbentFeeAprPct: 100,
-      aprMultiple: 4.5,
-      candidateQualityScore: 90,
-      incumbentQualityScore: 70,
-      qualityAdvantage: 20,
-      liquidityRatio: 1,
+      qualityScore: 90,
+      estimatedCapacityUsd: 10_000,
     };
     const result = planCentralizedCatalogUpdate({
-      report: { ...report([evaluation(candidate.id, "eligible", false, "base")]), replacements: [proposal] },
+      report: { ...report([evaluation(candidate.id, "eligible", false, "base")]), admissions: [proposal] },
       decision: decision({
-        verdict: "replace",
-        replacement: { fromMarketId: incumbent.id, toMarketId: candidate.id, rationale: ["policy proposal survived research"] },
+        verdict: "update",
+        marketAdmissions: [{ candidateMarketId: candidate.id, rationale: ["policy proposal survived research"] }],
       }),
       curatorConfig: config,
       catalog: structuredClone(getMarketCatalog()),
       today: "2026-09-01",
     });
     const base = parseMarketCatalog(result.catalog).chains.find((chain) => chain.slug === "base")!;
-    expect(base.markets.find((market) => market.id === incumbent.id)!.status).toBe("paused");
     expect(base.markets.find((market) => market.id === candidate.id)).toMatchObject({
       status: "active",
       protocol: "AERODROME_SLIPSTREAM",
       aerodromeDeployment: "legacy",
       pool: candidate.pool,
     });
-    expect(result.appliedReplacement).toEqual({ fromMarketId: incumbent.id, toMarketId: candidate.id });
+    expect(result.appliedAdmissions).toEqual([candidate.id]);
   });
 
   it("accepts Base explorer evidence for a reviewed Base candidate", () => {
@@ -139,6 +124,7 @@ describe("agentic centralized curator", () => {
       feePips: 3_000,
       risk: "experimental" as const,
       identity: "watch" as const,
+      tokenDecimals: 18,
       chain: "base" as const,
       token: "0x3333333333333333333333333333333333333333" as const,
       pool: "0x4444444444444444444444444444444444444444" as const,
@@ -169,6 +155,7 @@ describe("agentic centralized curator", () => {
       name: "Fresh Meme",
       symbol: "FRESH",
       token: "0x5555555555555555555555555555555555555555" as const,
+      tokenDecimals: 18,
       pool: "0x6666666666666666666666666666666666666666" as const,
       protocol: "V3" as const,
       feePips: 10_000,
@@ -178,6 +165,8 @@ describe("agentic centralized curator", () => {
       sourceUrl: "https://www.geckoterminal.com/base/pools/0x6666666666666666666666666666666666666666",
       dexId: "uniswap-v3-base",
       executionReady: true,
+      policyEligible: true,
+      eligibilityNotes: [],
       venues: [
         {
           protocol: "V3" as const,
@@ -256,6 +245,7 @@ describe("agentic centralized curator", () => {
       name: "V4 Lead",
       symbol: "V4LEAD",
       token: "0x5555555555555555555555555555555555555555" as const,
+      tokenDecimals: 18,
       pool: poolId,
       protocol: "V4" as const,
       feePips: 3_000,
@@ -266,6 +256,8 @@ describe("agentic centralized curator", () => {
       dexId: "uniswap-v4-base",
       executionReady: false,
       executionNote: "Pool key research is required.",
+      policyEligible: true,
+      eligibilityNotes: [],
       venues: [{
         protocol: "V4" as const,
         pool: poolId,
@@ -305,6 +297,7 @@ describe("agentic centralized curator", () => {
       name: market.name,
       symbol: market.symbol,
       token: market.token,
+      tokenDecimals: market.tokenDecimals,
       pool,
       protocol: "V2" as const,
       feePips: 3_000,
@@ -314,6 +307,8 @@ describe("agentic centralized curator", () => {
       sourceUrl: `https://www.geckoterminal.com/base/pools/${pool}`,
       dexId: "uniswap-v2-base",
       executionReady: true,
+      policyEligible: true,
+      eligibilityNotes: [],
       venues: [{
         protocol: "V2" as const,
         pool,
@@ -339,7 +334,7 @@ describe("agentic centralized curator", () => {
       today: "2026-09-01",
     });
     expect(result.appliedVenues).toEqual([`${market.id}:V2:${pool}`]);
-    expect(result.appliedReplacement).toBeNull();
+    expect(result.appliedAdmissions).toEqual([]);
     expect(result.changedFiles).toEqual(["src/config/markets.json"]);
     expect(result.catalog.version).toBe(getMarketCatalog().version + 1);
     expect(result.catalog.chains.find((chain) => chain.slug === "base")!.markets.find((entry) => entry.id === market.id)!.liquidityVenues).toContainEqual({ protocol: "V2", pool });
@@ -382,14 +377,14 @@ describe("agentic centralized curator", () => {
     expect(result.changedFiles).toEqual([]);
   });
 
-  it("rejects an agent replacement that the deterministic report did not authorize", () => {
+  it("rejects a market admission that the deterministic report did not authorize", () => {
     const config = structuredClone(getCuratorConfig());
     config.candidates.find((row) => row.id === "robinhood-gg")!.identity = "reviewed";
     expect(() => planCentralizedCatalogUpdate({
       report: report([evaluation("robinhood-gg", "eligible", false)]),
       decision: decision({
-        verdict: "replace",
-        replacement: { fromMarketId: firstActiveMarket("robinhood").id, toMarketId: "robinhood-gg", rationale: ["unsupported"] },
+        verdict: "update",
+        marketAdmissions: [{ candidateMarketId: "robinhood-gg", rationale: ["unsupported"] }],
       }),
       curatorConfig: config,
       catalog: structuredClone(getMarketCatalog()),
@@ -407,7 +402,7 @@ function report(evaluations: MarketEvaluation[]): CuratorReport {
     snapshotCadenceMinutes: 360,
     evaluations,
     discoveries: [],
-    replacements: [],
+    admissions: [],
   };
 }
 
@@ -460,13 +455,13 @@ function evaluation(
 
 function decision(overrides: Partial<CuratorResearchDecision> = {}): CuratorResearchDecision {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     verdict: "no_change",
-    summary: "No policy-authorized replacement",
+    summary: "No policy-authorized update",
     candidateReviews: [],
     candidateNominations: [],
     venueAdditions: [],
-    replacement: null,
+    marketAdmissions: [],
     ...overrides,
   };
 }

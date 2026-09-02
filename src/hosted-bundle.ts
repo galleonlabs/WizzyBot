@@ -13,6 +13,7 @@ export {
 } from "./surfaces/hosted.js";
 export { getMarketCatalog } from "./markets/catalog.js";
 export { fetchMarketStats } from "./markets/stats.js";
+export { selectBestMarketVenue } from "./markets/venue-observations.js";
 export { fetchRecentPoolActivity, mergePoolActivityItems } from "./markets/activity.js";
 export { getSolanaMarketCatalog } from "./markets/solana-catalog.js";
 export { fetchSolanaMarketStats } from "./markets/solana-stats.js";

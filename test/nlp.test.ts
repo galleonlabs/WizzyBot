@@ -22,8 +22,7 @@ describe("NL parser verbs", () => {
       expect(mint.widthPct).toBe(10);
     }
 
-    expect(parseIntent("compound 12345")).toEqual({ verb: "compound", tokenId: 12345n, noFee: false, protocol: "V3" });
-    expect(parseIntent("compound 12345 --no-fee")).toMatchObject({ verb: "compound", noFee: true });
+    expect(parseIntent("compound 12345")).toEqual({ verb: "compound", tokenId: 12345n, protocol: "V3" });
 
     expect(parseIntent("range 12345").verb).toBe("rerange");
     expect(parseIntent("re-range 12345").verb).toBe("rerange");

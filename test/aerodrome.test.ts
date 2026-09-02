@@ -4,7 +4,6 @@ import { AERODROME_DEPLOYMENTS } from "../src/aerodrome/deployments.js";
 import { exactInSlipstreamTx, mintSlipstreamTx } from "../src/aerodrome/calldata.js";
 import { activeMarkets } from "../src/markets/catalog.js";
 import { buildPositionActionPlan, buildRebalancePositionActionPlan } from "../src/portfolio/position-actions.js";
-import { TREASURY } from "../src/constants.js";
 import type { PositionSnapshot } from "../src/types.js";
 import { AerodromeSlipstreamAdapter } from "../src/aerodrome/positions.js";
 
@@ -58,22 +57,20 @@ describe("Aerodrome Slipstream", () => {
   });
 
   it("compounds and withdraws through the Aerodrome position manager", () => {
-    const collect = buildPositionActionPlan(snapshot(), owner, "base", "collect", TREASURY);
+    const collect = buildPositionActionPlan(snapshot(), owner, "base", "collect");
     expect(collect.serviceFeeBps).toBe(0);
     expect(collect.transactions.map((tx) => tx.description)).toEqual(["Aerodrome collect"]);
 
-    const compound = buildPositionActionPlan(snapshot(), owner, "base", "compound", TREASURY);
+    const compound = buildPositionActionPlan(snapshot(), owner, "base", "compound");
     expect(compound.transactions[0]?.description).toBe("Aerodrome collect");
     expect(compound.transactions.at(-1)?.description).toBe("Aerodrome increaseLiquidity");
     expect(compound.transactions.filter((tx) => tx.description.startsWith("ERC20.approve")).every((tx) => tx.data !== "0x")).toBe(true);
     expect(compound.transactions.every((tx) => compound.allowedTargets.includes(tx.to))).toBe(true);
 
-    const withdraw = buildPositionActionPlan(snapshot(), owner, "base", "withdraw", TREASURY);
+    const withdraw = buildPositionActionPlan(snapshot(), owner, "base", "withdraw");
     expect(withdraw.transactions.map((tx) => tx.description)).toEqual([
       "Aerodrome decreaseLiquidity 100%",
       "Aerodrome collect",
-      expect.stringContaining("ERC20.transfer"),
-      expect.stringContaining("ERC20.transfer"),
       "Aerodrome burn empty position",
     ]);
     expect(withdraw.transactions[0]?.to).toBe(deployment.positionManager);
@@ -88,7 +85,7 @@ describe("Aerodrome Slipstream", () => {
       inRange: false,
       percentThroughRange: 100,
     };
-    const plan = buildRebalancePositionActionPlan(position, owner, "base", TREASURY, {
+    const plan = buildRebalancePositionActionPlan(position, owner, "base", {
       venue: "aerodrome-slipstream",
       router: deployment.swapRouter,
       tokenIn: position.token1.address,

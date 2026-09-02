@@ -13,7 +13,7 @@ Morpho vault deployment is permissionless. A vault has an owner, a curator (appr
 | | Today: index of vaults | Wizzy-curated vault |
 | --- | --- | --- |
 | User position | 4 share balances | 1 vault token (ERC-4626) |
-| Revenue | 0.15% in / 0.15% out, one-shot | Recurring performance fee on yield (aligned: we earn only when users earn) |
+| Revenue | None | Recurring performance fee on yield (aligned: we earn only when users earn) |
 | Rebalancing | User-signed batches | Allocator reallocates for everyone at once — the curator loop finally *acts* |
 | Distribution | wizzy.meme only | Listed on Morpho's own app, DefiLlama, aggregators — free discovery |
 | Risk surface | The same four venues | The same four venues, via caps we set |
@@ -27,7 +27,7 @@ Real risk-manager responsibility (we set caps, we answer for allocations), multi
 
 ### Verdict
 
-Do it, staged: **(1)** verify Vaults V2 on Base and design roles (owner = treasury multisig, curator = timelocked, allocator = dappnode key, guardian = operator); **(2)** deploy + seed with treasury USDC, allocate across the current four venues at current weights; **(3)** point the product's deposit flow at the single vault; keep direct-index mode as fallback; **(4)** retire the 0.15% entry fee in favor of the performance fee once TVL justifies it. The current product keeps running throughout — nothing ships dark or breaks.
+This was a superseded stablecoin-vault proposal. Any future vault performance fee would require its own implementation, review, and release; the current direct LP product charges no Wizzy fee.
 
 ## Part 2 — where a token fits a stablecoin yield product
 

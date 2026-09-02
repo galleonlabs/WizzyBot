@@ -4,18 +4,15 @@ import {
   deriveQuestObservation,
   ROBINHOOD_POSITION_MANAGER,
   verifyQuestActionReceipt,
-  WIZZY_TREASURY,
   type QuestReceipt,
 } from "../app/lib/quest-verification.js";
 
 const OWNER = "0x1111111111111111111111111111111111111111";
 const STRANGER = "0x2222222222222222222222222222222222222222";
-const TOKEN = "0x3333333333333333333333333333333333333333";
 const HASH = `0x${"ab".repeat(32)}` as Hex;
 const increaseEvent = parseAbiItem("event IncreaseLiquidity(uint256 indexed tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)");
 const decreaseEvent = parseAbiItem("event DecreaseLiquidity(uint256 indexed tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)");
 const transferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)");
-const erc20TransferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
 
 describe("authoritative quest verification", () => {
   it("derives only live curated Robinhood position and fee progress", () => {
@@ -42,13 +39,13 @@ describe("authoritative quest verification", () => {
       action: "compound",
       tokenId: "941",
       walletAddresses: [OWNER],
-      receipt: receipt(OWNER, [increase(941n), payment(OWNER)]),
+      receipt: receipt(OWNER, [increase(941n)]),
     })).not.toThrow();
     expect(() => verifyQuestActionReceipt({
       action: "compound",
       tokenId: "941",
       walletAddresses: [OWNER],
-      receipt: receipt(STRANGER, [increase(941n), payment(STRANGER)]),
+      receipt: receipt(STRANGER, [increase(941n)]),
     })).toThrow(/not sent by this wallet/);
   });
 
@@ -57,23 +54,23 @@ describe("authoritative quest verification", () => {
       action: "rebalance",
       tokenId: "941",
       walletAddresses: [OWNER],
-      receipt: receipt(OWNER, [decrease(941n), transfer(zeroAddress, OWNER, 942n), increase(942n), payment(OWNER)]),
+      receipt: receipt(OWNER, [decrease(941n), transfer(zeroAddress, OWNER, 942n), increase(942n)]),
     })).not.toThrow();
     expect(() => verifyQuestActionReceipt({
       action: "rebalance",
       tokenId: "941",
       walletAddresses: [OWNER],
-      receipt: receipt(OWNER, [decrease(941n), increase(941n), payment(OWNER)]),
+      receipt: receipt(OWNER, [decrease(941n), increase(941n)]),
     })).toThrow(/did not rebalance/);
   });
 
-  it("rejects an unrelated liquidity increase that did not pay Wizzy's disclosed fee", () => {
+  it("rejects an increase for a different position", () => {
     expect(() => verifyQuestActionReceipt({
       action: "compound",
       tokenId: "941",
       walletAddresses: [OWNER],
-      receipt: receipt(OWNER, [increase(941n)]),
-    })).toThrow(/disclosed fee/);
+      receipt: receipt(OWNER, [increase(942n)]),
+    })).toThrow(/did not compound/);
   });
 });
 
@@ -108,13 +105,5 @@ function transfer(from: string, to: string, tokenId: bigint): QuestReceipt["logs
     address: ROBINHOOD_POSITION_MANAGER,
     topics: encodeEventTopics({ abi: [transferEvent], eventName: "Transfer", args: { from: from as Hex, to: to as Hex, tokenId } }).flat().filter((topic): topic is Hex => topic !== null),
     data: "0x",
-  };
-}
-
-function payment(from: string): QuestReceipt["logs"][number] {
-  return {
-    address: TOKEN,
-    topics: encodeEventTopics({ abi: [erc20TransferEvent], eventName: "Transfer", args: { from: from as Hex, to: WIZZY_TREASURY } }).flat().filter((topic): topic is Hex => topic !== null),
-    data: encodeAbiParameters([{ type: "uint256" }], [1n]),
   };
 }

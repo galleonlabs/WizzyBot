@@ -6,13 +6,13 @@ How to run Wizzy. The consumer app presents reviewed meme markets on Base and Ro
 
 ## Current release scope
 
-The application does not automatically buy, bundle, or allocate to WIZZY. All implemented product fees continue to accumulate in the Wizzy treasury.
+The application does not automatically buy, bundle, or allocate to WIZZY. Direct LP actions are fee-free because their wallet-confirmed transaction sequences cannot enforce a product fee atomically.
 
 No application, curator, CLI, keeper, or ordinary deployment path may:
 
 - create or announce a Wizzy token;
 - add a related-party market without the same explicit review and opt-in listing used for other markets;
-- route product fees into token/WETH liquidity;
+- treat user assets or pool fees as treasury revenue;
 - describe treasury revenue as a buyback, yield, price floor, or token-holder entitlement.
 
 Token graduation and any later opt-in market listing are separate releases governed by the [token and treasury plan](TOKEN_FLYWHEEL.md).
@@ -52,7 +52,7 @@ unabot import --owner <addr>
 unabot config
 ```
 
-`--protocol v2|v3|v4` (default v3) on list, status, mint, compound, range, exit. `--no-fee` skips the take. `--fee-source fees|notional`. `--config <path>` merges over `~/.unabot/config.json`.
+`--protocol v2|v3|v4` (default v3) on list, status, mint, compound, range, exit. `--config <path>` merges over `~/.unabot/config.json`. Direct LP actions have no Wizzy fee.
 
 Live CLI writes need `UNABOT_PRIVATE_KEY`. Reads can pass `--owner` instead. Without a TTY, `--live` is refused.
 
@@ -122,10 +122,9 @@ Set these in `.env` locally or in the Vercel project `wizzy`. Values here are pu
 | `SOLANA_RPC_URL` | Server-only endpoint retained for the dormant Solana planner and position reader. Never expose a credentialed RPC URL through a `NEXT_PUBLIC_` variable. |
 | `UNISWAP_API_KEY` | Optional. Write paths use Uniswap LP + Trading APIs when set. Never commit. |
 | `UNABOT_PRIVATE_KEY` | CLI `--live` signer. `0x` + 32-byte hex. Never commit. Hosted agent does **not** use this. |
-| `UNABOT_TREASURY` | Optional override. Product fees go here. |
+| `UNABOT_TREASURY` | Optional legacy treasury override. Direct LP actions do not route fees here. |
 | `UNA_TREASURY_PRIVATE_KEY` | Legacy-compatible key name for the Wizzy EVM treasury and future token-creation wallet. The app does not read it. Never expose it to client code or logs. |
 | `UNA_TOKEN_CREATOR_ADDRESS` | Legacy-compatible key name for the public address reserved for a future Wizzy token launch. |
-| `UNABOT_SOLANA_TREASURY` | Public Solana fee recipient. Required to prepare Solana withdraw and reinvest actions. |
 | `UNABOT_ETH_USD` | Optional USD/ETH fallback for skip math. |
 | `TELEGRAM_BOT_TOKEN` | Telegram surface. Never commit. |
 | `UNABOT_KEEPER_OWNER` | Wallet address the hosted keeper scans. Unset, the schedule logs a skip and does nothing. |
@@ -135,8 +134,6 @@ Set these in `.env` locally or in the Vercel project `wizzy`. Values here are pu
 Never log env values.
 
 Production EVM authority: Vercel stores the public address and the retrievable production-only private key reserved for treasury and future token-creation work. The application and dappnode curator do not read the key. Centralized curation requires no signing key and spends no chain gas.
-
-Production Solana treasury custody: Vercel stores only the public address. The independent private key is in the Mac login Keychain under service `unabot-solana-treasury`.
 
 Robinhood market membership comes from `src/config/markets.json`. Metadata for tracked candidates remains version-controlled so existing positions stay readable and withdrawable.
 
@@ -150,7 +147,7 @@ The persistent workflow is documented in `docs/CURATION.md`. The dappnode timer 
 | MCP / hosted tools | `live` omitted or false. | `live=true` **and** `confirm=true` prepares an EOA wallet plan. Hosted code never signs or broadcasts it. |
 | Hosted keeper | Observe-only scans and recommendations. | No unattended execution path. |
 
-Hosted plans are allowlisted to the relevant position manager, Permit2, router, treasury, and pair tokens. The connected EOA remains the only consumer signer.
+Hosted plans are allowlisted to the relevant position manager, Permit2, router, and pair tokens. The connected EOA remains the only consumer signer.
 
 ## Vercel
 

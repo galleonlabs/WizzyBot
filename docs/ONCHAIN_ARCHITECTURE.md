@@ -4,7 +4,7 @@ Status: current. Wizzy prepares one reviewed market position at a time for an ex
 
 ## Decision
 
-Wizzy prepares the selected market as a short sequence of allowlisted transactions for the connected EOA. The wallet shows each approval, swap, LP mint, and service-fee transfer before it is sent, and Wizzy waits for a successful receipt before moving to the next step. If a later transaction fails, completed transactions remain onchain; the wallet always owns the assets and position.
+Wizzy prepares the selected market as a short sequence of allowlisted transactions for the connected EOA. The wallet shows each approval, swap, and LP mint before it is sent, and Wizzy waits for a successful receipt before moving to the next step. If a later transaction fails, completed transactions remain onchain; the wallet always owns the assets and position. Direct LP actions have no Wizzy fee because the sequence cannot enforce a fee atomically.
 
 Do not fork Revert Finance to solve market entry. Revert's Auto-Compound, Auto-Range, and Auto-Exit contracts automate an LP NFT after it exists. They do not replace the transaction plan, and their operator approvals would add a separate authority surface. Wizzy can study those automators for post-mint jobs while keeping the LP NFT in the user wallet.
 

@@ -46,8 +46,9 @@ export type CuratorDiscovery = {
   name: string;
   symbol: string;
   token: `0x${string}`;
+  tokenDecimals: number;
   pool: `0x${string}`;
-  protocol: "V2" | "V3" | "V4";
+  protocol: "V2" | "V3" | "V4" | "AERODROME_SLIPSTREAM";
   feePips: number;
   liquidityUsd: number;
   volume24hUsd: number;
@@ -56,11 +57,13 @@ export type CuratorDiscovery = {
   dexId: string;
   executionReady: boolean;
   executionNote?: string;
+  policyEligible: boolean;
+  eligibilityNotes: string[];
   venues: CuratorDiscoveryVenue[];
 };
 
 export type CuratorDiscoveryVenue = {
-  protocol: "V2" | "V3" | "V4";
+  protocol: "V2" | "V3" | "V4" | "AERODROME_SLIPSTREAM";
   pool: `0x${string}`;
   feePips: number;
   liquidityUsd: number;
@@ -80,16 +83,7 @@ type DiscoveryOptions = {
 };
 
 const NETWORKS: readonly ChainSlug[] = ["base", "robinhood"];
-const EXCLUDED_SYMBOLS = new Set(["AERO", "CBBTC", "ETH", "USDC", "USDBC", "USDG", "USDT", "VIRTUAL", "WBTC", "WETH"]);
-const EXCLUDED_COINGECKO_IDS = new Set([
-  "aerodrome-finance",
-  "coinbase-wrapped-btc",
-  "global-dollar",
-  "l2-standard-bridged-weth-base",
-  "usd-coin",
-  "virtual-protocol",
-  "wrapped-bitcoin",
-]);
+const EXCLUDED_SYMBOLS = new Set(["ETH", "WETH"]);
 
 function numeric(value: unknown): number | null {
   const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
@@ -110,8 +104,10 @@ function feePipsFromName(name: string): number | null {
 
 function protocolForDex(dexId: string, chain: ChainSlug): CuratorDiscoveryVenue["protocol"] | null {
   if (dexId === `uniswap-v2-${chain}`) return "V2";
+  if (chain === "robinhood" && dexId === "pons-v2-dex") return "V2";
   if (dexId === `uniswap-v3-${chain}`) return "V3";
   if (dexId === `uniswap-v4-${chain}`) return "V4";
+  if (chain === "base" && (dexId === "aerodrome-slipstream" || dexId === "aerodrome-slipstream-3")) return "AERODROME_SLIPSTREAM";
   return null;
 }
 
@@ -150,6 +146,7 @@ export function extractCuratorDiscoveries(
     name: string;
     symbol: string;
     token: `0x${string}`;
+    tokenDecimals: number;
     marketId?: string;
     venues: Map<string, CuratorDiscoveryVenue>;
   }>();
@@ -180,7 +177,7 @@ export function extractCuratorDiscoveries(
     const feePips = feePipsForPool(pool, protocol);
     if (liquidityUsd === null || liquidityUsd <= 0) continue;
     if (volume24hUsd === null || volume24hUsd <= 0) continue;
-    if (poolAgeDays === null || poolAgeDays < options.policy.minimumPoolAgeDays) continue;
+    if (poolAgeDays === null || poolAgeDays < options.policy.discoveryMinimumPoolAgeDays) continue;
     if (feePips === null) continue;
 
     const tokenRelationshipId = baseAddress.toLowerCase() === tokenAddress.toLowerCase()
@@ -189,9 +186,9 @@ export function extractCuratorDiscoveries(
     const token = tokenById.get(tokenRelationshipId.toLowerCase());
     const symbol = token?.attributes.symbol?.trim();
     const name = token?.attributes.name?.trim();
-    if (!symbol || !name) continue;
+    const tokenDecimals = token?.attributes.decimals;
+    if (!symbol || !name || !Number.isInteger(tokenDecimals) || tokenDecimals! < 0 || tokenDecimals! > 36) continue;
     if (EXCLUDED_SYMBOLS.has(symbol.toUpperCase())) continue;
-    if (token?.attributes.coingecko_coin_id && EXCLUDED_COINGECKO_IDS.has(token.attributes.coingecko_coin_id)) continue;
 
     const tokenAddressNormalized = getAddress(tokenAddress);
     const venue: CuratorDiscoveryVenue = {
@@ -205,13 +202,14 @@ export function extractCuratorDiscoveries(
       dexId,
       // V4 discovery identifies the PoolId, but GeckoTerminal does not expose
       // the hooks-bearing pool key needed to prepare safe calldata.
-      autoAttachable: protocol !== "V4",
+      autoAttachable: protocol === "V2" || protocol === "V3",
     };
     const key = tokenAddressNormalized.toLowerCase();
     const lead = leads.get(key) ?? {
       name,
       symbol,
       token: tokenAddressNormalized,
+      tokenDecimals: tokenDecimals!,
       marketId: options.trackedMarkets?.get(key),
       venues: new Map(),
     };
@@ -225,13 +223,18 @@ export function extractCuratorDiscoveries(
     const venues = [...lead.venues.values()].sort((a, b) => b.liquidityUsd - a.liquidityUsd || b.volume24hUsd - a.volume24hUsd);
     const liquidityUsd = venues.reduce((sum, venue) => sum + venue.liquidityUsd, 0);
     const volume24hUsd = venues.reduce((sum, venue) => sum + venue.volume24hUsd, 0);
-    if (liquidityUsd < options.policy.minimumLiquidityUsd || volume24hUsd < options.policy.minimumVolume24hUsd) return [];
+    if (liquidityUsd < options.policy.discoveryMinimumLiquidityUsd || volume24hUsd < options.policy.discoveryMinimumVolume24hUsd) return [];
     const kind = lead.marketId ? "venue" as const : "candidate" as const;
-    const v3Primary = venues.find((venue) => venue.protocol === "V3" && venue.liquidityUsd >= options.policy.incumbentLiquidityUsd);
+    const v3Primary = venues.find((venue) => venue.protocol === "V3");
     const attachableVenue = venues.find((venue) => venue.protocol === "V2" && venue.autoAttachable);
     const primary = kind === "venue" ? attachableVenue ?? venues[0] : v3Primary ?? venues[0];
     if (!primary) return [];
     const executionReady = kind === "venue" ? primary.protocol === "V2" : primary.protocol === "V3";
+    const eligibilityNotes: string[] = [];
+    if (liquidityUsd < options.policy.minimumLiquidityUsd) eligibilityNotes.push(`activation liquidity below $${options.policy.minimumLiquidityUsd.toLocaleString("en-US")}`);
+    if (volume24hUsd < options.policy.minimumVolume24hUsd) eligibilityNotes.push(`activation volume below $${options.policy.minimumVolume24hUsd.toLocaleString("en-US")}`);
+    if (primary.poolAgeDays < options.policy.minimumPoolAgeDays) eligibilityNotes.push(`primary pool younger than ${options.policy.minimumPoolAgeDays} days`);
+    const policyEligible = eligibilityNotes.length === 0;
     return [{
       id: discoveryId(chain, lead.symbol, lead.token),
       kind,
@@ -240,6 +243,7 @@ export function extractCuratorDiscoveries(
       name: lead.name,
       symbol: lead.symbol,
       token: lead.token,
+      tokenDecimals: lead.tokenDecimals,
       pool: primary.pool,
       protocol: primary.protocol,
       feePips: primary.feePips,
@@ -254,11 +258,13 @@ export function extractCuratorDiscoveries(
         : kind === "venue"
           ? "This venue needs additional pool-key support before it can be attached to the tracked market."
           : "Research must identify a supported V3 primary pool before this lead can enter the executable catalog.",
+      policyEligible,
+      eligibilityNotes,
       venues,
     }];
   })
     .sort((a, b) => b.volume24hUsd - a.volume24hUsd || b.liquidityUsd - a.liquidityUsd)
-    .slice(0, 12);
+    .slice(0, options.policy.discoveryLimitPerChain);
 }
 
 async function getJson(url: string): Promise<GeckoPoolsPayload | null> {
@@ -291,9 +297,11 @@ export async function discoverCuratorCandidates(observedAt = new Date().toISOStr
         : candidate.liquidityVenues?.map((venue) => ("pool" in venue ? venue.pool : venue.poolId).toLowerCase()) ?? []),
     ]);
     const root = `https://api.geckoterminal.com/api/v2/networks/${chain}`;
+    const weth = addressesFor(chain).weth.toLowerCase();
     const payloads = await Promise.all([
       getJson(`${root}/trending_pools?page=1&include=base_token%2Cquote_token%2Cdex`),
-      getJson(`${root}/pools?page=1&include=base_token%2Cquote_token%2Cdex&sort=h24_volume_usd_desc`),
+      ...Array.from({ length: config.policy.discoveryPages }, (_, index) =>
+        getJson(`${root}/tokens/${weth}/pools?page=${index + 1}&include=base_token%2Cquote_token%2Cdex`)),
     ]);
     return extractCuratorDiscoveries(payloads.filter((payload): payload is GeckoPoolsPayload => payload !== null), chain, {
       policy: config.policy,

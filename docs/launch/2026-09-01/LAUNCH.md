@@ -161,7 +161,7 @@ The asset is a launch billboard, not a UI screenshot. “Make Meme Markets” is
 Repository evidence is the source of truth for Wizzy-specific behavior:
 
 - `README.md` — one amount, an external wallet, Relay funding, user-visible positions, and six-hour curation.
-- `docs/CURATION.md` — market membership, review policy, cadence, and replacement rules.
+- `docs/CURATION.md` — market discovery, additive admission, review policy, and cadence.
 - `docs/LAUNCH_PRIVACY.md` — no implied affiliation, no personal identity, no token bundling.
 - `docs/TOKEN_FLYWHEEL.md` — the app launches without a token.
 - `src/portfolio/allocation.ts` — one-selected-market transaction planning.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getCuratorConfig } from "../src/curator/config.js";
-import { evaluateMarket, proposeReplacements, summarizeMarketHistory, type CuratorObservation } from "../src/curator/policy.js";
+import { evaluateMarket, proposeAdmissions, summarizeMarketHistory, type CuratorObservation } from "../src/curator/policy.js";
 import { decodeSolanaMintSecurity } from "../src/curator/sources.js";
 import { renderCuratorMarkdown, type CuratorReport } from "../src/curator/run.js";
 
@@ -49,7 +49,7 @@ describe("market curator", () => {
       snapshotCadenceMinutes: 360,
       evaluations: [],
       discoveries: [],
-      replacements: [],
+      admissions: [],
     };
     const markdown = renderCuratorMarkdown(report);
     expect(markdown).toContain("version-controlled market catalog remains the live market set");
@@ -70,22 +70,22 @@ describe("market curator", () => {
   });
 
   it("requires a complete proof window before a candidate becomes eligible", () => {
-    expect(evaluateMarket(history({}, 6 * 24), policy).recommendation).toBe("observe");
+    expect(evaluateMarket(history({}, 24), policy).recommendation).toBe("observe");
     const evaluation = evaluateMarket(history(), policy);
     expect(evaluation.recommendation).toBe("eligible");
     expect(evaluation.estimatedCapacityUsd).toBe(10_000);
   });
 
   it("does not reward a young pool for a one-day APR spike", () => {
-    const evaluation = evaluateMarket(history({ poolAgeDays: 12, feeAprPct: 2_000 }), policy);
+    const evaluation = evaluateMarket(history({ poolAgeDays: 2, feeAprPct: 2_000 }), policy);
     expect(evaluation.recommendation).toBe("observe");
-    expect(evaluation.reasons.join(" ")).toContain("younger than 30 days");
+    expect(evaluation.reasons.join(" ")).toContain("younger than 7 days");
   });
 
   it("reviews a young incumbent instead of presenting an extrapolated fee spike as healthy", () => {
-    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", poolAgeDays: 12, feeAprPct: 3_000 }, 0), policy);
+    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", poolAgeDays: 2, feeAprPct: 3_000 }, 0), policy);
     expect(evaluation.recommendation).toBe("review");
-    expect(evaluation.reasons.join(" ")).toContain("younger than 30 days");
+    expect(evaluation.reasons.join(" ")).toContain("younger than 7 days");
     expect(evaluation.quality.confidence).toBe("low");
   });
 
@@ -105,7 +105,7 @@ describe("market curator", () => {
   });
 
   it("reviews low-turnover incumbents immediately", () => {
-    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", volume24hUsd: 10_000, feeAprPct: 4 }, 0), policy);
+    const evaluation = evaluateMarket(history({ incumbent: true, catalogStatus: "active", volume24hUsd: 9_000, feeAprPct: 4 }, 0), policy);
     expect(evaluation.recommendation).toBe("review");
     expect(evaluation.reasons.join(" ")).toContain("daily volume");
   });
@@ -125,20 +125,15 @@ describe("market curator", () => {
     expect(evaluateMarket(observations, policy).recommendation).toBe("hold");
   });
 
-  it("only proposes a same-chain replacement with a material fee advantage", () => {
+  it("proposes every independently eligible candidate without removing another market", () => {
     const candidate = evaluateMarket(history({ marketId: "base-candidate" }), policy);
-    const incumbent = evaluateMarket(history({ marketId: "base-incumbent", symbol: "OLD", incumbent: true, catalogStatus: "active", feeAprPct: 8, volume24hUsd: 55_000, liquidityUsd: 500_000, priceChange24hPct: 25, topHolderPct: 18 }), policy);
-    const proposals = proposeReplacements([candidate, incumbent], policy);
+    const proposals = proposeAdmissions([candidate]);
     expect(proposals).toHaveLength(1);
-    expect(proposals[0]).toMatchObject({ candidateMarketId: "base-candidate", incumbentMarketId: "base-incumbent" });
-    expect(proposals[0]!.aprMultiple).toBeGreaterThan(policy.replacementAprMultiplier);
-    expect(proposals[0]!.qualityAdvantage).toBeGreaterThanOrEqual(policy.replacementQualityAdvantage);
-    expect(proposals[0]!.liquidityRatio).toBeGreaterThanOrEqual(policy.minimumReplacementLiquidityRatio);
+    expect(proposals[0]).toMatchObject({ candidateMarketId: "base-candidate", chain: "base", qualityScore: candidate.quality.score });
   });
 
-  it("refuses a headline-APR replacement that would materially reduce pool depth", () => {
-    const candidate = evaluateMarket(history({ marketId: "base-candidate", feeAprPct: 5_000, liquidityUsd: 300_000 }), policy);
-    const incumbent = evaluateMarket(history({ marketId: "base-incumbent", symbol: "OLD", incumbent: true, catalogStatus: "active", feeAprPct: 8, liquidityUsd: 2_000_000 }), policy);
-    expect(proposeReplacements([candidate, incumbent], policy)).toEqual([]);
+  it("does not propose a candidate that has not cleared its independent gates", () => {
+    const candidate = evaluateMarket(history({ marketId: "base-candidate", securityAvailable: false }), policy);
+    expect(proposeAdmissions([candidate])).toEqual([]);
   });
 });

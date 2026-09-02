@@ -13,7 +13,7 @@ export const MCP_TOOL_DEFS = [
   { name: "list", description: "List LP positions (v2, v3, v4)", required: ["owner"] },
   { name: "status", description: "Status / position card: range, fees, APR, HOLD", required: ["tokenId"] },
   { name: "mint", description: "Mint a position. Dry-run unless live=true.", required: ["token0", "token1", "fee"] },
-  { name: "compound", description: "Compound: collect, optional swap, increase. Take unless noFee.", required: ["tokenId"] },
+  { name: "compound", description: "Compound: collect, optional swap, increase. No Wizzy fee.", required: ["tokenId"] },
   { name: "range", description: "Range: same-width recenter when out of range", required: ["tokenId"] },
   { name: "exit", description: "Exit a position, optional swap to one token", required: ["tokenId"] },
   { name: "simulate", description: "Simulate compound | range | exit | mint without broadcast", required: ["action"] },
@@ -74,7 +74,7 @@ export function schemaFor(name: string): z.ZodRawShape {
     case "compound":
     case "rebalance":
     case "exit":
-      return { tokenId: str, owner: opt, live: opt, noFee: opt, feeSource: opt, pct: opt, swapTo: opt, oorPercent: opt, protocol: opt, chain: opt };
+      return { tokenId: str, owner: opt, live: opt, pct: opt, swapTo: opt, oorPercent: opt, protocol: opt, chain: opt };
     case "simulate":
       return { action: str, tokenId: opt, token0: opt, token1: opt, fee: opt, widthPct: opt, amount0: opt, amount1: opt, protocol: opt, chain: opt };
     default:
@@ -192,14 +192,14 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
     const ctx = {
       owner,
       dryRun: args.live !== true && args.live !== "true",
-      noFee: Boolean(args.noFee),
-      feeSource: (args.feeSource as "fees" | "notional") ?? "fees",
+      noFee: true,
+      feeSource: "fees" as const,
       minFeeUsd: 1,
       minPositionUsd: 50,
       feesUsd: usd.feesUsd,
       notionalUsd: usd.positionUsd,
       gasUsd: 0.15,
-      takeBps: 200,
+      takeBps: 0,
     };
     const action = name === "simulate" ? String(args.action) : name;
     const receipt =

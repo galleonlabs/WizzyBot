@@ -6,6 +6,17 @@ import { deriveSolanaMarketStats } from "../src/markets/solana-stats.js";
 import { liquidityVenueFor } from "../src/portfolio/allocation.js";
 
 describe("curated meme markets", () => {
+  it("offers a materially broad active menu on both supported chains", () => {
+    const catalog = getMarketCatalog();
+    const base = catalog.chains.find((chain) => chain.slug === "base")!;
+    const robinhood = catalog.chains.find((chain) => chain.slug === "robinhood")!;
+
+    expect(base.markets.filter((market) => market.status === "active").length).toBeGreaterThanOrEqual(8);
+    expect(robinhood.markets.filter((market) => market.status === "active").length).toBeGreaterThanOrEqual(16);
+    expect(catalog.chains.flatMap((chain) => chain.markets).filter((market) => market.status === "active").length)
+      .toBeGreaterThanOrEqual(24);
+  });
+
   it("keeps every reviewed market uniquely addressable without chain allocations", () => {
     const catalog = getMarketCatalog();
     for (const chain of catalog.chains) {
@@ -31,7 +42,7 @@ describe("curated meme markets", () => {
     expect(() => liquidityVenueFor(basecat, "V4")).toThrow("no reviewed Uniswap V4 pool");
   });
 
-  it("accepts a reviewed market replacement without allocation weights", () => {
+  it("accepts a reviewed market addition without allocation weights", () => {
     const candidate = structuredClone(getMarketCatalog());
     const robinhood = candidate.chains.find((chain) => chain.slug === "robinhood")!;
     const outgoing = robinhood.markets.find((market) => market.id === "robinhood-cashcat")!;
@@ -64,8 +75,7 @@ describe("curated meme markets", () => {
       info: { imageUrl: "https://cdn.example/basecat.png" },
     }, "2026-08-29T00:00:00.000Z");
     expect(stats.trailingFeeAprPct).toBeCloseTo(36.5);
-    expect(stats.projectedMonthlyFeesPer1000Usd).toBeCloseTo(30.4167, 3);
-    expect(stats.projectionConfidence).toBe("illustrative");
+    expect(stats).not.toHaveProperty("projectedMonthlyFeesPer1000Usd");
     expect(stats.sourceUrl).toContain("dexscreener.com");
     expect(stats.tokenImageUrl).toBe("https://cdn.example/basecat.png");
   });
@@ -78,7 +88,7 @@ describe("curated meme markets", () => {
       pairCreatedAt: Date.parse("2025-01-01T00:00:00.000Z"),
     }, "2026-08-29T00:00:00.000Z", 2_500);
     expect(stats.feePips).toBe(2_500);
-    expect(stats.dailyFeesPer1000Usd).toBe(0.25);
+    expect(stats).not.toHaveProperty("dailyFeesPer1000Usd");
   });
 
   it("uses GeckoTerminal as the Robinhood evidence and token-image source", () => {
@@ -117,8 +127,6 @@ describe("curated meme markets", () => {
       pairCreatedAt: Date.parse("2025-01-01T00:00:00.000Z"),
     }, "2026-08-29T00:00:00.000Z");
     expect(stats.trailingFeeAprPct).toBeGreaterThan(1_000);
-    expect(stats.dailyFeesPer1000Usd).toBe(60);
-    expect(stats.projectionConfidence).toBe("unstable");
-    expect(stats.projectedMonthlyFeesPer1000Usd).toBeNull();
+    expect(stats).not.toHaveProperty("projectionConfidence");
   });
 });

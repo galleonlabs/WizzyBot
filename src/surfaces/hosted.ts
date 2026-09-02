@@ -7,9 +7,8 @@ import { AERODROME_DEPLOYMENTS } from "../aerodrome/deployments.js";
 import { snapshotUsd, usdPricesForPosition } from "../chain/prices.js";
 import { adapterFor } from "../core/protocols.js";
 import { formatReceipt, planCompound, planExit, planRerange, type PlanContext } from "../core/actions.js";
-import { COMPOUND_FEE_BPS, RANGE_EXIT_FEE_BPS } from "../core/fees.js";
 import { buildCard, formatCard } from "../core/card.js";
-import { formatHoldNote, getHold, holdAmounts } from "../core/hold.js";
+import { formatHoldNote, getHold, holdAmounts, type HoldRecord } from "../core/hold.js";
 import { readHoldBaseline } from "../chain/mint-history.js";
 import { runMintFlow } from "../core/mint-flow.js";
 import { hydrateCalldata } from "../core/hydrate.js";
@@ -26,7 +25,6 @@ import {
 } from "../core/view.js";
 import { addressesFor, parseChainSlug, viemChainFor, type ChainSlug } from "../chains.js";
 import { scoutMarkets as getMarketScout } from "../markets/scout.js";
-import { chainCatalog } from "../markets/catalog.js";
 import { readLiquidityProfile } from "../portfolio/liquidity-profile.js";
 
 export type WriteFlags = {
@@ -84,7 +82,8 @@ export function connectRead(chain: ChainSlug | string = "base", selector: Positi
   const slug = slugOf(chain);
   const env = loadEnv();
   const client = makePublicClient(env.rpcByChain[slug], viemChainFor(slug));
-  return { env, client, adapter: positionAdapter(client, slug, selector), chain: slug };
+  const historyClient = makePublicClient(env.rpcByChain[slug], viemChainFor(slug), { retryCount: 0, timeoutMs: 3_500 });
+  return { env, client, historyClient, adapter: positionAdapter(client, slug, selector), chain: slug };
 }
 
 export async function connectHosted(ownerArg?: string, chain: ChainSlug | string = "base", selector: PositionSelector = {}) {
@@ -97,49 +96,71 @@ export async function connectHosted(ownerArg?: string, chain: ChainSlug | string
   return { env, client, owner, adapter, chain: slug };
 }
 
-async function liveViewFor(snap: PositionSnapshot, client: ReturnType<typeof makePublicClient>, ethUsd?: number) {
-  const profilePromise = readLiquidityProfile(client, snap).catch(() => undefined);
-  const prices = await usdPricesForPosition(client, snap, ethUsd);
-  const rec = await readHoldBaseline(client, snap.ref.tokenId, { amount0: snap.amount0, amount1: snap.amount1 }, {
-    positionManager: snap.positionManager,
+function firstSeenBaseline(snap: PositionSnapshot): HoldRecord {
+  return {
+    tokenId: snap.ref.tokenId.toString(),
+    hold0: snap.amount0.toString(),
+    hold1: snap.amount1.toString(),
+    createdAt: 0,
+    source: "first-seen-import",
+    note: "Historical mint data was unavailable. HOLD comparisons use current first-seen inventory and are not historical PnL.",
+  };
+}
+
+async function within<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), timeoutMs);
   });
+  try {
+    return await Promise.race([promise.catch(() => fallback), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function liveViewFor(
+  snap: PositionSnapshot,
+  client: ReturnType<typeof makePublicClient>,
+  ethUsd?: number,
+  options: { historyClient?: ReturnType<typeof makePublicClient>; readHistory?: boolean; timeoutMs?: number } = {},
+) {
+  const timeoutMs = options.timeoutMs ?? 4_000;
+  const baseline = firstSeenBaseline(snap);
+  const pricesPromise = within(usdPricesForPosition(client, snap, ethUsd), timeoutMs, { price0Usd: 0, price1Usd: 0 });
+  const profilePromise = within(readLiquidityProfile(client, snap), timeoutMs, undefined);
+  const holdPromise = options.readHistory
+    ? within(readHoldBaseline(options.historyClient ?? client, snap.ref.tokenId, { amount0: snap.amount0, amount1: snap.amount1 }, {
+        positionManager: snap.positionManager,
+      }), timeoutMs, baseline)
+    : Promise.resolve(baseline);
+  const [prices, rec, liquidityProfile] = await Promise.all([pricesPromise, holdPromise, profilePromise]);
   const card = buildCard(snap, prices, holdAmounts(rec), rec.createdAt, undefined, {
     source: rec.source,
     note: formatHoldNote(rec),
   });
-  return { card, view: serializeLiveView(card), liquidityProfile: await profilePromise };
+  return { card, view: serializeLiveView(card), liquidityProfile };
 }
 
 export async function listPositions(ownerArg?: string, chain: ChainSlug | string = "base") {
   const slug = slugOf(chain);
   const { client, owner, env } = await connectHosted(ownerArg, slug);
-  const out: Record<string, unknown>[] = [];
   const adapters: Array<{ adapter: ReturnType<typeof adapterFor> | AerodromeSlipstreamAdapter; venue?: "aerodrome-slipstream" }> = [
     ...(["V2", "V3", "V4"] as const).map((protocol) => ({ adapter: adapterFor(protocol, client) })),
   ];
   if (slug === "base") {
-    const deployments = new Set(chainCatalog("base").markets
-      .filter((market) => market.status === "active" && market.protocol === "AERODROME_SLIPSTREAM" && market.aerodromeDeployment)
-      .map((market) => market.aerodromeDeployment!));
-    for (const deployment of deployments) {
+    for (const deployment of Object.keys(AERODROME_DEPLOYMENTS) as Array<keyof typeof AERODROME_DEPLOYMENTS>) {
       adapters.push({ adapter: new AerodromeSlipstreamAdapter(client, deployment), venue: "aerodrome-slipstream" });
     }
   }
-  const curatedAerodromePools = new Set(chainCatalog(slug).markets
-    .filter((market) => market.protocol === "AERODROME_SLIPSTREAM")
-    .map((market) => market.pool.toLowerCase()));
-  for (const descriptor of adapters) {
+  const discovered = await Promise.all(adapters.map(async (descriptor) => ({
+    descriptor,
+    refs: await descriptor.adapter.listPositions(owner).catch(() => []),
+  })));
+  const out = await Promise.all(discovered.flatMap(({ descriptor, refs }) => refs.map(async (ref): Promise<Record<string, unknown>> => {
     const { adapter } = descriptor;
-    let refs: { protocol: string; tokenId: bigint }[] = [];
-    try {
-      refs = await adapter.listPositions(owner);
-    } catch {
-      refs = [];
-    }
-    for (const ref of refs) {
       try {
         const snap = await adapter.readPosition(ref.tokenId);
-        if (descriptor.venue === "aerodrome-slipstream" && !curatedAerodromePools.has(snap.pool.toLowerCase())) continue;
         const row: Record<string, unknown> = {
           protocol: ref.protocol,
           tokenId: ref.tokenId.toString(),
@@ -154,7 +175,7 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
           positionManager: snap.positionManager ?? snap.ref.positionManager,
         };
         try {
-          const { view, liquidityProfile } = await liveViewFor(snap, client, env.ethUsd);
+          const { view, liquidityProfile } = await liveViewFor(snap, client, env.ethUsd, { readHistory: false, timeoutMs: 3_500 });
           row.view = view;
           row.positionUsd = view.positionUsd;
           row.feesUsd = view.feesUsd;
@@ -171,17 +192,16 @@ export async function listPositions(ownerArg?: string, chain: ChainSlug | string
         } catch {
           // Light row still useful if prices / HOLD fail.
         }
-        out.push(row);
+        return row;
       } catch (err) {
-        out.push({
+        return {
           protocol: ref.protocol,
           tokenId: ref.tokenId.toString(),
           chain: slug,
           error: err instanceof Error ? err.message : String(err),
-        });
+        };
       }
-    }
-  }
+  })));
   return jsonSafe({ owner, chain: slug, count: out.length, positions: out });
 }
 
@@ -192,10 +212,10 @@ export async function statusPosition(
   positionManager?: string,
 ) {
   const slug = slugOf(chain);
-  const { adapter, client, env } = connectRead(slug, { protocol, positionManager });
+  const { adapter, client, historyClient, env } = connectRead(slug, { protocol, positionManager });
   const id = BigInt(tokenId);
   const snap = await adapter.readPosition(id);
-  const { card, view, liquidityProfile } = await liveViewFor(snap, client, env.ethUsd);
+  const { card, view, liquidityProfile } = await liveViewFor(snap, client, env.ethUsd, { historyClient, readHistory: true });
   return jsonSafe({
     card: formatCard(card),
     view,
@@ -214,8 +234,7 @@ async function planContext(
   snap: PositionSnapshot,
   owner: Address,
   live: boolean,
-  action: "compound" | "rerange" | "exit",
-  flags: { noFee?: boolean; feeSource?: "fees" | "notional"; chain?: ChainSlug | string },
+  flags: { chain?: ChainSlug | string },
 ): Promise<PlanContext> {
   const slug = slugOf(flags.chain);
   const env = loadEnv();
@@ -226,14 +245,14 @@ async function planContext(
   return {
     owner,
     dryRun: !live,
-    noFee: Boolean(flags.noFee),
-    feeSource: flags.feeSource ?? policy.feeSource,
+    noFee: true,
+    feeSource: "fees",
     minFeeUsd: policy.minFeeUsd,
     minPositionUsd: policy.minPositionUsd,
     feesUsd: usd.feesUsd,
     notionalUsd: usd.positionUsd,
     gasUsd: 0.15,
-    takeBps: action === "compound" ? COMPOUND_FEE_BPS : RANGE_EXIT_FEE_BPS,
+    takeBps: 0,
   };
 }
 
@@ -262,8 +281,6 @@ export async function compoundPosition(input: {
   owner?: string;
   live?: boolean;
   confirm?: boolean;
-  noFee?: boolean;
-  feeSource?: "fees" | "notional";
   chain?: ChainSlug | string;
   protocol?: Protocol;
 }) {
@@ -271,7 +288,7 @@ export async function compoundPosition(input: {
   const slug = slugOf(input.chain);
   const { adapter, owner } = await connectHosted(input.owner, slug, { protocol: input.protocol });
   const snap = await adapter.readPosition(BigInt(input.tokenId));
-  const ctx = await planContext(snap, owner, live, "compound", { ...input, chain: slug });
+  const ctx = await planContext(snap, owner, live, { chain: slug });
   const receipt = planCompound(snap, ctx);
   const executed = await maybeBroadcast(receipt, snap, owner, live, slug);
   return jsonSafe({
@@ -287,8 +304,6 @@ export async function rangePosition(input: {
   owner?: string;
   live?: boolean;
   confirm?: boolean;
-  noFee?: boolean;
-  feeSource?: "fees" | "notional";
   oorPercent?: number;
   chain?: ChainSlug | string;
   protocol?: Protocol;
@@ -298,7 +313,7 @@ export async function rangePosition(input: {
   const { adapter, owner } = await connectHosted(input.owner, slug, { protocol: input.protocol });
   const snap = await adapter.readPosition(BigInt(input.tokenId));
   const policy = policyFor(loadConfig(), snap.ref.tokenId);
-  const ctx = await planContext(snap, owner, live, "rerange", { ...input, chain: slug });
+  const ctx = await planContext(snap, owner, live, { chain: slug });
   const receipt = planRerange(snap, ctx, { oorPercent: input.oorPercent ?? policy.oorPercent });
   const executed = await maybeBroadcast(receipt, snap, owner, live, slug);
   let projection;
@@ -330,8 +345,6 @@ export async function exitPosition(input: {
   owner?: string;
   live?: boolean;
   confirm?: boolean;
-  noFee?: boolean;
-  feeSource?: "fees" | "notional";
   exitPrice?: number;
   swapTo?: string;
   chain?: ChainSlug | string;
@@ -342,7 +355,7 @@ export async function exitPosition(input: {
   const { adapter, owner } = await connectHosted(input.owner, slug, { protocol: input.protocol });
   const snap = await adapter.readPosition(BigInt(input.tokenId));
   const policy = policyFor(loadConfig(), snap.ref.tokenId);
-  const ctx = await planContext(snap, owner, live, "exit", { ...input, chain: slug });
+  const ctx = await planContext(snap, owner, live, { chain: slug });
   const receipt = planExit(snap, ctx, {
     exitPrice: input.exitPrice ?? policy.exitPrice,
     currentPrice: input.exitPrice !== undefined ? (Number(snap.sqrtPriceX96) / 2 ** 96) ** 2 : undefined,

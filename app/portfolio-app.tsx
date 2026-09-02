@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { formatEther, parseEther } from "viem";
 import { compositionShares, lightRowToView, positionRangeGeometry, positionRangePreview, positionRangePreviewForTicks, priceLabel, type PositionView, type RangePreset } from "./lib/cards";
 import { readJsonPayload } from "./lib/api-payload";
+import { loadPositionRows } from "./lib/position-loading";
 import { positionFeesEth, positionValueEth, positionValueUsd } from "./lib/portfolio-summary";
 import { type ChainSlug } from "./lib/chains";
 import {
@@ -30,13 +31,14 @@ type PlanState = { kind: "idle" | "planning" | "ready" | "signing" | "waiting" |
 type BalanceState = { kind: "idle" | "loading" | "ready" | "error"; balanceWei?: string };
 type ChainBalances = Record<ChainSlug, BalanceState>;
 type AnyPositionActionPlan = PositionActionPlan;
-type PositionActionKind = "collect" | "compound" | "rebalance" | "withdraw";
+type PositionActionKind = "collect" | "compound" | "increase" | "rebalance" | "withdraw";
 type MarketChain = ChainSlug | "solana";
 type MarketEntry = {
   market: CuratedMarket;
   chain: MarketChain;
 };
 const MARKET_SKELETON_COUNT = 6;
+const MARKETS_PER_PAGE = 8;
 const FOMO_URL = "https://fomo.family/r/makemememarkets";
 const BRIDGE_URLS: Record<ChainSlug, string> = {
   base: "https://relay.link/bridge/base",
@@ -58,7 +60,7 @@ const PREVIEW_WITHDRAWAL_PLAN: PositionActionPlan = {
   execution: "wallet_transactions",
   atomic: false,
   expectedConfirmations: 1,
-  serviceFeeBps: 15,
+  serviceFeeBps: 0,
   serviceFee: [],
   settlement: { asset: "ETH", minimumAmountWei: "19118000000000000", marketSymbol: "CASHCAT" },
   transactions: [],
@@ -76,7 +78,7 @@ const BRAND_ASSETS = {
 } as const;
 
 const EMPTY_MARKETS: MarketsPayload = {
-  catalog: { version: 1, updatedAt: "", fees: { allocateBps: 15, withdrawBps: 15, rebalanceBps: 15, compoundBps: 200 }, chains: [] },
+  catalog: { version: 1, updatedAt: "", chains: [] },
   solana: {
     slug: "solana",
     chainId: 792703809,
@@ -111,7 +113,6 @@ export function PortfolioApp() {
   const [actionState, setActionState] = useState<PlanState>({ kind: "idle" });
   const [zapMarketId, setZapMarketId] = useState<string | null>(null);
   const [zapAmount, setZapAmount] = useState("0.05");
-  const [zapProtocol, setZapProtocol] = useState<"V2" | "V3" | "V4">("V3");
   const [zapPlan, setZapPlan] = useState<AllocationPlan | null>(null);
   const [zapState, setZapState] = useState<PlanState>({ kind: "idle" });
   const [sendOpen, setSendOpen] = useState(false);
@@ -189,18 +190,13 @@ export function PortfolioApp() {
     }
     setPositionsState("loading");
     try {
-      const requests = (["base", "robinhood"] as const).map(async (chain) => {
-        const response = await fetch(`/api/positions?owner=${encodeURIComponent(address)}&chain=${chain}`);
-        const payload = await readJsonPayload(response) as { positions?: unknown[]; error?: string };
-        if (!response.ok || payload.error) throw new Error(payload.error ?? `Could not load ${chain} positions`);
-        return payload.positions ?? [];
-      });
-      const payloads = await Promise.all(requests);
+      const result = await loadPositionRows(address);
       if (requestId !== positionsRequestRef.current) return;
-      const next = payloads.flat().map((row) => row && typeof row === "object" ? lightRowToView(row as Record<string, unknown>) : null)
+      const next = result.rows.map((row) => row && typeof row === "object" ? lightRowToView(row as Record<string, unknown>) : null)
         .filter((row): row is PositionView => Boolean(row));
       setPositions(next);
-      setPositionsState("ready");
+      setPositionsState(result.failedChains.length === 2 ? "error" : "ready");
+      result.errors.forEach((error) => reportClientError("positions", error));
     } catch (error) {
       if (requestId !== positionsRequestRef.current) return;
       setPositions([]);
@@ -247,7 +243,7 @@ export function PortfolioApp() {
         });
       }
     }
-    fetch("/api/markets")
+    fetch("/api/markets", { cache: "no-cache" })
       .then(async (response) => {
         const payload = await readJsonPayload(response) as MarketsPayload;
         if (!response.ok) throw new Error("Could not load markets");
@@ -325,13 +321,26 @@ export function PortfolioApp() {
     window.open(`${BRIDGE_URLS[chain]}?toAddress=${address}`, "_blank", "noopener,noreferrer");
   }
 
-  async function preparePositionAction(position: PositionView, action: PositionActionKind, rangePreset?: RangePreset) {
+  async function preparePositionAction(position: PositionView, action: PositionActionKind, rangePreset?: RangePreset, amount?: string) {
     if (!address || !position.tokenId || !position.chain) return;
+    let amountWei: bigint | undefined;
+    if (action === "increase") {
+      try {
+        amountWei = parseEther(amount ?? "0");
+        if (amountWei <= 0n) throw new Error("Enter an ETH amount to add.");
+      } catch {
+        setActionPlan(null);
+        setActionState({ kind: "error", message: "Enter a valid ETH amount." });
+        return;
+      }
+    }
     const withdrawsToEth = positionSettlesToEth(position);
     const planningVerb = action === "collect"
       ? "Preparing to collect fees from"
       : action === "compound"
       ? "Preparing to reinvest"
+      : action === "increase"
+        ? "Preparing to add liquidity to"
       : action === "rebalance"
         ? "Preparing a new range for"
         : withdrawsToEth ? "Preparing an ETH withdrawal for" : "Preparing to withdraw";
@@ -346,6 +355,7 @@ export function PortfolioApp() {
           chain: position.chain,
           tokenId: position.tokenId,
           action,
+          amountWei: amountWei?.toString(),
           protocol: position.protocol === "V2" || position.protocol === "V3" || position.protocol === "V4" ? position.protocol : undefined,
           venue: position.venue,
           positionManager: position.positionManager,
@@ -359,6 +369,8 @@ export function PortfolioApp() {
         ? "Review the fees returning to your wallet."
         : action === "compound"
         ? "Review the fees ready to reinvest."
+        : action === "increase"
+          ? "Review the ETH being added to this position."
         : action === "rebalance"
           ? "Review the new range before continuing."
           : withdrawsToEth ? "Review the ETH return before continuing." : "Review the withdrawal before continuing.";
@@ -404,7 +416,7 @@ export function PortfolioApp() {
           transactionHashes,
         });
       }
-      trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : actionPlan.kind === "rebalance" ? "Rebalance Confirmed" : actionPlan.kind === "collect" ? "Fees Collected" : "Compound Confirmed", { chainId: actionPlan.chainId });
+      trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : actionPlan.kind === "rebalance" ? "Rebalance Confirmed" : actionPlan.kind === "increase" ? "Liquidity Increased" : actionPlan.kind === "collect" ? "Fees Collected" : "Compound Confirmed", { chainId: actionPlan.chainId });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : "Wallet submission failed" });
       reportClientError("position-action", error);
@@ -413,7 +425,6 @@ export function PortfolioApp() {
 
   function openZap(marketId: string) {
     setZapMarketId((current) => current === marketId ? null : marketId);
-    setZapProtocol("V3");
     setZapPlan(null);
     setZapState({ kind: "idle" });
     trackProductEvent("Zap Opened", { marketId });
@@ -447,7 +458,6 @@ export function PortfolioApp() {
           chain: selected.chain,
           amountWei: amountWei.toString(),
           marketId,
-          ...(zapProtocol === "V3" ? {} : { protocol: zapProtocol }),
         }),
       });
       const payload = await readJsonPayload(response) as { plan?: AllocationPlan; error?: string };
@@ -504,6 +514,8 @@ export function PortfolioApp() {
       actionState={actionState}
       onExecute={executePositionAction}
       onCancel={() => { setActionPlan(null); setActionState({ kind: "idle" }); }}
+      balances={authenticated ? balances : null}
+      onFund={fundChain}
     />
   );
   const marketLedger = (
@@ -517,15 +529,13 @@ export function PortfolioApp() {
         state={marketsState}
         zapMarketId={zapMarketId}
         zapAmount={zapAmount}
-        zapProtocol={zapProtocol}
         zapPlan={zapPlan}
         zapState={zapState}
         onOpenZap={openZap}
         onZapAmount={(next) => { setZapAmount(next); setZapPlan(null); if (zapState.kind !== "idle") setZapState({ kind: "idle" }); }}
-        onZapProtocol={(next) => { setZapProtocol(next); setZapPlan(null); setZapState({ kind: "idle" }); }}
         onPrepareZap={(id) => void prepareZap(id)}
         onExecuteZap={() => void executeZap()}
-        onCloseZap={() => { setZapMarketId(null); setZapProtocol("V3"); setZapPlan(null); setZapState({ kind: "idle" }); }}
+        onCloseZap={() => { setZapMarketId(null); setZapPlan(null); setZapState({ kind: "idle" }); }}
         balances={authenticated ? balances : null}
         onFund={fundChain}
       />
@@ -589,9 +599,9 @@ export function PortfolioApp() {
                 <div className="hero-stage">
                   <div className="hero-copy">
                     <h1>Make Meme Markets</h1>
-                    <p>Pick a market. Add ETH. Own the position.<br /><span>Wizzy handles the swap and liquidity range.</span></p>
+                    <p>Add ETH to any listed market. Wizzy selects the best eligible pool, handles the swap, and creates the LP position in your wallet.</p>
                   </div>
-                  <MarketShowcase markets={activeMarkets} stats={stats} loading={marketsState === "loading"} />
+                  <MarketShowcase />
                 </div>
             </section>
           ) : null}
@@ -694,19 +704,11 @@ function PoolActivityGroup({ items, duplicate = false }: { items: PoolActivityIt
   </span>;
 }
 
-function MarketShowcase({ markets, stats, loading }: { markets: MarketEntry[]; stats: Map<string, MarketStats>; loading: boolean }) {
+function MarketShowcase() {
   return <div className="market-showcase" aria-label="Base and Robinhood meme markets">
     <div className="network-lockup" aria-label="Built on Base and Robinhood Chain">
       <span className="network-icons" aria-hidden="true"><img src={BRAND_ASSETS.base} alt="" /><img src={BRAND_ASSETS.robinhood} alt="" /></span>
       <span className="network-name"><small>Built on</small><b>Base + Robinhood</b></span>
-    </div>
-    <div className={`hero-token-field ${loading ? "is-loading" : ""}`}>
-      {(loading ? Array.from({ length: MARKET_SKELETON_COUNT }, (_, index) => ({ market: { id: String(index), symbol: "", color: "" } })) : markets).map(({ market }, index) => (
-        <span className="hero-token" key={market.id} style={{ "--token-index": index } as CSSProperties}>
-          <TokenIcon symbol={market.symbol} src={stats.get(market.id)?.tokenImageUrl} color={market.color} />
-          {market.symbol ? <b>{market.symbol}</b> : null}
-        </span>
-      ))}
     </div>
   </div>;
 }
@@ -826,18 +828,16 @@ function SuccessCelebration({ label }: { label: string }) {
   </div>;
 }
 
-function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapProtocol, zapPlan, zapState, onOpenZap, onZapAmount, onZapProtocol, onPrepareZap, onExecuteZap, onCloseZap, balances, onFund }: {
+function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapPlan, zapState, onOpenZap, onZapAmount, onPrepareZap, onExecuteZap, onCloseZap, balances, onFund }: {
   markets: MarketEntry[];
   stats: Map<string, MarketStats>;
   state: "loading" | "ready" | "error";
   zapMarketId: string | null;
   zapAmount: string;
-  zapProtocol: "V2" | "V3" | "V4";
   zapPlan: AllocationPlan | null;
   zapState: PlanState;
   onOpenZap: (marketId: string) => void;
   onZapAmount: (next: string) => void;
-  onZapProtocol: (next: "V2" | "V3" | "V4") => void;
   onPrepareZap: (marketId: string) => void;
   onExecuteZap: () => void;
   onCloseZap: () => void;
@@ -845,7 +845,18 @@ function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapProtoc
   onFund: (chain: ChainSlug) => void;
 }) {
   const [chainFilter, setChainFilter] = useState<"all" | ChainSlug>("all");
-  const visibleMarkets = chainFilter === "all" ? markets : markets.filter((entry) => entry.chain === chainFilter);
+  const [marketQuery, setMarketQuery] = useState("");
+  const [marketPage, setMarketPage] = useState(1);
+  const normalizedQuery = marketQuery.trim().toLocaleLowerCase();
+  const filteredMarkets = markets.filter(({ market, chain }) => {
+    if (chainFilter !== "all" && chain !== chainFilter) return false;
+    if (!normalizedQuery) return true;
+    return `${market.symbol} ${market.name}`.toLocaleLowerCase().includes(normalizedQuery);
+  });
+  const pageCount = Math.max(1, Math.ceil(filteredMarkets.length / MARKETS_PER_PAGE));
+  const currentPage = Math.min(marketPage, pageCount);
+  const pageStart = (currentPage - 1) * MARKETS_PER_PAGE;
+  const visibleMarkets = filteredMarkets.slice(pageStart, pageStart + MARKETS_PER_PAGE);
   const selected = markets.find(({ market, chain }) => market.id === zapMarketId && (chain === "base" || chain === "robinhood"));
 
   useEffect(() => {
@@ -865,48 +876,59 @@ function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapProtoc
   return <>
     <section className="market-ledger">
       <div className="market-table-wrap">
-        <div className="market-toolbar" aria-label="Filter markets by chain">
-          {(["all", "base", "robinhood"] as const).map((chain) => <button key={chain} type="button" className={chainFilter === chain ? "is-active" : ""} aria-pressed={chainFilter === chain} onClick={() => setChainFilter(chain)}>{chain === "all" ? "All markets" : chainLabel(chain)}</button>)}
+        <div className="market-toolbar">
+          <div className="market-filters" aria-label="Filter markets by chain">
+            {(["all", "base", "robinhood"] as const).map((chain) => <button key={chain} type="button" className={chainFilter === chain ? "is-active" : ""} aria-pressed={chainFilter === chain} onClick={() => { setChainFilter(chain); setMarketPage(1); }}>{chain === "all" ? "All markets" : chainLabel(chain)}</button>)}
+          </div>
+          <label className="market-search"><SearchIcon /><input type="search" value={marketQuery} onChange={(event) => { setMarketQuery(event.target.value); setMarketPage(1); }} placeholder="Search markets" aria-label="Search markets" /></label>
         </div>
         <table className="market-table">
-          <thead><tr><th>Market</th><th>24h volume</th><th>Liquidity</th><th>Action</th></tr></thead>
+          <thead><tr><th>Market</th><th>24h fee APR</th><th>24h volume</th><th>Liquidity</th><th>Action</th></tr></thead>
           <tbody>
-            {state === "loading" ? Array.from({ length: MARKET_SKELETON_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={4}><i /></td></tr>) : null}
-            {state === "error" ? <tr><td colSpan={4} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
+            {state === "loading" ? Array.from({ length: MARKET_SKELETON_COUNT }, (_, index) => <tr className="skeleton-row" key={index}><td colSpan={5}><i /></td></tr>) : null}
+            {state === "error" ? <tr><td colSpan={5} className="table-message">Market data is temporarily unavailable.</td></tr> : null}
+            {state === "ready" && !visibleMarkets.length ? <tr><td colSpan={5} className="table-message">No markets match that search.</td></tr> : null}
             {state === "ready" ? visibleMarkets.map(({ market, chain }) => {
               const row = stats.get(market.id);
               const zappable = chain === "base" || chain === "robinhood";
               return <tr key={market.id}>
                 <td><span className="pair-cell"><TokenIcon symbol={market.symbol} src={row?.tokenImageUrl} color={market.color} /><span><b>{market.symbol}/WETH</b><VenueTrail chain={chain} protocol={market.protocol} /></span></span></td>
+                <td><b className="fee-apr">{formatFeeApr(row?.trailingFeeAprPct ?? null)}</b></td>
                 <td>{compactMoney(row?.volume24hUsd)}</td>
                 <td>{compactMoney(row?.liquidityUsd)}</td>
                 <td><span className="market-links">
                   {zappable ? <button className="market-link zap-link" type="button" aria-haspopup="dialog" onClick={() => onOpenZap(market.id)} aria-label={`Make the ${market.symbol}/WETH market`}><span className="market-link-label">Make market</span></button> : null}
                   <a className="market-link gecko-link" href={row?.sourceUrl ?? geckoPoolUrl(chain, market.pool)} target="_blank" rel="noreferrer" aria-label={`View ${market.symbol}/WETH on GeckoTerminal`}><img src={BRAND_ASSETS.gecko} alt="" /><span className="market-link-label">Gecko</span></a>
-                  {chain === "robinhood" ? <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a> : null}
+                  {zappable ? <a className="market-link fomo-link" href={FOMO_URL} target="_blank" rel="noreferrer" aria-label={`Trade ${market.symbol}/WETH on Fomo`}><img src={BRAND_ASSETS.fomo} alt="" /><span className="market-link-label">Trade on Fomo</span></a> : null}
                 </span></td>
               </tr>;
             }) : null}
           </tbody>
         </table>
+        {state === "ready" && filteredMarkets.length ? <nav className="market-pagination" aria-label="Market pages">
+          <span>{pageStart + 1}–{Math.min(pageStart + MARKETS_PER_PAGE, filteredMarkets.length)} of {filteredMarkets.length}</span>
+          <div>
+            <button type="button" disabled={currentPage === 1} onClick={() => setMarketPage(currentPage - 1)}>Previous</button>
+            <span>Page {currentPage} of {pageCount}</span>
+            <button type="button" disabled={currentPage === pageCount} onClick={() => setMarketPage(currentPage + 1)}>Next</button>
+          </div>
+        </nav> : null}
       </div>
     </section>
     {selected && typeof document !== "undefined" ? createPortal(
       <div className="zap-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onCloseZap(); }}>
         <section className="zap-dialog" role="dialog" aria-modal="true" aria-labelledby="zap-dialog-title">
           <header>
-            <span><TokenIcon symbol={selected.market.symbol} src={stats.get(selected.market.id)?.tokenImageUrl} color={selected.market.color} /><span><b id="zap-dialog-title">{selected.market.symbol}/{zapProtocol === "V4" ? "ETH" : "WETH"}</b><small>{chainLabel(selected.chain)} · {zapProtocol === "V2" ? "Uniswap V2" : zapProtocol === "V4" ? "Uniswap V4" : selected.market.protocol === "AERODROME_SLIPSTREAM" ? "Aerodrome V3" : "Uniswap V3"}{zapProtocol === "V2" ? "" : ` · ±${selected.market.rangeWidthPct.toFixed(0)}% range`}</small></span></span>
+            <span><TokenIcon symbol={selected.market.symbol} src={stats.get(selected.market.id)?.tokenImageUrl} color={selected.market.color} /><span><b id="zap-dialog-title">{selected.market.symbol}/{selected.market.quoteSymbol}</b><small>{chainLabel(selected.chain)} · {zapPlan?.markets[0] ? `${allocationVenueLabel(zapPlan.markets[0])} · ${allocationRangeLabel(zapPlan.markets[0], selected.market)}` : "Best pool selected automatically"}</small></span></span>
             <button type="button" onClick={onCloseZap} aria-label="Close"><CloseIcon /></button>
           </header>
           <ZapPanel
             market={selected.market}
             chain={selected.chain as ChainSlug}
             amount={zapAmount}
-            protocol={zapProtocol}
             plan={zapPlan}
             state={zapState}
             onAmount={onZapAmount}
-            onProtocol={onZapProtocol}
             onPrepare={() => onPrepareZap(selected.market.id)}
             onExecute={onExecuteZap}
             balance={balances?.[selected.chain as ChainSlug] ?? null}
@@ -919,15 +941,13 @@ function MarketLedger({ markets, stats, state, zapMarketId, zapAmount, zapProtoc
   </>;
 }
 
-function ZapPanel({ market, chain, amount, protocol, plan, state, onAmount, onProtocol, onPrepare, onExecute, balance, onFund }: {
+function ZapPanel({ market, chain, amount, plan, state, onAmount, onPrepare, onExecute, balance, onFund }: {
   market: CuratedMarket;
   chain: ChainSlug;
   amount: string;
-  protocol: "V2" | "V3" | "V4";
   plan: AllocationPlan | null;
   state: PlanState;
   onAmount: (next: string) => void;
-  onProtocol: (next: "V2" | "V3" | "V4") => void;
   onPrepare: () => void;
   onExecute: () => void;
   balance: BalanceState | null;
@@ -938,12 +958,9 @@ function ZapPanel({ market, chain, amount, protocol, plan, state, onAmount, onPr
   const needsFunding = hasInsufficientBalance(amount, balance);
   return <div className="zap-panel" aria-label={`Make the ${market.symbol}/WETH market`}>
     <div className="zap-controls">
-      {market.liquidityVenues?.length ? <div className="zap-protocol" aria-label="Pool version">
-        {(["V2", "V3", "V4"] as const).filter((candidate) => candidate === "V3" || market.liquidityVenues?.some((venue) => venue.protocol === candidate)).map((candidate) => <button key={candidate} type="button" className={protocol === candidate ? "is-active" : ""} aria-pressed={protocol === candidate} onClick={() => onProtocol(candidate)}>{candidate}</button>)}
-      </div> : null}
       <span className="zap-balance"><span>Amount</span>{balance ? <span className="zap-balance-meta"><small role="status">Balance <b>{balance.kind === "ready" && balance.balanceWei !== undefined ? formatWalletBalance(balance.balanceWei) : "—"} ETH</b></small>{needsFunding ? <button type="button" onClick={onFund}>Get {chainLabel(chain)} ETH</button> : null}</span> : null}</span>
       <label className="zap-amount">
-        <input autoFocus inputMode="decimal" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
+        <input autoFocus type="text" inputMode="decimal" enterKeyHint="done" value={amount} placeholder="0.00" onChange={(event) => onAmount(event.target.value)} aria-label="ETH amount" />
         <b>ETH</b>
       </label>
       {plan && (state.kind === "ready" || busy) ? (
@@ -957,14 +974,15 @@ function ZapPanel({ market, chain, amount, protocol, plan, state, onAmount, onPr
       )}
     </div>
     {plan && planMarket ? <dl className="zap-preview">
+      <div><dt>Pool</dt><dd>{allocationVenueLabel(planMarket)} · selected automatically</dd></div>
       <div><dt>You add</dt><dd>{formatWalletBalance(planMarket.mintQuote)} {planMarket.quoteSymbol} + {compactAmount(planMarket.mintMeme, 18)} {market.symbol}</dd></div>
-      <div><dt>Wizzy fee</dt><dd>{formatWalletBalance(plan.serviceFeeWei)} ETH</dd></div>
+      <div><dt>Wizzy fee</dt><dd>None</dd></div>
     </dl> : null}
     {state.kind === "submitted" || state.kind === "error" ? <p className={`funding-status is-${state.kind === "submitted" ? "submitted" : "error"}`} aria-live="polite">{state.message}</p> : null}
   </div>;
 }
 
-function PositionLedger({ authenticated, positions, state, markets, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel }: {
+function PositionLedger({ authenticated, positions, state, markets, stats, onStart, onRetry, onAction, actionPlan, actionState, onExecute, onCancel, balances, onFund }: {
   authenticated: boolean;
   positions: PositionView[];
   state: "idle" | "loading" | "ready" | "error";
@@ -972,11 +990,13 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
   stats: Map<string, MarketStats>;
   onStart: () => void;
   onRetry: () => void;
-  onAction: (position: PositionView, action: PositionActionKind, rangePreset?: RangePreset) => void;
+  onAction: (position: PositionView, action: PositionActionKind, rangePreset?: RangePreset, amount?: string) => void;
   actionPlan: AnyPositionActionPlan | null;
   actionState: PlanState;
   onExecute: () => void;
   onCancel: () => void;
+  balances: ChainBalances | null;
+  onFund: (chain: ChainSlug) => void;
 }) {
   const [managedKey, setManagedKey] = useState<string | null>(null);
   const showPositions = authenticated && positions.length > 0;
@@ -1045,6 +1065,8 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
           onExecute={onExecute}
           onCancel={onCancel}
           onClose={closeManager}
+          balance={managedPosition.chain === "base" || managedPosition.chain === "robinhood" ? balances?.[managedPosition.chain] ?? null : null}
+          onFund={onFund}
         />,
         document.body,
       ) : null}
@@ -1063,26 +1085,34 @@ function PositionActionReview({ plan, state, settlement, onExecute, onCancel }: 
   return <section className={`action-preview is-${state.kind}`} aria-live="polite">
     {state.kind === "submitted" ? <SuccessCelebration label={positionActionSuccessLabel(plan)} /> : null}
     <div className="action-copy"><b>{positionActionTitle(plan, state)}</b><p>{positionActionDescription(plan, state, settlement)}</p></div>
-    {plan && state.kind === "ready" ? <span>{plan.serviceFeeBps === 0 ? "No Wizzy fee" : formatServiceFee(plan.serviceFeeBps)}</span> : null}
+    {plan && state.kind === "ready" ? <span>No Wizzy fee</span> : null}
     <div className="action-buttons">{state.kind === "ready" ? <button className="small-primary" type="button" onClick={onExecute}>{positionActionButtonLabel(plan)}</button> : null}<button type="button" onClick={onCancel} disabled={busy}>Close</button></div>
   </section>;
 }
 
-function PositionManager({ position, image, actionPlan, actionState, onAction, onExecute, onCancel, onClose }: {
+function PositionManager({ position, image, actionPlan, actionState, onAction, onExecute, onCancel, onClose, balance, onFund }: {
   position: PositionView;
   image?: string | null;
   actionPlan: AnyPositionActionPlan | null;
   actionState: PlanState;
-  onAction: (position: PositionView, action: PositionActionKind, rangePreset?: RangePreset) => void;
+  onAction: (position: PositionView, action: PositionActionKind, rangePreset?: RangePreset, amount?: string) => void;
   onExecute: () => void;
   onCancel: () => void;
   onClose: () => void;
+  balance: BalanceState | null;
+  onFund: (chain: ChainSlug) => void;
 }) {
   const [rangePreset, setRangePreset] = useState<RangePreset>("balanced");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addAmount, setAddAmount] = useState("0.05");
   const canCollect = position.protocol !== "V2" && hasCollectibleFees(position) && !position.closed;
   const canAdjustRange = (position.protocol === "V3" || position.protocol === "V4") && position.chain !== "solana" && !position.closed;
+  const fundingChain: ChainSlug | null = position.chain === "base" || position.chain === "robinhood" ? position.chain : null;
+  const canAdd = fundingChain !== null && !position.closed && (position.protocol === "V2" || position.inRange);
   const actionBusy = actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting";
+  const addAmountValid = isPositiveEthAmount(addAmount);
+  const addNeedsFunding = hasInsufficientBalance(addAmount, balance);
   const { share0, share1 } = compositionShares(position);
   const plannedRange = actionPlan?.kind === "rebalance" ? actionPlan.range : undefined;
   const rangePreview = useMemo(() => {
@@ -1096,7 +1126,15 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
       return null;
     }
   }, [canAdjustRange, plannedRange, position, rangePreset]);
-  useEffect(() => setRangePreset("balanced"), [position.chain, position.positionManager, position.protocol, position.tokenId]);
+  useEffect(() => {
+    setRangePreset("balanced");
+    setMoreOpen(false);
+    setAddOpen(false);
+    setAddAmount("0.05");
+  }, [position.chain, position.positionManager, position.protocol, position.tokenId]);
+  useEffect(() => {
+    if (actionPlan?.kind === "increase" && actionState.kind === "submitted") setAddOpen(false);
+  }, [actionPlan?.kind, actionState.kind]);
   return <div className="position-manager-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="position-manager" role="dialog" aria-modal="true" aria-labelledby="position-manager-title">
       <header className="position-manager-header">
@@ -1121,16 +1159,29 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
         </section>
         {actionState.kind !== "idle" ? <PositionActionReview plan={actionPlan} state={actionState} settlement={actionPlan?.settlement} onExecute={onExecute} onCancel={onCancel} /> : null}
       </div>
-      {actionState.kind === "idle" ? <footer className="position-manager-actions">
-        {position.protocol === "V2" ? <p><b>Full range by design.</b> V2 fees stay invested in the LP token automatically.</p> : null}
-        {canAdjustRange && rangePreview ? <button className="position-primary-action" type="button" onClick={() => onAction(position, "rebalance", rangePreset)} disabled={actionBusy}>{position.inRange ? "Adjust range" : "Rebalance range"}</button> : null}
-        {!canAdjustRange && !position.closed ? <button className="position-primary-action position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button> : null}
-        {canAdjustRange ? <div className={`position-secondary-actions ${moreOpen ? "is-open" : ""}`} id="position-more-actions">
-          {canCollect ? <button type="button" onClick={() => onAction(position, "collect")} disabled={actionBusy}>Collect fees</button> : null}
-          {position.protocol !== "V2" && !position.closed ? <button type="button" onClick={() => onAction(position, "compound")} disabled={!hasCollectibleFees(position) || actionBusy}>Compound</button> : null}
-          <button className="position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed || actionBusy}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button>
-        </div> : null}
-        {canAdjustRange ? <button className="position-more-action" type="button" aria-expanded={moreOpen} aria-controls="position-more-actions" onClick={() => setMoreOpen((open) => !open)} disabled={actionBusy}>{moreOpen ? "Less" : "More"}</button> : null}
+      {actionState.kind === "idle" ? <footer className={`position-manager-actions ${addOpen ? "is-adding" : ""}`}>
+        {addOpen ? <div className="position-add-liquidity">
+          <header><b>Add to this position</b><small>{balance?.kind === "ready" && balance.balanceWei !== undefined ? `${formatWalletBalance(balance.balanceWei)} ETH available` : fundingChain ? `Uses ${chainLabel(fundingChain)} ETH` : "ETH balance unavailable"}</small></header>
+          <label className="position-add-amount">
+            <input autoFocus type="text" inputMode="decimal" enterKeyHint="done" name="position-add-amount" value={addAmount} onChange={(event) => setAddAmount(event.target.value)} aria-label="ETH to add" />
+            <b>ETH</b>
+          </label>
+          {addNeedsFunding && fundingChain ? <button className="position-add-fund" type="button" onClick={() => onFund(fundingChain)}>Get {chainLabel(fundingChain)} ETH</button> : null}
+          <div><button type="button" onClick={() => setAddOpen(false)}>Cancel</button><button className="position-primary-action" type="button" disabled={!addAmountValid || addNeedsFunding} onClick={() => onAction(position, "increase", undefined, addAmount)}>Review</button></div>
+        </div> : <>
+          {position.protocol === "V2" ? <p><b>Full range by design.</b> V2 fees stay invested in the LP token automatically.</p> : null}
+          {canAdd ? <button className="position-primary-action" type="button" onClick={() => setAddOpen(true)} disabled={actionBusy}>Add to this position</button> : null}
+          {!canAdd && canAdjustRange && rangePreview ? <button className="position-primary-action" type="button" onClick={() => onAction(position, "rebalance", rangePreset)} disabled={actionBusy}>Rebalance range</button> : null}
+          {!canAdjustRange && !canAdd && !position.closed ? <button className="position-primary-action position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button> : null}
+          {canAdjustRange ? <div className={`position-secondary-actions ${moreOpen ? "is-open" : ""}`} id="position-more-actions">
+            {canAdd && rangePreview ? <button type="button" onClick={() => onAction(position, "rebalance", rangePreset)} disabled={actionBusy}>Adjust range</button> : null}
+            {canCollect ? <button type="button" onClick={() => onAction(position, "collect")} disabled={actionBusy}>Collect fees</button> : null}
+            {position.protocol !== "V2" && !position.closed ? <button type="button" onClick={() => onAction(position, "compound")} disabled={!hasCollectibleFees(position) || actionBusy} title="Collect and reinvest claimable fees into this position">Reinvest fees</button> : null}
+            <button className="position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")} disabled={position.closed || actionBusy}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button>
+          </div> : null}
+          {!canAdjustRange && canAdd ? <button className="position-withdraw-action" type="button" onClick={() => onAction(position, "withdraw")} disabled={actionBusy}>{positionSettlesToEth(position) ? "Withdraw to ETH" : "Withdraw"}</button> : null}
+          {canAdjustRange ? <button className="position-more-action" type="button" aria-expanded={moreOpen} aria-controls="position-more-actions" onClick={() => setMoreOpen((open) => !open)} disabled={actionBusy}>{moreOpen ? "Less" : "More"}</button> : null}
+        </>}
       </footer> : null}
     </section>
   </div>;
@@ -1277,37 +1328,53 @@ function positionVenueLabel(position: PositionView): string {
   return position.venueLabel ?? position.protocol;
 }
 
+function allocationVenueLabel(market: AllocationPlan["markets"][number]): string {
+  if (market.venue === "aerodrome-slipstream") return "Aerodrome Slipstream";
+  if (market.protocol === "V2") return "Uniswap V2";
+  if (market.protocol === "V4") return "Uniswap V4";
+  return "Uniswap V3";
+}
+
+function allocationRangeLabel(market: AllocationPlan["markets"][number], catalogMarket: CuratedMarket): string {
+  return market.protocol === "V2" ? "full range" : `±${catalogMarket.rangeWidthPct.toFixed(0)}% range`;
+}
+
 function positionActionTitle(plan: AnyPositionActionPlan | null, state: PlanState): string {
   if (!plan) return "Preparing your position";
   if (state.kind === "submitted") {
     if (plan.kind === "withdraw") return plan.settlement?.asset === "ETH" ? `${plan.pair} withdrawn to ETH` : `${plan.pair} withdrawn`;
     if (plan.kind === "rebalance") return `${plan.pair} rebalanced`;
+    if (plan.kind === "increase") return `Liquidity added to ${plan.pair}`;
     if (plan.kind === "collect") return `${plan.pair} fees collected`;
-    return `${plan.pair} fees compounded`;
+    return `${plan.pair} fees reinvested`;
   }
   if (plan.kind === "withdraw") return plan.settlement?.asset === "ETH" ? `Withdraw ${plan.pair} to ETH` : `Withdraw ${plan.pair}`;
   if (plan.kind === "rebalance") return `Rebalance ${plan.pair}`;
+  if (plan.kind === "increase") return `Add liquidity to ${plan.pair}`;
   if (plan.kind === "collect") return `Collect ${plan.pair} fees`;
-  return `Compound ${plan.pair} fees`;
+  return `Reinvest ${plan.pair} fees`;
 }
 
 function positionActionButtonLabel(plan: AnyPositionActionPlan | null): string {
   if (plan?.kind === "withdraw") return plan.settlement?.asset === "ETH" ? "Withdraw to ETH" : "Withdraw";
   if (plan?.kind === "rebalance") return "Rebalance";
+  if (plan?.kind === "increase") return "Add liquidity";
   if (plan?.kind === "collect") return "Collect fees";
-  return "Compound";
+  return "Reinvest fees";
 }
 
 function positionActionSuccessLabel(plan: AnyPositionActionPlan | null): string {
   if (plan?.kind === "withdraw") return plan.settlement?.asset === "ETH" ? "ETH returned" : "Position withdrawn";
   if (plan?.kind === "rebalance") return "Position rebalanced";
+  if (plan?.kind === "increase") return "Liquidity added";
   if (plan?.kind === "collect") return "Fees collected";
-  return "Fees compounded";
+  return "Fees reinvested";
 }
 
 function positionActionSuccessMessage(plan: AnyPositionActionPlan, settlesToEth: boolean): string {
   if (plan.kind === "withdraw") return settlesToEth ? "Your ETH is back in your wallet." : "Your pool tokens are back in your wallet.";
   if (plan.kind === "rebalance") return "Your position is earning in its new range.";
+  if (plan.kind === "increase") return "Your added liquidity is now in this position.";
   if (plan.kind === "collect") return "Your fees are in your wallet.";
   return "Your fees are back at work.";
 }
@@ -1326,12 +1393,11 @@ function positionActionDescription(
     return `Move liquidity from ticks ${plan.range.previousTickLower}–${plan.range.previousTickUpper} to the ${plan.range.preset} range ${plan.range.tickLower}–${plan.range.tickUpper}.`;
   }
   if (plan.kind === "rebalance") return "Move this liquidity into a new range around the current price.";
+  if (plan.kind === "increase" && plan.funding) {
+    return `Add ${trimEth(BigInt(plan.funding.amountWei))} ETH to this exact position without changing its range. Wizzy does not charge for this action.`;
+  }
   if (plan.kind === "collect") return "Return all claimable fees to your wallet without changing the position.";
   return "Collect and reinvest the fees ready to claim.";
-}
-
-function formatServiceFee(serviceFeeBps: number): string {
-  return `${(serviceFeeBps / 100).toFixed(serviceFeeBps % 100 === 0 ? 0 : 2)}% Wizzy fee`;
 }
 
 function PortfolioEmpty({ variant, onPrimary }: {
@@ -1391,6 +1457,14 @@ function hasInsufficientBalance(amount: string, balance: BalanceState | null): b
   if (balance?.kind !== "ready" || balance.balanceWei === undefined) return false;
   try {
     return parseEther(amount || "0") > BigInt(balance.balanceWei);
+  } catch {
+    return false;
+  }
+}
+
+function isPositiveEthAmount(amount: string): boolean {
+  try {
+    return parseEther(amount || "0") > 0n;
   } catch {
     return false;
   }
@@ -1468,6 +1542,7 @@ function VenueTrail({ chain, protocol }: { chain: MarketChain; protocol: Curated
 }
 
 function WalletIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3H6.5a1.5 1.5 0 0 0 0 3H20v8H6a2 2 0 0 1-2-2V7.5Z"/><circle cx="16.5" cy="15" r="1.25"/></svg>; }
+function SearchIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5" /><path d="m15 15 4 4" /></svg>; }
 function ChevronIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 9 5 5 5-5" /></svg>; }
 function ExternalLinkIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M17 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h5" /></svg>; }
 function CloseIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>; }

@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { getCuratorConfig } from "./config.js";
-import { evaluateMarket, proposeReplacements, type CuratorSnapshot, type MarketEvaluation } from "./policy.js";
+import { evaluateMarket, proposeAdmissions, type CuratorSnapshot, type MarketEvaluation } from "./policy.js";
 import { collectCuratorObservations } from "./sources.js";
 import { discoverCuratorCandidates, type CuratorDiscovery } from "./discovery.js";
 
@@ -14,7 +14,7 @@ export type CuratorReport = {
   snapshotCadenceMinutes: number;
   evaluations: MarketEvaluation[];
   discoveries: CuratorDiscovery[];
-  replacements: ReturnType<typeof proposeReplacements>;
+  admissions: ReturnType<typeof proposeAdmissions>;
 };
 
 export function defaultCuratorStateDir(): string {
@@ -63,10 +63,10 @@ export function renderCuratorMarkdown(report: CuratorReport): string {
   const discoveries = report.discoveries.length
     ? report.discoveries.map((row) => `| ${row.symbol} | ${row.chain} | ${[...new Set(row.venues.map((venue) => venue.protocol))].join(" + ")} | ${row.kind === "venue" && row.executionReady ? `add to ${row.marketId}` : row.kind === "candidate" && row.executionReady ? "candidate" : "research"} | $${Math.round(row.liquidityUsd).toLocaleString("en-US")} | $${Math.round(row.volume24hUsd).toLocaleString("en-US")} | ${row.poolAgeDays.toFixed(0)}d | ${row.sourceUrl} |`).join("\n")
     : "| — | — | — | — | — | — | — | No new policy-qualified leads. |";
-  const replacements = report.replacements.length
-    ? report.replacements.map((row) => `- ${row.chain}: replace ${row.incumbentSymbol} with ${row.candidateSymbol} (${row.qualityAdvantage >= 0 ? "+" : ""}${row.qualityAdvantage} quality, ${(row.liquidityRatio * 100).toFixed(0)}% liquidity, ${row.aprMultiple.toFixed(1)}× fee pace)`).join("\n")
+  const admissions = report.admissions.length
+    ? report.admissions.map((row) => `- ${row.chain}: add ${row.candidateSymbol} (${row.qualityScore}/100 quality${row.estimatedCapacityUsd === null ? "" : `, $${Math.round(row.estimatedCapacityUsd).toLocaleString("en-US")} cautious entry capacity`})`).join("\n")
     : "- None.";
-  return `# Wizzy market curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live market set. This report supplies evidence and policy-valid proposals for the curator agent to apply through the normal tested deployment path. Fee pace is a trailing observation, not a promise or a standalone selection rule.\n\n| Market | Chain | Set | Call | LP quality | Median TVL | Median 24h volume | Median fee pace | History |\n|---|---|---:|---|---:|---:|---:|---:|---:|\n${table}\n\n## Discovery leads\n\nLeads pass the pool-age, aggregate liquidity, aggregate volume, WETH-pair, and supported Uniswap V2/V3/V4 gates. V2 and V4-only leads stay research-only until a supported V3 primary pool is identified; V4 PoolIds also need a verified hooks-bearing pool key before calldata can be prepared.\n\n| Token | Chain | Venues | Route | TVL | 24h volume | Pool age | Source |\n|---|---|---|---|---:|---:|---:|---|\n${discoveries}\n\n## Replacements\n\n${replacements}\n`;
+  return `# Wizzy market curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live market set. This report supplies evidence and policy-valid additions for the curator agent to apply through the normal tested deployment path. Fee pace is a trailing observation, not a promise or a standalone selection rule.\n\n| Market | Chain | Set | Call | LP quality | Median TVL | Median 24h volume | Median fee pace | History |\n|---|---|---:|---|---:|---:|---:|---:|---:|\n${table}\n\n## Discovery inventory\n\nDiscovery is intentionally broad. Indexed pools may sit below activation policy; that makes them observable, not depositable. Uniswap V2/V3/V4 and Aerodrome Slipstream leads remain research-only until their execution metadata is verified.\n\n| Token | Chain | Venues | Route | TVL | 24h volume | Pool age | Source |\n|---|---|---|---|---:|---:|---:|---|\n${discoveries}\n\n## Eligible additions\n\n${admissions}\n`;
 }
 
 export async function runCurator(options: { stateDir?: string; persist?: boolean; observedAt?: string } = {}): Promise<CuratorReport> {
@@ -97,7 +97,7 @@ export async function runCurator(options: { stateDir?: string; persist?: boolean
     snapshotCadenceMinutes: config.policy.snapshotMinutes,
     evaluations,
     discoveries,
-    replacements: proposeReplacements(evaluations, config.policy),
+    admissions: proposeAdmissions(evaluations),
   };
   if (options.persist !== false) {
     await mkdir(stateDir, { recursive: true, mode: 0o700 });

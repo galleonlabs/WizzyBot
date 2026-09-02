@@ -4,6 +4,15 @@ type HostedPortfolioSurface = {
   getMarketCatalog: () => unknown;
   getSolanaMarketCatalog: () => unknown;
   fetchMarketStats: () => Promise<unknown>;
+  selectBestMarketVenue: (chain: "base" | "robinhood", marketId: string) => Promise<{
+    methodology: "venue-quality-v1";
+    selectedKey: "PRIMARY" | "V2" | "V4";
+    selectedProtocol: "V2" | "V3" | "V4" | "AERODROME_SLIPSTREAM";
+    selectedPoolReference: `0x${string}`;
+    switched: boolean;
+    confidence: "high" | "guarded" | "fallback";
+    decisionReasons: string[];
+  }>;
   fetchRecentPoolActivity: () => Promise<{
     items: Array<{
       id: string;
@@ -37,7 +46,8 @@ type HostedPortfolioSurface = {
     owner: string;
     chain: "base" | "robinhood";
     tokenId: bigint;
-    action: "collect" | "compound" | "rebalance" | "withdraw";
+    action: "collect" | "compound" | "increase" | "rebalance" | "withdraw";
+    amountWei?: bigint;
     protocol?: "V2" | "V3" | "V4";
     venue?: "uniswap-v3" | "aerodrome-slipstream";
     positionManager?: string;
@@ -63,6 +73,7 @@ const hosted = loadHostedPortfolio();
 export const getMarketCatalog = hosted.getMarketCatalog;
 export const getSolanaMarketCatalog = hosted.getSolanaMarketCatalog;
 export const fetchMarketStats = hosted.fetchMarketStats;
+export const selectBestMarketVenue = hosted.selectBestMarketVenue;
 export const fetchRecentPoolActivity = hosted.fetchRecentPoolActivity;
 export const mergePoolActivityItems = hosted.mergePoolActivityItems;
 export const fetchSolanaMarketStats = hosted.fetchSolanaMarketStats;

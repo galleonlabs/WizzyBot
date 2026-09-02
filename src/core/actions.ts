@@ -8,10 +8,8 @@ import type {
   PlannedAction,
   PlannedTx,
   PositionSnapshot,
-  TreasuryFee,
 } from "../types.js";
 import { evaluateEconomics } from "./economics.js";
-import { netAfterTake, resolveActionFee } from "./fees.js";
 import { recenterSameWidth } from "./ticks.js";
 import { shouldExitAtPrice, shouldRerange } from "./range.js";
 
@@ -27,55 +25,6 @@ export interface PlanContext {
   gasUsd: number;
   takeBps: number;
   takeBaseUsd?: number;
-}
-
-function recipients(
-  fee: TreasuryFee | null,
-  owner: Address,
-  protocol: PositionSnapshot["ref"]["protocol"] = "V3",
-  chainId = 8453,
-): Address[] {
-  const out = new Set<Address>([writeTarget(protocol, chainId), owner]);
-  if (fee && !fee.skipped && (fee.amount0 > 0n || fee.amount1 > 0n)) {
-    out.add(fee.recipient);
-  }
-  return [...out];
-}
-
-function feeTransfers(fee: TreasuryFee | null): PlannedAction[] {
-  if (!fee || fee.skipped) return [];
-  const actions: PlannedAction[] = [];
-  if (fee.amount0 > 0n) {
-    actions.push({
-      kind: "transfer",
-      description: `treasury take ${fee.bps} bps token0`,
-      tokenIn: fee.token0,
-      amountIn: fee.amount0,
-      recipient: fee.recipient,
-      tx: {
-        to: fee.token0,
-        data: "0x",
-        value: 0n,
-        description: `ERC20 transfer token0 → treasury ${fee.recipient}`,
-      },
-    });
-  }
-  if (fee.amount1 > 0n) {
-    actions.push({
-      kind: "transfer",
-      description: `treasury take ${fee.bps} bps token1`,
-      tokenIn: fee.token1,
-      amountIn: fee.amount1,
-      recipient: fee.recipient,
-      tx: {
-        to: fee.token1,
-        data: "0x",
-        value: 0n,
-        description: `ERC20 transfer token1 → treasury ${fee.recipient}`,
-      },
-    });
-  }
-  return actions;
 }
 
 function collectAction(position: PositionSnapshot, recipient: Address): PlannedAction {
@@ -119,21 +68,9 @@ export function planCompound(
     gasUsd: ctx.gasUsd,
     minFeeUsd: ctx.minFeeUsd,
     minPositionUsd: ctx.minPositionUsd,
-    takeBps: ctx.takeBps,
-    noFee: ctx.noFee,
+    takeBps: 0,
+    noFee: true,
     takeBaseUsd: ctx.takeBaseUsd,
-  });
-
-  const fee = resolveActionFee({
-    action: "compound",
-    feeSource: "fees",
-    noFee: ctx.noFee,
-    uncollected0: position.uncollected0,
-    uncollected1: position.uncollected1,
-    notional0: position.amount0,
-    notional1: position.amount1,
-    token0: position.token0.address,
-    token1: position.token1.address,
   });
 
   if (econ.skip) {
@@ -146,22 +83,17 @@ export function planCompound(
       from: ctx.owner,
       to: [],
       actions: [],
-      treasuryFee: fee,
+      treasuryFee: null,
       txs: [],
     };
   }
 
-  const leftover = netAfterTake(
-    position.uncollected0,
-    position.uncollected1,
-    fee.amount0,
-    fee.amount1,
-  );
+  const leftover = {
+    amount0: position.uncollected0,
+    amount1: position.uncollected1,
+  };
 
-  const actions: PlannedAction[] = [
-    collectAction(position, ctx.owner),
-    ...feeTransfers(fee),
-  ];
+  const actions: PlannedAction[] = [collectAction(position, ctx.owner)];
 
   if (!opts.skipSwap && leftover.amount0 > 0n && leftover.amount1 > 0n) {
     actions.push({
@@ -189,7 +121,7 @@ export function planCompound(
     },
   });
 
-  return receipt("compound", position, ctx, actions, fee);
+  return receipt("compound", position, ctx, actions);
 }
 
 export function planRerange(
@@ -239,8 +171,8 @@ export function planRerange(
     gasUsd: ctx.gasUsd,
     minFeeUsd: ctx.minFeeUsd,
     minPositionUsd: ctx.minPositionUsd,
-    takeBps: ctx.takeBps,
-    noFee: ctx.noFee,
+    takeBps: 0,
+    noFee: true,
     takeBaseUsd: ctx.takeBaseUsd,
   });
 
@@ -258,18 +190,6 @@ export function planRerange(
       txs: [],
     };
   }
-
-  const fee = resolveActionFee({
-    action: "rerange",
-    feeSource: ctx.feeSource,
-    noFee: ctx.noFee,
-    uncollected0: position.uncollected0,
-    uncollected1: position.uncollected1,
-    notional0: position.amount0,
-    notional1: position.amount1,
-    token0: position.token0.address,
-    token1: position.token1.address,
-  });
 
   const nextRange = recenterSameWidth(
     position.tickLower,
@@ -290,7 +210,6 @@ export function planRerange(
       },
     },
     collectAction(position, ctx.owner),
-    ...feeTransfers(fee),
     {
       kind: "mint",
       description: `mint same-width recenter ticks [${nextRange.tickLower}, ${nextRange.tickUpper}]`,
@@ -308,7 +227,7 @@ export function planRerange(
     },
   ];
 
-  const built = receipt("rerange", position, ctx, actions, fee);
+  const built = receipt("rerange", position, ctx, actions);
   return built;
 }
 
@@ -345,17 +264,6 @@ export function planExit(
   }
 
   if (position.ref.protocol === "V2") {
-    const fee = resolveActionFee({
-      action: "exit",
-      feeSource: ctx.feeSource,
-      noFee: ctx.noFee,
-      uncollected0: position.uncollected0,
-      uncollected1: position.uncollected1,
-      notional0: position.amount0,
-      notional1: position.amount1,
-      token0: position.token0.address,
-      token1: position.token1.address,
-    });
     const actions: PlannedAction[] = [
       {
         kind: "approve",
@@ -374,22 +282,9 @@ export function planExit(
           description: "Router02.removeLiquidity",
         },
       },
-      ...feeTransfers(fee),
     ];
-    return receipt("exit", position, ctx, actions, fee);
+    return receipt("exit", position, ctx, actions);
   }
-
-  const fee = resolveActionFee({
-    action: "exit",
-    feeSource: ctx.feeSource,
-    noFee: ctx.noFee,
-    uncollected0: position.uncollected0,
-    uncollected1: position.uncollected1,
-    notional0: position.amount0,
-    notional1: position.amount1,
-    token0: position.token0.address,
-    token1: position.token1.address,
-    });
 
   const actions: PlannedAction[] = [
     {
@@ -403,7 +298,6 @@ export function planExit(
       },
     },
     collectAction(position, ctx.owner),
-    ...feeTransfers(fee),
   ];
 
   if (opts.swapTo) {
@@ -433,7 +327,7 @@ export function planExit(
     },
   });
 
-  return receipt("exit", position, ctx, actions, fee);
+  return receipt("exit", position, ctx, actions);
 }
 
 function receipt(
@@ -441,7 +335,6 @@ function receipt(
   position: PositionSnapshot,
   ctx: PlanContext,
   actions: PlannedAction[],
-  fee: TreasuryFee | null,
 ): ActionReceipt {
   const txs: PlannedTx[] = actions
     .map((a) => a.tx)
@@ -452,9 +345,9 @@ function receipt(
     skipped: false,
     tokenId: position.ref.tokenId,
     from: ctx.owner,
-    to: recipients(fee, ctx.owner, position.ref.protocol, position.ref.chainId),
+    to: [writeTarget(position.ref.protocol, position.ref.chainId), ctx.owner],
     actions,
-    treasuryFee: fee,
+    treasuryFee: null,
     txs,
   };
 }

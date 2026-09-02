@@ -2,7 +2,6 @@ import { decodeEventLog, getAddress, isAddress, zeroAddress, type Hex } from "vi
 import type { AchievementAction } from "./achievements.js";
 
 export const ROBINHOOD_POSITION_MANAGER = getAddress("0x73991a25c818bf1f1128deaab1492d45638de0d3");
-export const WIZZY_TREASURY = getAddress("0x2520B4BA71D2a026803cce0e5C72eDa4a20B0C42");
 
 const positionManagerEvents = [
   {
@@ -35,16 +34,6 @@ const positionManagerEvents = [
     ],
   },
 ] as const;
-
-const erc20TransferEvent = [{
-  type: "event",
-  name: "Transfer",
-  inputs: [
-    { name: "from", type: "address", indexed: true },
-    { name: "to", type: "address", indexed: true },
-    { name: "value", type: "uint256", indexed: false },
-  ],
-}] as const;
 
 export type QuestReceipt = {
   status: "success" | "reverted";
@@ -80,18 +69,6 @@ export function verifyQuestActionReceipt(input: {
   const decreases = events.filter((event) => event.eventName === "DecreaseLiquidity");
   const transfers = events.filter((event) => event.eventName === "Transfer");
   const increasedExpected = increases.some((event) => event.args.tokenId === expectedTokenId);
-  const paidWizzy = input.receipt.logs.some((log) => {
-    if (sameAddress(log.address, ROBINHOOD_POSITION_MANAGER)) return false;
-    try {
-      const event = decodeEventLog({ abi: erc20TransferEvent, data: log.data, topics: [...log.topics] as [Hex, ...Hex[]] });
-      return event.eventName === "Transfer" && event.args.value > 0n &&
-        sameAddress(event.args.to, WIZZY_TREASURY) &&
-        input.walletAddresses.some((address) => sameAddress(address, event.args.from));
-    } catch {
-      return false;
-    }
-  });
-  if (!paidWizzy) throw new Error("transaction did not include Wizzy's disclosed fee");
 
   if (input.action === "compound") {
     if (!increasedExpected || decreases.some((event) => event.args.tokenId === expectedTokenId)) {

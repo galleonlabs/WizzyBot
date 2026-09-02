@@ -7,7 +7,7 @@ export type Intent =
   | { verb: "status"; tokenId?: bigint; owner?: string; protocol: Protocol }
   | { verb: "list"; owner?: string; protocol: Protocol }
   | { verb: "mint"; token0?: string; token1?: string; fee?: number; widthPct?: number; tickLower?: number; tickUpper?: number; amount?: string; protocol: Protocol }
-  | { verb: "compound"; tokenId: bigint; noFee?: boolean; protocol: Protocol }
+  | { verb: "compound"; tokenId: bigint; protocol: Protocol }
   | { verb: "rerange"; tokenId: bigint; oorPercent?: number; protocol: Protocol }
   | { verb: "exit"; tokenId: bigint; swapTo?: string; protocol: Protocol }
   | { verb: "simulate"; action?: SimulateAction; tokenId?: bigint; protocol: Protocol }
@@ -57,7 +57,7 @@ export function parseIntent(text: string): Intent {
   if (/\b(compound|reinvest)\b/.test(lower)) {
     const tokenId = captureTokenId(raw);
     if (tokenId === undefined) return { verb: "unknown", text: raw };
-    return { verb: "compound", tokenId, noFee: /\bno-?fee\b/.test(lower), protocol };
+    return { verb: "compound", tokenId, protocol };
   }
 
   if (/\b(range|re-?range|rerange|recenter|auto-?range)\b/.test(lower)) {
@@ -115,7 +115,7 @@ export function confirmPhrase(intent: Intent): string {
   const proto = protocolOf(intent).toLowerCase();
   switch (intent.verb) {
     case "compound":
-      return `Compound tokenId ${intent.tokenId}${intent.noFee ? " with --no-fee" : ""} protocol=${proto}? Type yes to broadcast.`;
+      return `Compound tokenId ${intent.tokenId} protocol=${proto}? Type yes to broadcast.`;
     case "rerange":
       return `Re-range tokenId ${intent.tokenId} protocol=${proto}? Type yes to broadcast.`;
     case "exit":

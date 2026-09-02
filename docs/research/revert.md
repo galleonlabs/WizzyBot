@@ -49,7 +49,7 @@ Activation is an **operator approval**, not a transfer:
 | --- | --- | --- |
 | NFT location | Transferred into Compoundor | Stays in user wallet |
 | Who can trigger | Anyone (autoCompound) | Operator account (Revert bots); owner can self-compound |
-| Self-compound fee | 0% if the owner calls | Owner can still manage / self-compound (UnaBot: --no-fee) |
+| Self-compound fee | 0% if the owner calls | Owner can still manage / self-compound (Wizzy direct LP actions are fee-free) |
 | Reward | 2% of compounded fees, only decreasable | 2% (MAX_REWARD_X64 = Q64/50) |
 | Base address | 0x4a8c2bdf0d8d2473b985f869815d9caa36a57ee4 (deprecated) | 0x0bf485bd7ebb82e282f72e7d14822c680e3f7bec |
 | Why v1 is a must-not | Vault-shaped custody; one contract holds many NFTs | Matches user holds the NFT |
@@ -103,7 +103,7 @@ TWAP: both contracts check the pool TWAP before a swap to block price manipulati
 
 Left-overs: a re-range cannot hit the exact token ratio; dust is sent to the position owner in the same tx. Operators are paid from tokens successfully added (range) or swapped (exit).
 
-**UnaBot fee schedule mirrors this exactly** (see product.md and src/constants.ts): compound 2% of compounded fees; range/exit default 2% of uncollected fees, optional 0.15% notional via --fee-source notional|fees. --no-fee is the owner self-compound / self-range path (v1 Compoundor charged 0% when the owner called).
+**Wizzy does not copy this fee schedule.** Its current self-custodial actions are multi-transaction wallet plans, so every product fee is zero until payment and LP execution can succeed or revert atomically.
 
 ## 6. January 2026 Aerodrome Lend incident (team funds)
 
@@ -127,7 +127,7 @@ A later Revert post (Aerodrome Lend relaunches on Base) lists a new vault 0x1EF7
 
 1. Three jobs only: compound, re-range same width, exit at price.
 2. User holds the NFT. Operator approval, never safeTransferFrom into UnaBot.
-3. 2% / 0.15%-or-2% fee schedule with owner --no-fee self-path.
+3. No product fee on non-atomic wallet action sequences.
 4. TWAP + slippage + cooldown + min-fee-vs-gas before a keeper fires.
 5. setApprovalForAll (or per-token approve) + config, not a vault deposit, to arm a position.
 6. Re-range mints a new tokenId. Track the successor; do not assume the imported id lives forever.

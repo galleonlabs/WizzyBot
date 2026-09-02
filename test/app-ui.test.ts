@@ -128,7 +128,7 @@ describe("meme yield curator surface", () => {
     expect(positionRow).toContain("<RangeStrip view={view} ethUsd={ethUsd} />");
     expect(positionRow).toContain('className={`row-action tip ${className}`} data-kind={kind} data-tip={tip} aria-label={tip}');
     expect(positionRow).toContain("takes more than one transaction");
-    expect(portfolio).toContain('<thead><tr><th>Position</th><th>Value</th><th>Unclaimed fees</th><th>Range</th><th>Pool APR · 24h</th><th>Actions</th></tr></thead>');
+    expect(portfolio).toContain('<thead><tr><th>Position</th><th>Value</th><th>Unclaimed fees</th><th>Range</th><th>Pool APR</th><th>Actions</th></tr></thead>');
     expect(portfolio).toContain('className="positions-stats"');
     expect(portfolio).not.toMatch(/lp-card|PositionCard|portfolio-summary/);
     expect(existsSync("app/positions/position-card.tsx")).toBe(false);

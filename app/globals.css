@@ -654,13 +654,15 @@ svg {
 .positions-stats dt { color: var(--muted-2); font-size: 9px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
 .positions-stats dd { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 650; letter-spacing: -.03em; }
 .positions-note { max-width: 34ch; color: var(--muted-2); font-size: 10px; line-height: 1.45; text-align: right; }
-.positions-table th:first-child { width: 25%; }
-.positions-table th:nth-child(2),
-.positions-table th:nth-child(3) { width: 14%; }
-.positions-table th:nth-child(4) { width: 23%; }
-.positions-table th:nth-child(5) { width: 10%; }
-.positions-table th:nth-child(6) { width: 14%; }
+/* Doubled selectors outrank the generic market-table column widths declared later. */
+.market-table.positions-table th:first-child { width: 24%; }
+.market-table.positions-table th:nth-child(2),
+.market-table.positions-table th:nth-child(3) { width: 15%; }
+.market-table.positions-table th:nth-child(4) { width: 22%; }
+.market-table.positions-table th:nth-child(5) { width: 9%; }
+.market-table.positions-table th:nth-child(6) { width: 15%; }
 .positions-table td { padding-block: 13px; }
+.positions-table .cell-stack small { white-space: nowrap; }
 .position-row.is-oor td:first-child { box-shadow: inset 3px 0 0 var(--orange); }
 .position-row.is-in-range td:first-child { box-shadow: inset 3px 0 0 var(--mint); }
 .cell-stack { display: grid; gap: 3px; }
@@ -668,13 +670,13 @@ svg {
 .cell-stack small { color: var(--muted-2); font-size: 10px; }
 .muted { color: var(--muted-2) !important; font-weight: 650 !important; }
 
-.range-strip { display: grid; gap: 6px; min-width: 150px; }
+.range-strip { display: grid; gap: 6px; min-width: 0; }
 .range-strip-track { position: relative; display: block; height: 8px; border-radius: 4px; background: var(--surface-3); }
 .range-strip-band { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: color-mix(in srgb, var(--mint) 62%, var(--surface-3)); }
 .range-strip.is-oor .range-strip-band { background: color-mix(in srgb, var(--orange) 62%, var(--surface-3)); }
 .range-strip.is-closed .range-strip-band { background: var(--line-strong); }
 .range-strip-price { position: absolute; top: -3px; width: 2px; height: 14px; border-radius: 1px; background: var(--ink); box-shadow: 0 0 0 2px var(--surface); transform: translateX(-1px); }
-.range-strip-labels { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.range-strip-labels { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; }
 .range-strip-labels small { color: var(--muted-2); font-size: 9px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .range-strip-status { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-soft); font-size: 9px; font-weight: 750; white-space: nowrap; }
 .range-strip-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); }
@@ -846,13 +848,13 @@ svg {
 .pool-toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pool-sort { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 8px 0 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted-2); font-size: 10px; font-weight: 750; }
 .pool-sort select { border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 10px; font-weight: 750; outline: 0; }
-.pool-table th:first-child { width: 26%; }
-.pool-table th:nth-child(2),
-.pool-table th:nth-child(3),
-.pool-table th:nth-child(4) { width: 11%; }
-.pool-table th:nth-child(5) { width: 7%; }
-.pool-table th:nth-child(6) { width: 16%; }
-.pool-table th:nth-child(7) { width: 18%; }
+.market-table.pool-table th:first-child { width: 26%; }
+.market-table.pool-table th:nth-child(2),
+.market-table.pool-table th:nth-child(3),
+.market-table.pool-table th:nth-child(4) { width: 11%; }
+.market-table.pool-table th:nth-child(5) { width: 7%; }
+.market-table.pool-table th:nth-child(6) { width: 16%; }
+.market-table.pool-table th:nth-child(7) { width: 18%; }
 .pool-table tr.is-reviewed td:first-child { box-shadow: inset 3px 0 0 var(--mint); }
 .pool-fee { color: var(--muted-2); font-size: 10px; font-weight: 700; }
 .pool-flags { display: flex; flex-wrap: wrap; gap: 4px; }

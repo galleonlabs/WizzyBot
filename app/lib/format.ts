@@ -39,8 +39,9 @@ export function formatPercent(value?: number | null, digits = 1): string {
 export function compactTokenAmount(formatted: string): string {
   const numeric = Number(formatted.replaceAll(",", ""));
   if (!Number.isFinite(numeric)) return formatted;
-  if (numeric >= 100_000) return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(numeric);
-  if (numeric >= 1) return new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(numeric);
+  if (numeric >= 10_000) return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(numeric);
+  if (numeric >= 100) return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(numeric);
+  if (numeric >= 1) return new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 }).format(numeric);
   if (numeric === 0) return "0";
   return trimZeros(numeric.toFixed(Math.min(12, Math.max(4, 3 - Math.floor(Math.log10(numeric))))));
 }

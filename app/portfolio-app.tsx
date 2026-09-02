@@ -536,7 +536,7 @@ function PositionsPage({ authenticated, positions, chainState, ethUsdFor, poolFo
         <span className="positions-note">In-app actions settle in one transaction. Anything multi-step opens on the venue.</span>
       </div>
       <table className="market-table positions-table">
-        <thead><tr><th>Position</th><th>Value</th><th>Unclaimed fees</th><th>Range</th><th>Pool APR · 24h</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Position</th><th>Value</th><th>Unclaimed fees</th><th>Range</th><th>Pool APR</th><th>Actions</th></tr></thead>
         <tbody>
           {sorted.map((position) => <PositionRow
             key={positionKey(position)}

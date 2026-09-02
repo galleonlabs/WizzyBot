@@ -1,5 +1,5 @@
 import type { Config } from "wagmi";
-import { getAccount, sendTransaction, switchChain, waitForTransactionReceipt } from "wagmi/actions";
+import { estimateGas, getAccount, sendTransaction, switchChain, waitForTransactionReceipt } from "wagmi/actions";
 
 export type WalletTransaction = {
   to: `0x${string}`;
@@ -43,12 +43,22 @@ export async function sendPlanTransactions(input: {
   const total = transactions.length;
   for (const [index, transaction] of transactions.entries()) {
     input.onProgress?.({ step: index + 1, total, description: transaction.description });
-    const hash = await sendTransaction(config, {
+    const request = {
       chainId,
+      account: account.address,
       to: transaction.to,
       data: transaction.data,
       value: toWeiBigInt(transaction.value),
-    });
+    } as const;
+    try {
+      // Estimate immediately before every signature, after the prior receipt.
+      // This catches changed allowances, balances, ranges, and deadlines before
+      // the wallet is asked to submit a transaction that can no longer land.
+      await estimateGas(config, request);
+    } catch {
+      throw new Error(`"${transaction.description}" is no longer executable. Nothing after it was submitted. Review a fresh quote.`);
+    }
+    const hash = await sendTransaction(config, request);
     const receipt = await waitForTransactionReceipt(config, { chainId, hash, timeout: 180_000 });
     if (receipt.status !== "success") {
       throw new Error(`"${transaction.description}" reverted onchain. Nothing after it was submitted.`);

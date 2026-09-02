@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const actions = vi.hoisted(() => ({
+  estimateGas: vi.fn(),
   getAccount: vi.fn(),
   sendTransaction: vi.fn(),
   switchChain: vi.fn(),
@@ -21,6 +22,7 @@ describe("external wallet plan execution", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     actions.getAccount.mockReturnValue({ address: OWNER, chainId: 4663 });
+    actions.estimateGas.mockResolvedValue(100_000n);
     actions.sendTransaction.mockResolvedValueOnce(`0x${"a".repeat(64)}`).mockResolvedValueOnce(`0x${"b".repeat(64)}`);
     actions.waitForTransactionReceipt.mockResolvedValue({ status: "success" });
   });
@@ -47,9 +49,11 @@ describe("external wallet plan execution", () => {
       onProgress: ({ step, total, description }) => progress.push(`${step}/${total} ${description}`),
     });
     expect(actions.switchChain).not.toHaveBeenCalled();
+    expect(actions.estimateGas).toHaveBeenCalledTimes(2);
     expect(actions.sendTransaction).toHaveBeenCalledTimes(2);
     expect(actions.sendTransaction).toHaveBeenNthCalledWith(2, CONFIG, {
       chainId: 4663,
+      account: OWNER,
       to: PLAN[1]!.to,
       data: PLAN[1]!.data,
       value: 50000000000000000n,
@@ -69,6 +73,21 @@ describe("external wallet plan execution", () => {
     actions.waitForTransactionReceipt.mockResolvedValueOnce({ status: "reverted" });
     await expect(sendPlanTransactions({ config: CONFIG, owner: OWNER, chainId: 4663, transactions: PLAN }))
       .rejects.toThrow(/"Approve WETH" reverted onchain/);
+    expect(actions.sendTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("simulates every step after the prior receipt and stops before signing stale calldata", async () => {
+    const order: string[] = [];
+    actions.estimateGas
+      .mockImplementationOnce(async () => { order.push("simulate-1"); return 100_000n; })
+      .mockImplementationOnce(async () => { order.push("simulate-2"); throw new Error("execution reverted"); });
+    actions.sendTransaction.mockReset();
+    actions.sendTransaction.mockImplementationOnce(async () => { order.push("send-1"); return `0x${"a".repeat(64)}`; });
+    actions.waitForTransactionReceipt.mockImplementationOnce(async () => { order.push("receipt-1"); return { status: "success" }; });
+
+    await expect(sendPlanTransactions({ config: CONFIG, owner: OWNER, chainId: 4663, transactions: PLAN }))
+      .rejects.toThrow(/"Mint the position" is no longer executable/);
+    expect(order).toEqual(["simulate-1", "send-1", "receipt-1", "simulate-2"]);
     expect(actions.sendTransaction).toHaveBeenCalledTimes(1);
   });
 });

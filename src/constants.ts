@@ -71,7 +71,9 @@ export const FEE_AMOUNT_TICK_SPACING: Record<number, number> = {
 export const ZERO_ADDR: Address = ADDRESSES.nativeEth;
 export const EMPTY_HEX: Hex = "0x";
 
-export const DEFAULT_DEADLINE_SEC = 600;
+/** Leaves enough time for a user to confirm every step in a wallet batch. */
+export const WALLET_PLAN_DEADLINE_SEC = 30 * 60;
+export const DEFAULT_DEADLINE_SEC = WALLET_PLAN_DEADLINE_SEC;
 export const DEFAULT_SLIPPAGE_BPS = 50;
 export const DEFAULT_MIN_POSITION_USD = 50;
 export const DEFAULT_MIN_FEE_USD = 1;

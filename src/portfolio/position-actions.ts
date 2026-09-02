@@ -32,6 +32,7 @@ import { permit2ApproveTx, poolKeyFromPosition, v4BurnTx, v4ClaimFeesTx, v4Curre
 import { quoterV2Abi } from "../chain/abi.js";
 import { fittedLiquidityAmounts, liquidityForAmounts } from "../core/hydrate.js";
 import { planAllocation, type AllocationPlan, type SerializableTx } from "./allocation.js";
+import { WALLET_PLAN_DEADLINE_SEC } from "../constants.js";
 
 const PLAN_TTL_MS = 8 * 60_000;
 const WITHDRAW_FEE_SAFETY_BPS = 9_800n;
@@ -179,9 +180,9 @@ export function buildIncreasePositionActionPlan(
             amount0: fitted!.amount0,
             amount1: fitted!.amount1,
             slippageBps: 150,
-            deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+            deadlineSec: WALLET_PLAN_DEADLINE_SEC,
           })
-        : increaseCalldata(snapshot, add0, add1, 150, Math.floor(PLAN_TTL_MS / 1_000));
+        : increaseCalldata(snapshot, add0, add1, 150, WALLET_PLAN_DEADLINE_SEC);
 
   let replacedMint = false;
   const transactions = allocation.transactions.map((transaction) => {
@@ -544,12 +545,12 @@ export function buildRebalancePositionActionPlan(
             liquidity: snapshot.liquidity,
             amount0Min: (snapshot.amount0 * (BPS - WITHDRAW_SWAP_SLIPPAGE_BPS)) / BPS,
             amount1Min: (snapshot.amount1 * (BPS - WITHDRAW_SWAP_SLIPPAGE_BPS)) / BPS,
-            deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+            deadlineSec: WALLET_PLAN_DEADLINE_SEC,
           }),
           collectSlipstreamTx(positionManager, snapshot.ref.tokenId, owner),
           burnSlipstreamTx(positionManager, snapshot.ref.tokenId),
         ]
-    : [decreaseCalldata(snapshot, 100, owner, 150, Math.floor(PLAN_TTL_MS / 1_000), true)];
+    : [decreaseCalldata(snapshot, 100, owner, 150, WALLET_PLAN_DEADLINE_SEC, true)];
   if (swap) {
     const inputToken = swap.tokenIn.toLowerCase() === snapshot.token0.address.toLowerCase() ? snapshot.token0 : snapshot.token1;
     const outputToken = swap.tokenOut.toLowerCase() === snapshot.token0.address.toLowerCase() ? snapshot.token0 : snapshot.token1;
@@ -566,7 +567,7 @@ export function buildRebalancePositionActionPlan(
           amountIn: swap.amountIn,
           amountOutMin: swap.minimumAmountOut,
           recipient: owner,
-          deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+          deadlineSec: WALLET_PLAN_DEADLINE_SEC,
         })
       : exactInV3Tx({
         tokenIn: swap.tokenIn,
@@ -600,7 +601,7 @@ export function buildRebalancePositionActionPlan(
       amount1: add1,
       recipient: owner,
       slippageBps: 150,
-      deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+      deadlineSec: WALLET_PLAN_DEADLINE_SEC,
       chainId: snapshot.ref.chainId,
     }));
   } else if (aerodrome) {
@@ -617,7 +618,7 @@ export function buildRebalancePositionActionPlan(
       amount1: add1,
       recipient: owner,
       slippageBps: 150,
-      deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+      deadlineSec: WALLET_PLAN_DEADLINE_SEC,
     }));
   } else {
     if (add0 > 0n) transactions.push(erc20ApproveTx(snapshot.token0.address, positionManager, add0));
@@ -630,7 +631,7 @@ export function buildRebalancePositionActionPlan(
       amount1: add1,
       recipient: owner,
       slippageBps: 150,
-      deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+      deadlineSec: WALLET_PLAN_DEADLINE_SEC,
     }));
   }
   const allowedTargets = uniqueAddresses([
@@ -688,9 +689,9 @@ function compoundTransactions(
         amount0: add0,
         amount1: add1,
         slippageBps: 150,
-        deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+        deadlineSec: WALLET_PLAN_DEADLINE_SEC,
       })
-    : increaseCalldata(snapshot, add0, add1, 150, Math.floor(PLAN_TTL_MS / 1_000)));
+    : increaseCalldata(snapshot, add0, add1, 150, WALLET_PLAN_DEADLINE_SEC));
   return txs;
 }
 
@@ -708,11 +709,11 @@ function withdrawTransactions(
           liquidity: snapshot.liquidity,
           amount0Min: (snapshot.amount0 * 9_850n) / BPS,
           amount1Min: (snapshot.amount1 * 9_850n) / BPS,
-          deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+          deadlineSec: WALLET_PLAN_DEADLINE_SEC,
         }),
         collectSlipstreamTx(manager, snapshot.ref.tokenId, owner),
       ]
-    : [decreaseCalldata(snapshot, 100, owner, 150, Math.floor(PLAN_TTL_MS / 1_000), true)];
+    : [decreaseCalldata(snapshot, 100, owner, 150, WALLET_PLAN_DEADLINE_SEC, true)];
   if (snapshot.venue === "aerodrome-slipstream") txs.push(burnSlipstreamTx(manager, snapshot.ref.tokenId));
   return txs;
 }

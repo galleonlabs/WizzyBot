@@ -278,8 +278,10 @@ describe("meme market maker UI", () => {
     expect(portfolio).not.toContain("Index updated");
     expect(portfolio).not.toContain("/api/portfolio/migrate");
     expect(portfolio).toContain("sameAddress(zapPlan.owner, address)");
-    expect(portfolio).toContain("owner: zapPlan.owner");
-    expect(portfolio).toContain("owner: actionPlan.owner");
+    expect(portfolio).toContain("const freshPlan = await requestAllocationPlan");
+    expect(portfolio).toContain("const freshPlan = await requestPositionActionPlan");
+    expect(portfolio).toContain("transactions: freshPlan.transactions");
+    expect(portfolio).toContain('cache: "no-store"');
   });
 
   it("keeps wallet costs and preview data honest", () => {
@@ -295,6 +297,8 @@ describe("meme market maker UI", () => {
     expect(allocationRoute).toContain("marketId: z.string().min(1)");
     expect(allocationRoute).not.toMatch(/marketIds|planDual|\"both\"/);
     expect(allocationSource).toContain("const markets = activeMarkets(input.chain, [input.marketId])");
+    expect(allocationSource).toContain("const postSwapSqrtPriceX96 = quoteResult.result[1]");
+    expect(allocationSource).toContain("tickCurrent: postSwapTick");
     expect(allocationSource).not.toContain("weightBps");
     expect(portfolioTypes).not.toMatch(/MemeIndex|DualChain|IndexMigration|weightBps/);
     expect(hostedBundle).not.toMatch(/index-plan|dual-chain|index-migration|index-selection/);
@@ -444,7 +448,7 @@ describe("meme market maker UI", () => {
   });
 
   it("clears the completed deposit celebration after an ETH withdrawal", () => {
-    expect(portfolio).toContain('if (actionPlan.kind === "withdraw")');
+    expect(portfolio).toContain('if (freshPlan.kind === "withdraw")');
     expect(portfolio).toContain('setZapState({ kind: "idle" });');
   });
 
@@ -462,7 +466,11 @@ describe("meme market maker UI", () => {
     expect(portfolio).toContain('const canAdjustRange = (position.protocol === "V3" || position.protocol === "V4") && position.chain !== "solana" && !position.closed');
     expect(positionActionRoute).toContain('z.enum(["collect", "compound", "increase", "rebalance", "withdraw"])');
     expect(positionActionRoute).toContain('rangePreset: z.enum(["focused", "balanced", "wide"]).optional()');
-    expect(portfolio).toContain('role="dialog" aria-modal="true" aria-labelledby="position-manager-title"');
+    expect(portfolio).toContain('className="position-manager" id={id} aria-label={`Manage ${position.pair}`}');
+    expect(portfolio).toContain('className={`position-list-item ${expanded ? "is-expanded" : ""}`}');
+    expect(portfolio).toContain('aria-expanded={expanded} aria-controls={managerId}');
+    expect(portfolio).not.toContain('className="position-manager-backdrop"');
+    expect(css).not.toContain(".position-manager-backdrop");
     expect(portfolio).toContain('onAction(position, "collect")');
     expect(portfolio).toContain('onAction(position, "rebalance", rangePreset)');
     expect(portfolio).toContain('role="group" aria-label="Range width"');
@@ -485,7 +493,7 @@ describe("meme market maker UI", () => {
   it("does not promise ETH for V2 or V4 withdrawals", () => {
     expect(portfolio).toContain("positionSettlesToEth(position)");
     expect(portfolio).toContain('position.protocol !== "V2"');
-    expect(portfolio).toContain('actionPlan.settlement?.asset === "ETH"');
+    expect(portfolio).toContain('freshPlan.settlement?.asset === "ETH"');
   });
 
   it("ships wallet-scoped XP and quests tied to confirmed product actions", () => {

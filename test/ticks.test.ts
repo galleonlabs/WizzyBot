@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { nearestUsableTick } from "@uniswap/v3-sdk";
-import { rangeFromWidthPct, recenterRangeForPreset, recenterSameWidth, snapRange, snapTick, tickSpacingForFee } from "../src/core/ticks.js";
+import { nearestUsableTick, TickMath } from "@uniswap/v3-sdk";
+import { rangeFromWidthPct, recenterRangeForPreset, recenterSameWidth, snapRange, snapTick, tickAtSqrtPriceX96, tickSpacingForFee } from "../src/core/ticks.js";
 
 describe("tick snap", () => {
+  it("derives the exact tick from a quoter post-swap price", () => {
+    for (const tick of [-158_040, -600, 0, 12_345]) {
+      const sqrtPriceX96 = BigInt(TickMath.getSqrtRatioAtTick(tick).toString());
+      expect(tickAtSqrtPriceX96(sqrtPriceX96)).toBe(tick);
+    }
+    const tick = 1_234;
+    const lower = BigInt(TickMath.getSqrtRatioAtTick(tick).toString());
+    const upper = BigInt(TickMath.getSqrtRatioAtTick(tick + 1).toString());
+    expect(tickAtSqrtPriceX96(lower + ((upper - lower) / 2n))).toBe(tick);
+  });
+
   it("snaps to fee-tier spacing via v3-sdk nearestUsableTick", () => {
     expect(tickSpacingForFee(500)).toBe(10);
     expect(tickSpacingForFee(3000)).toBe(60);

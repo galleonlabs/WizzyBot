@@ -320,13 +320,42 @@ export function PortfolioApp() {
     window.open(`${BRIDGE_URLS[chain]}?toAddress=${address}`, "_blank", "noopener,noreferrer");
   }
 
+  async function requestPositionActionPlan(input: {
+    position: PositionView;
+    action: PositionActionKind;
+    amountWei?: string;
+    rangePreset?: RangePreset;
+  }): Promise<AnyPositionActionPlan> {
+    if (!address || !input.position.tokenId || !input.position.chain) throw new Error("Connect your wallet first.");
+    const response = await fetch("/api/portfolio/action", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        owner: address,
+        chain: input.position.chain,
+        tokenId: input.position.tokenId,
+        action: input.action,
+        amountWei: input.amountWei,
+        protocol: input.position.protocol === "V2" || input.position.protocol === "V3" || input.position.protocol === "V4" ? input.position.protocol : undefined,
+        venue: input.position.venue,
+        positionManager: input.position.positionManager,
+        rangePreset: input.action === "rebalance" ? input.rangePreset : undefined,
+      }),
+    });
+    const payload = await readJsonPayload(response) as { plan?: AnyPositionActionPlan; error?: string };
+    if (!response.ok || !payload.plan) throw new Error(payload.error ?? `Could not prepare ${input.action}`);
+    return payload.plan;
+  }
+
   async function preparePositionAction(position: PositionView, action: PositionActionKind, rangePreset?: RangePreset, amount?: string) {
     if (!address || !position.tokenId || !position.chain) return;
-    let amountWei: bigint | undefined;
+    let amountWei: string | undefined;
     if (action === "increase") {
       try {
-        amountWei = parseEther(amount ?? "0");
-        if (amountWei <= 0n) throw new Error("Enter an ETH amount to add.");
+        const parsedAmount = parseEther(amount ?? "0");
+        if (parsedAmount <= 0n) throw new Error("Enter an ETH amount to add.");
+        amountWei = parsedAmount.toString();
       } catch {
         setActionPlan(null);
         setActionState({ kind: "error", message: "Enter a valid ETH amount." });
@@ -346,24 +375,8 @@ export function PortfolioApp() {
     setActionPlan(null);
     setActionState({ kind: "planning", message: `${planningVerb} ${position.pair}…` });
     try {
-      const response = await fetch("/api/portfolio/action", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          owner: address,
-          chain: position.chain,
-          tokenId: position.tokenId,
-          action,
-          amountWei: amountWei?.toString(),
-          protocol: position.protocol === "V2" || position.protocol === "V3" || position.protocol === "V4" ? position.protocol : undefined,
-          venue: position.venue,
-          positionManager: position.positionManager,
-          rangePreset: action === "rebalance" ? rangePreset : undefined,
-        }),
-      });
-      const payload = await readJsonPayload(response) as { plan?: AnyPositionActionPlan; error?: string };
-      if (!response.ok || !payload.plan) throw new Error(payload.error ?? `Could not prepare ${action}`);
-      setActionPlan(payload.plan);
+      const plan = await requestPositionActionPlan({ position, action, amountWei, rangePreset });
+      setActionPlan(plan);
       const message = action === "collect"
         ? "Review the fees returning to your wallet."
         : action === "compound"
@@ -382,21 +395,32 @@ export function PortfolioApp() {
 
   async function executePositionAction() {
     if (!actionPlan || !address) return;
-    if (Date.now() >= Date.parse(actionPlan.expiresAt)) {
-      setActionState({ kind: "error", message: "This quote expired. Prepare it again." });
+    if (!sameAddress(actionPlan.owner, address)) {
+      setActionPlan(null);
+      setActionState({ kind: "error", message: "Your wallet changed. Review this action again." });
       return;
     }
     try {
-      const settlesToEth = actionPlan.kind === "withdraw" && actionPlan.settlement?.asset === "ETH";
+      const position = positions.find((candidate) => candidate.chain === actionPlan.chain && candidate.tokenId === actionPlan.tokenId);
+      if (!position) throw new Error("This position changed. Reload it before continuing.");
+      setActionState({ kind: "planning", message: "Refreshing the position and checking the latest chain state…" });
+      const freshPlan = await requestPositionActionPlan({
+        position,
+        action: actionPlan.kind,
+        amountWei: actionPlan.funding?.amountWei,
+        rangePreset: actionPlan.range?.preset,
+      });
+      setActionPlan(freshPlan);
+      const settlesToEth = freshPlan.kind === "withdraw" && freshPlan.settlement?.asset === "ETH";
       setActionState({ kind: "signing", message: "Approve this position update in your wallet." });
       const confirmedEvm = await sendEvmBatch({
-        owner: actionPlan.owner,
-        chainId: actionPlan.chainId,
-        transactions: actionPlan.transactions,
+        owner: freshPlan.owner,
+        chainId: freshPlan.chainId,
+        transactions: freshPlan.transactions,
         onStep: (message) => setActionState({ kind: "waiting", message }),
       });
       await Promise.all([loadPositions(), loadBalances()]);
-      if (actionPlan.kind === "withdraw") {
+      if (freshPlan.kind === "withdraw") {
         // The exit invalidates the earlier zap celebration. Returning to Make
         // must show a fresh form, never a stale "Market made" state.
         setZapPlan(null);
@@ -404,18 +428,18 @@ export function PortfolioApp() {
       }
       setActionState({
         kind: "submitted",
-        message: positionActionSuccessMessage(actionPlan, settlesToEth),
+        message: positionActionSuccessMessage(freshPlan, settlesToEth),
       });
-      if ((actionPlan.kind === "compound" || actionPlan.kind === "rebalance") && actionPlan.chain === "robinhood" && confirmedEvm) {
+      if ((freshPlan.kind === "compound" || freshPlan.kind === "rebalance") && freshPlan.chain === "robinhood" && confirmedEvm) {
         const transactionHashes = confirmedEvm.transactionHashes;
         if (transactionHashes.length) void achievementActionRef.current?.({
-          action: actionPlan.kind,
+          action: freshPlan.kind,
           chainId: 4663,
-          tokenId: actionPlan.tokenId,
+          tokenId: freshPlan.tokenId,
           transactionHashes,
         });
       }
-      trackProductEvent(actionPlan.kind === "withdraw" ? "Withdrawal Confirmed" : actionPlan.kind === "rebalance" ? "Rebalance Confirmed" : actionPlan.kind === "increase" ? "Liquidity Increased" : actionPlan.kind === "collect" ? "Fees Collected" : "Compound Confirmed", { chainId: actionPlan.chainId });
+      trackProductEvent(freshPlan.kind === "withdraw" ? "Withdrawal Confirmed" : freshPlan.kind === "rebalance" ? "Rebalance Confirmed" : freshPlan.kind === "increase" ? "Liquidity Increased" : freshPlan.kind === "collect" ? "Fees Collected" : "Compound Confirmed", { chainId: freshPlan.chainId });
     } catch (error) {
       setActionState({ kind: "error", message: error instanceof Error ? error.message : "Wallet submission failed" });
       reportClientError("position-action", error);
@@ -427,6 +451,23 @@ export function PortfolioApp() {
     setZapPlan(null);
     setZapState({ kind: "idle" });
     trackProductEvent("Zap Opened", { marketId });
+  }
+
+  async function requestAllocationPlan(input: { owner: string; chain: ChainSlug; amountWei: string; marketId: string }): Promise<AllocationPlan> {
+    const response = await fetch("/api/portfolio/allocate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        owner: input.owner,
+        chain: input.chain,
+        amountWei: input.amountWei,
+        marketId: input.marketId,
+      }),
+    });
+    const payload = await readJsonPayload(response) as { plan?: AllocationPlan; error?: string };
+    if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not quote this market");
+    return payload.plan;
   }
 
   async function prepareZap(marketId: string) {
@@ -449,19 +490,8 @@ export function PortfolioApp() {
     setZapState({ kind: "planning", message: "Quoting the pool…" });
     setZapPlan(null);
     try {
-      const response = await fetch("/api/portfolio/allocate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          owner: address,
-          chain: selected.chain,
-          amountWei: amountWei.toString(),
-          marketId,
-        }),
-      });
-      const payload = await readJsonPayload(response) as { plan?: AllocationPlan; error?: string };
-      if (!response.ok || !payload.plan) throw new Error(payload.error ?? "Could not quote this market");
-      setZapPlan(payload.plan);
+      const plan = await requestAllocationPlan({ owner: address, chain: selected.chain, amountWei: amountWei.toString(), marketId });
+      setZapPlan(plan);
       setZapState({ kind: "ready", message: "Review the position, then confirm in your wallet." });
       trackProductEvent("Zap Quote Ready", { marketId });
     } catch (error) {
@@ -477,22 +507,28 @@ export function PortfolioApp() {
       setZapState({ kind: "error", message: "Your wallet changed. Review a fresh quote before continuing." });
       return;
     }
-    if (Date.now() >= Date.parse(zapPlan.expiresAt)) {
-      setZapState({ kind: "error", message: "This quote expired. Quote it again." });
-      return;
-    }
     try {
+      const marketId = zapPlan.markets[0]?.marketId;
+      if (!marketId) throw new Error("This market quote is incomplete. Review it again.");
+      setZapState({ kind: "planning", message: "Refreshing the pool quote and checking the latest chain state…" });
+      const freshPlan = await requestAllocationPlan({
+        owner: address,
+        chain: zapPlan.chain,
+        amountWei: zapPlan.amountWei,
+        marketId,
+      });
+      setZapPlan(freshPlan);
       setZapState({ kind: "signing", message: "Approve the market in your wallet." });
       await sendEvmBatch({
-        owner: zapPlan.owner,
-        chainId: zapPlan.chainId,
-        transactions: zapPlan.transactions,
+        owner: freshPlan.owner,
+        chainId: freshPlan.chainId,
+        transactions: freshPlan.transactions,
         onStep: (message) => setZapState({ kind: "waiting", message }),
       });
       await loadPositions();
       setZapState({ kind: "submitted", message: "Market made. Your position NFT is in your wallet." });
       setZapPlan(null);
-      trackProductEvent("Zap Confirmed", { marketId: zapMarketId });
+      trackProductEvent("Zap Confirmed", { marketId });
     } catch (error) {
       setZapState({ kind: "error", message: error instanceof Error ? error.message : "The market could not be made" });
       reportClientError("market-submit", error);
@@ -1002,43 +1038,6 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
   const settlement = actionPlan?.settlement;
   const actionBusy = actionState.kind === "planning" || actionState.kind === "signing" || actionState.kind === "waiting";
 
-  useEffect(() => {
-    if (!managedPosition) return;
-    const previousOverflow = document.body.style.overflow;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !actionBusy) {
-        onCancel();
-        setManagedKey(null);
-        return;
-      }
-      if (event.key === "Tab") {
-        const focusable = [...document.querySelectorAll<HTMLButtonElement>(".position-manager button:not(:disabled)")];
-        if (!focusable.length) return;
-        const first = focusable[0]!;
-        const last = focusable.at(-1)!;
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [actionBusy, managedPosition, onCancel]);
-
-  function closeManager() {
-    if (actionBusy) return;
-    onCancel();
-    setManagedKey(null);
-  }
-
   return (
     <section className={`position-ledger ${authenticated ? "" : "is-disconnected"}`} id="positions">
       {actionState.kind !== "idle" && !managedPosition ? <PositionActionReview plan={actionPlan} state={actionState} settlement={settlement} onExecute={onExecute} onCancel={onCancel} /> : null}
@@ -1046,28 +1045,31 @@ function PositionLedger({ authenticated, positions, state, markets, stats, onSta
       {authenticated && (state === "idle" || state === "loading") ? <PortfolioEmpty variant="loading" /> : null}
       {authenticated && state === "error" ? <PortfolioEmpty variant="error" onPrimary={onRetry} /> : null}
       {authenticated && state === "ready" && positions.length === 0 ? <PortfolioEmpty variant="empty" onPrimary={onStart} /> : null}
-      {showPositions ? <div className="position-list">{positions.map((position) => <article key={positionKey(position)}>
-        <span className="position-pair"><TokenIcon symbol={position.symbol0} src={positionTokenImage(position, markets, stats)} /><span><b>{position.pair}</b><small>{position.chainLabel} · {positionVenueLabel(position)}</small></span></span>
-        <span><small>Position value</small><b>{positionValueLabel(position)}</b></span>
-        <span><small>Ready to collect</small><b>{positionFeesLabel(position)}</b></span>
-        <PositionRangeStatus position={position} />
-        <button className="position-manage" type="button" onClick={() => { onCancel(); setManagedKey(positionKey(position)); }}>Manage</button>
-      </article>)}</div> : null}
-      {managedPosition && typeof document !== "undefined" ? createPortal(
-        <PositionManager
-          position={managedPosition}
-          image={positionTokenImage(managedPosition, markets, stats)}
-          actionPlan={actionPlan}
-          actionState={actionState}
-          onAction={onAction}
-          onExecute={onExecute}
-          onCancel={onCancel}
-          onClose={closeManager}
-          balance={managedPosition.chain === "base" || managedPosition.chain === "robinhood" ? balances?.[managedPosition.chain] ?? null : null}
-          onFund={onFund}
-        />,
-        document.body,
-      ) : null}
+      {showPositions ? <div className="position-list">{positions.map((position) => {
+        const key = positionKey(position);
+        const expanded = managedKey === key;
+        const managerId = `position-manager-${position.chain}-${position.tokenId}`;
+        return <div className={`position-list-item ${expanded ? "is-expanded" : ""}`} key={key}>
+          <article>
+            <span className="position-pair"><TokenIcon symbol={position.symbol0} src={positionTokenImage(position, markets, stats)} /><span><b>{position.pair}</b><small>{position.chainLabel} · {positionVenueLabel(position)}</small></span></span>
+            <span><small>Position value</small><b>{positionValueLabel(position)}</b></span>
+            <span><small>Ready to collect</small><b>{positionFeesLabel(position)}</b></span>
+            <PositionRangeStatus position={position} />
+            <button className="position-manage" type="button" aria-expanded={expanded} aria-controls={managerId} disabled={actionBusy} onClick={() => { onCancel(); setManagedKey(expanded ? null : key); }}>{expanded ? "Done" : "Manage"}</button>
+          </article>
+          {expanded ? <PositionManager
+            id={managerId}
+            position={position}
+            actionPlan={actionPlan}
+            actionState={actionState}
+            onAction={onAction}
+            onExecute={onExecute}
+            onCancel={onCancel}
+            balance={position.chain === "base" || position.chain === "robinhood" ? balances?.[position.chain] ?? null : null}
+            onFund={onFund}
+          /> : null}
+        </div>;
+      })}</div> : null}
     </section>
   );
 }
@@ -1088,15 +1090,14 @@ function PositionActionReview({ plan, state, settlement, onExecute, onCancel }: 
   </section>;
 }
 
-function PositionManager({ position, image, actionPlan, actionState, onAction, onExecute, onCancel, onClose, balance, onFund }: {
+function PositionManager({ id, position, actionPlan, actionState, onAction, onExecute, onCancel, balance, onFund }: {
+  id: string;
   position: PositionView;
-  image?: string | null;
   actionPlan: AnyPositionActionPlan | null;
   actionState: PlanState;
   onAction: (position: PositionView, action: PositionActionKind, rangePreset?: RangePreset, amount?: string) => void;
   onExecute: () => void;
   onCancel: () => void;
-  onClose: () => void;
   balance: BalanceState | null;
   onFund: (chain: ChainSlug) => void;
 }) {
@@ -1133,12 +1134,7 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
   useEffect(() => {
     if (actionPlan?.kind === "increase" && actionState.kind === "submitted") setAddOpen(false);
   }, [actionPlan?.kind, actionState.kind]);
-  return <div className="position-manager-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="position-manager" role="dialog" aria-modal="true" aria-labelledby="position-manager-title">
-      <header className="position-manager-header">
-        <span className="position-pair"><TokenIcon symbol={position.symbol0} src={image} /><span><b id="position-manager-title">{position.pair}</b><small>{position.chainLabel} · {positionVenueLabel(position)} · {position.feeLabel}</small></span></span>
-        <button className="position-manager-close" type="button" onClick={onClose} aria-label="Close position manager" autoFocus>Close</button>
-      </header>
+  return <section className="position-manager" id={id} aria-label={`Manage ${position.pair}`}>
       <div className="position-manager-scroll">
         <section className="position-manager-value">
           <small>Position value</small>
@@ -1181,8 +1177,7 @@ function PositionManager({ position, image, actionPlan, actionState, onAction, o
           {canAdjustRange ? <button className="position-more-action" type="button" aria-expanded={moreOpen} aria-controls="position-more-actions" onClick={() => setMoreOpen((open) => !open)} disabled={actionBusy}>{moreOpen ? "Less" : "More"}</button> : null}
         </>}
       </footer> : null}
-    </section>
-  </div>;
+  </section>;
 }
 
 function PositionRangePlanner({ position, preset, preview, previousTickLower, previousTickUpper, disabled, onPreset }: {

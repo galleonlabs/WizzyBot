@@ -18,6 +18,8 @@ import { activeMarkets, chainCatalog, type CuratedMarket } from "../markets/cata
 import { slipstreamPoolAbi, slipstreamQuoterV2Abi } from "../aerodrome/abi.js";
 import { exactInSlipstreamTx, mintSlipstreamTx } from "../aerodrome/calldata.js";
 import { aerodromeDeployment } from "../aerodrome/deployments.js";
+import { WALLET_PLAN_DEADLINE_SEC } from "../constants.js";
+import { tickAtSqrtPriceX96 } from "../core/ticks.js";
 
 const BPS = 10_000n;
 const SWAP_SHARE_BPS = 5_000n;
@@ -380,8 +382,7 @@ async function quoteUniswapMarket(
   const wethForMint = budget - swapIn;
   if (swapIn <= 0n || wethForMint <= 0n) throw new Error(`${market.id} allocation is too small`);
 
-  const [slot0, token0Address, token1Address, quoteResult] = await Promise.all([
-    client.readContract({ address: market.pool, abi: poolAbi, functionName: "slot0" }),
+  const [token0Address, token1Address, quoteResult] = await Promise.all([
     client.readContract({ address: market.pool, abi: poolAbi, functionName: "token0" }),
     client.readContract({ address: market.pool, abi: poolAbi, functionName: "token1" }),
     client.simulateContract({
@@ -403,6 +404,8 @@ async function quoteUniswapMarket(
   }
   const quotedMemeOut = quoteResult.result[0];
   if (quotedMemeOut <= 0n) throw new Error(`${market.id} returned no swap output`);
+  const postSwapSqrtPriceX96 = quoteResult.result[1];
+  const postSwapTick = tickAtSqrtPriceX96(postSwapSqrtPriceX96);
   const minimumMemeOut = (quotedMemeOut * (BPS - SWAP_SLIPPAGE_BPS)) / BPS;
 
   const quoteToken: TokenRef = { address: market.quoteToken, symbol: market.quoteSymbol, decimals: market.quoteDecimals };
@@ -422,8 +425,10 @@ async function quoteUniswapMarket(
     token1,
     fee: market.fee,
     tickSpacing: market.tickSpacing,
-    sqrtPriceX96: slot0[0],
-    tickCurrent: slot0[1],
+    // The swap executes before the mint and can materially move a thin pool.
+    // Build the range and token ratio from the quoter's post-swap state.
+    sqrtPriceX96: postSwapSqrtPriceX96,
+    tickCurrent: postSwapTick,
     pool: market.pool,
     widthPct: market.rangeWidthPct,
     amount0Desired,
@@ -439,7 +444,7 @@ async function quoteUniswapMarket(
     amount1: mintQuote.amount1,
     recipient: owner,
     slippageBps: Number(SWAP_SLIPPAGE_BPS),
-    deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+    deadlineSec: WALLET_PLAN_DEADLINE_SEC,
   });
   const swap = exactInV3Tx({
     tokenIn: market.quoteToken,
@@ -449,7 +454,7 @@ async function quoteUniswapMarket(
     amountOutMin: minimumMemeOut,
     recipient: owner,
     payerIsUser: true,
-    deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+    deadlineSec: WALLET_PLAN_DEADLINE_SEC,
     chainId,
   });
 
@@ -495,8 +500,7 @@ async function quoteAerodromeMarket(
   const swapIn = (budget * SWAP_SHARE_BPS) / BPS;
   const wethForMint = budget - swapIn;
   if (swapIn <= 0n || wethForMint <= 0n) throw new Error(`${market.id} allocation is too small`);
-  const [slot0, token0Address, token1Address, factory, nft, liveFee, tickSpacing, quoteResult] = await Promise.all([
-    client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "slot0" }),
+  const [token0Address, token1Address, factory, nft, liveFee, tickSpacing, quoteResult] = await Promise.all([
     client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "token0" }),
     client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "token1" }),
     client.readContract({ address: market.pool, abi: slipstreamPoolAbi, functionName: "factory" }),
@@ -525,6 +529,8 @@ async function quoteAerodromeMarket(
   if (tickSpacing !== market.tickSpacing) throw new Error(`${market.id} Aerodrome tick spacing changed`);
   const quotedMemeOut = quoteResult.result[0];
   if (quotedMemeOut <= 0n) throw new Error(`${market.id} returned no swap output`);
+  const postSwapSqrtPriceX96 = quoteResult.result[1];
+  const postSwapTick = tickAtSqrtPriceX96(postSwapSqrtPriceX96);
   const minimumMemeOut = (quotedMemeOut * (BPS - SWAP_SLIPPAGE_BPS)) / BPS;
   const quoteToken: TokenRef = { address: market.quoteToken, symbol: market.quoteSymbol, decimals: market.quoteDecimals };
   const memeToken: TokenRef = { address: market.token, symbol: market.symbol, decimals: market.tokenDecimals };
@@ -540,8 +546,8 @@ async function quoteAerodromeMarket(
     token1,
     fee: liveFee,
     tickSpacing,
-    sqrtPriceX96: slot0[0],
-    tickCurrent: slot0[1],
+    sqrtPriceX96: postSwapSqrtPriceX96,
+    tickCurrent: postSwapTick,
     pool: market.pool,
     widthPct: market.rangeWidthPct,
     amount0Desired,
@@ -557,7 +563,7 @@ async function quoteAerodromeMarket(
     amountIn: swapIn,
     amountOutMin: minimumMemeOut,
     recipient: owner,
-    deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+    deadlineSec: WALLET_PLAN_DEADLINE_SEC,
   });
   const mint = mintSlipstreamTx({
     positionManager: deployment.positionManager,
@@ -570,7 +576,7 @@ async function quoteAerodromeMarket(
     amount1: mintQuote.amount1,
     recipient: owner,
     slippageBps: Number(SWAP_SLIPPAGE_BPS),
-    deadlineSec: Math.floor(PLAN_TTL_MS / 1_000),
+    deadlineSec: WALLET_PLAN_DEADLINE_SEC,
   });
   return {
     market,

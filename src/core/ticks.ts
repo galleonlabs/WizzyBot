@@ -114,6 +114,22 @@ export function tickToPrice(tick: number): number {
   return Math.pow(1.0001, tick);
 }
 
+/** Exact tick corresponding to a Q64.96 pool price returned by a quoter. */
+export function tickAtSqrtPriceX96(sqrtPriceX96: bigint): number {
+  const minimum = BigInt(TickMath.MIN_SQRT_RATIO.toString());
+  const maximum = BigInt(TickMath.MAX_SQRT_RATIO.toString());
+  if (sqrtPriceX96 < minimum || sqrtPriceX96 >= maximum) throw new Error("sqrt price outside Uniswap bounds");
+  let low = TickMath.MIN_TICK;
+  let high = TickMath.MAX_TICK;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const middlePrice = BigInt(TickMath.getSqrtRatioAtTick(middle).toString());
+    if (middlePrice <= sqrtPriceX96) low = middle + 1;
+    else high = middle - 1;
+  }
+  return high;
+}
+
 export function assertTickBounds(tick: number): void {
   if (tick < TickMath.MIN_TICK || tick > TickMath.MAX_TICK) {
     throw new Error(`tick ${tick} outside Uniswap bounds`);

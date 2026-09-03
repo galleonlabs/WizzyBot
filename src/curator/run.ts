@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { getCuratorConfig } from "./config.js";
+import { getCuratorConfig, type CuratorPolicy } from "./config.js";
 import { evaluateMarket, proposeAdmissions, type CuratorSnapshot, type MarketEvaluation } from "./policy.js";
 import { collectCuratorObservations } from "./sources.js";
 import { discoverCuratorCandidates, type CuratorDiscovery } from "./discovery.js";
@@ -69,6 +69,21 @@ export function renderCuratorMarkdown(report: CuratorReport): string {
   return `# Wizzy market curator\n\nGenerated ${report.generatedAt}. The version-controlled market catalog remains the live market set. This report supplies evidence and policy-valid additions for the curator agent to apply through the normal tested deployment path. Fee pace is a trailing observation, not a promise or a standalone selection rule.\n\n| Market | Chain | Set | Call | LP quality | Median TVL | Median 24h volume | Median fee pace | History |\n|---|---|---:|---|---:|---:|---:|---:|---:|\n${table}\n\n## Discovery inventory\n\nDiscovery is intentionally broad. Indexed pools may sit below activation policy; that makes them observable, not depositable. Uniswap V2/V3/V4 and Aerodrome Slipstream leads remain research-only until their execution metadata is verified.\n\n| Token | Chain | Venues | Route | TVL | 24h volume | Pool age | Source |\n|---|---|---|---|---:|---:|---:|---|\n${discoveries}\n\n## Eligible additions\n\n${admissions}\n`;
 }
 
+export function evaluateCurrentMarketHistory(
+  observations: CuratorSnapshot["markets"],
+  currentMarketIds: ReadonlySet<string>,
+  policy: CuratorPolicy,
+): MarketEvaluation[] {
+  const byMarket = new Map<string, CuratorSnapshot["markets"]>();
+  for (const row of observations) {
+    if (!currentMarketIds.has(row.marketId)) continue;
+    const rows = byMarket.get(row.marketId) ?? [];
+    rows.push(row);
+    byMarket.set(row.marketId, rows);
+  }
+  return [...byMarket.values()].map((rows) => evaluateMarket(rows, policy));
+}
+
 export async function runCurator(options: { stateDir?: string; persist?: boolean; observedAt?: string } = {}): Promise<CuratorReport> {
   const config = getCuratorConfig();
   const observedAt = options.observedAt ?? new Date().toISOString();
@@ -82,13 +97,8 @@ export async function runCurator(options: { stateDir?: string; persist?: boolean
   const cutoff = Date.parse(observedAt) - config.policy.historyDays * 86_400_000;
   const history = await readSnapshots(historyPath, cutoff);
   history.push(snapshot);
-  const byMarket = new Map<string, typeof observations>();
-  for (const row of history.flatMap((entry) => entry.markets)) {
-    const rows = byMarket.get(row.marketId) ?? [];
-    rows.push(row);
-    byMarket.set(row.marketId, rows);
-  }
-  const evaluations = [...byMarket.values()].map((rows) => evaluateMarket(rows, config.policy));
+  const currentMarketIds = new Set(observations.map((row) => row.marketId));
+  const evaluations = evaluateCurrentMarketHistory(history.flatMap((entry) => entry.markets), currentMarketIds, config.policy);
   const report: CuratorReport = {
     version: 1,
     role: "curator",

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getCuratorConfig } from "../src/curator/config.js";
 import { evaluateMarket, proposeAdmissions, summarizeMarketHistory, type CuratorObservation } from "../src/curator/policy.js";
 import { decodeSolanaMintSecurity } from "../src/curator/sources.js";
-import { renderCuratorMarkdown, type CuratorReport } from "../src/curator/run.js";
+import { evaluateCurrentMarketHistory, renderCuratorMarkdown, type CuratorReport } from "../src/curator/run.js";
 
 const policy = getCuratorConfig().policy;
 
@@ -123,6 +123,15 @@ describe("market curator", () => {
     observations.at(-1)!.securityAvailable = false;
     expect(summarizeMarketHistory(observations, 60).latestSecurityAvailable).toBe(true);
     expect(evaluateMarket(observations, policy).recommendation).toBe("hold");
+  });
+
+  it("drops historical markets that are no longer configured", () => {
+    const current = history({ marketId: "base-current" });
+    const stale = history({ marketId: "base-removed" });
+    const evaluations = evaluateCurrentMarketHistory([...current, ...stale], new Set(["base-current"]), policy);
+
+    expect(evaluations.map((evaluation) => evaluation.marketId)).toEqual(["base-current"]);
+    expect(proposeAdmissions(evaluations).map((proposal) => proposal.candidateMarketId)).toEqual(["base-current"]);
   });
 
   it("proposes every independently eligible candidate without removing another market", () => {

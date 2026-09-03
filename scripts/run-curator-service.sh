@@ -48,7 +48,8 @@ cd "${worktree}"
   cat src/config/curator.json
   printf '\n```\n## Centralized market catalog\n```json\n'
   cat src/config/markets.json
-  printf '\n```\n'
+  printf '\n```\n## Final output gate\n'
+  printf '%s\n' 'Before emitting JSON, remove every candidate nomination unless its exact deterministic-report discovery has kind=candidate, executionReady=true and protocol=V3. Remove every venue addition unless its exact discovery has kind=venue, executionReady=true and protocol=V2. Remove every market admission unless it has both an exact deterministic-report admission and a previously reviewed candidate registry entry; a same-run nomination is not eligible. The summary must agree with the arrays.'
 } | timeout 45m codex --search -C "${worktree}" exec \
   --ephemeral \
   --sandbox read-only \
@@ -71,7 +72,7 @@ for path in "${changed[@]}"; do
 done
 
 {
-  "${UNABOT_BUN_BIN}" test
+  "${UNABOT_BUN_BIN}" run test
   "${UNABOT_BUN_BIN}" run typecheck
   "${UNABOT_BUN_BIN}" run build:web
 } >"${state_dir}/validation.log" 2>&1

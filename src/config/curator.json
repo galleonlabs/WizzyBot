@@ -1,6 +1,6 @@
 {
-  "version": 10,
-  "updatedAt": "2026-09-02",
+  "version": 11,
+  "updatedAt": "2026-09-04",
   "policy": {
     "snapshotMinutes": 360,
     "historyDays": 30,
@@ -28,6 +28,7 @@
       "feePips": 10000,
       "risk": "experimental",
       "identity": "reviewed",
+      "tokenDecimals": 18,
       "sources": [
         "https://www.geckoterminal.com/base/pools/0x5116773e18a9c7bb03ebb961b38678e45e238923",
         "https://basescan.org/token/0x3ec2156d4c0a9cbdab4a016633b7bcf6a8d68ea2",
@@ -45,6 +46,7 @@
       "feePips": 10000,
       "risk": "experimental",
       "identity": "reviewed",
+      "tokenDecimals": 18,
       "sources": [
         "https://www.geckoterminal.com/base/pools/0xaec085e5a5ce8d96a7bdd3eb3a62445d4f6ce703",
         "https://basescan.org/token/0x22af33fe49fd1fa80c7149773dde5890d3c76f3b",
@@ -61,7 +63,8 @@
       "symbol": "MICRODUCK",
       "feePips": 10000,
       "risk": "experimental",
-      "identity": "reviewed",
+      "identity": "watch",
+      "tokenDecimals": 18,
       "chain": "robinhood",
       "token": "0xD5f1afEA47b1A9eab414D2ee740cF1d6d039E725",
       "pool": "0xb87C3c63b53d19984f3b4A927e26B667e32087E8",
@@ -73,7 +76,8 @@
       "symbol": "GG",
       "feePips": 10000,
       "risk": "experimental",
-      "identity": "reviewed",
+      "identity": "watch",
+      "tokenDecimals": 18,
       "chain": "robinhood",
       "token": "0xcaCB0e9caCcee63ec4d82952E561a291c68Bcb68",
       "pool": "0xd89F6933a8eF11C2939054c0e287eCb327817242",
@@ -86,6 +90,7 @@
       "feePips": 10000,
       "risk": "experimental",
       "identity": "watch",
+      "tokenDecimals": 18,
       "chain": "robinhood",
       "token": "0x5317C0d077D2eEB639448939b930D49c4984B63B",
       "pool": "0xAd5eB1Fb22A06231a89f1b27c325F264572E2a54",
@@ -98,6 +103,7 @@
       "feePips": 5000,
       "risk": "emerging",
       "identity": "reviewed",
+      "tokenDecimals": 18,
       "chain": "solana",
       "token": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
       "pool": "qhJ7kLjrE68sbDF11CpwMt3P9rqiwZtretM5ZzeAX6o",
@@ -110,6 +116,7 @@
       "feePips": 2000,
       "risk": "emerging",
       "identity": "watch",
+      "tokenDecimals": 18,
       "chain": "solana",
       "token": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
       "pool": "6e7V9eegCHw997T72MxgwwJipZ6GJyZF8NvjkzT1rvpN",
@@ -122,16 +129,165 @@
       "feePips": 10000,
       "risk": "experimental",
       "identity": "reviewed",
-      "chain": "robinhood",
-      "token": "0x56910D4409F3a0C78C64DD8D0545FF0705389870",
-      "pool": "0xD29893fFac8b29eC4Db2cfE0CDB3FE1377c028Ff",
-      "protocol": "V3",
-      "liquidityVenues": [],
+      "tokenDecimals": 18,
       "sources": [
         "https://www.geckoterminal.com/robinhood/pools/0xd29893ffac8b29ec4db2cfe0cdb3fe1377c028ff",
         "https://robinhoodchain.blockscout.com/token/0x56910D4409F3a0C78C64DD8D0545FF0705389870",
         "https://theindex.finance/",
         "https://support.hibt.com/hc/en-us/articles/16871787800719-Hibt-Announcement-on-the-Upcoming-Listing-of-INDEX-The-Index"
+      ],
+      "chain": "robinhood",
+      "token": "0x56910D4409F3a0C78C64DD8D0545FF0705389870",
+      "pool": "0xD29893fFac8b29eC4Db2cfE0CDB3FE1377c028Ff",
+      "protocol": "V3",
+      "liquidityVenues": []
+    },
+    {
+      "id": "base-usdc-833589",
+      "name": "USD Coin",
+      "symbol": "USDC",
+      "feePips": 3000,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 6,
+      "chain": "base",
+      "token": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "pool": "0x6c561B446416E1A00E8E93E221854d6eA4171372",
+      "protocol": "V3",
+      "liquidityVenues": [
+        {
+          "protocol": "V2",
+          "pool": "0x88A43bbDF9D098eEC7bCEda4e2494615dfD9bB9C"
+        }
+      ],
+      "sources": [
+        "https://www.geckoterminal.com/base/pools/0x6c561b446416e1a00e8e93e221854d6ea4171372",
+        "https://basescan.org/token/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "https://developers.circle.com/stablecoins/usdc-contract-addresses"
+      ]
+    },
+    {
+      "id": "base-cbbtc-cbb7c0",
+      "name": "Coinbase Wrapped BTC",
+      "symbol": "cbBTC",
+      "feePips": 3000,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 8,
+      "chain": "base",
+      "token": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+      "pool": "0x8c7080564B5A792A33Ef2FD473fbA6364d5495e5",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/base/pools/0x8c7080564b5a792a33ef2fd473fba6364d5495e5",
+        "https://basescan.org/token/0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+        "https://www.coinbase.com/en-fr/cbbtc",
+        "https://www.coinbase.com/en-es/cbbtc/proof-of-reserves"
+      ]
+    },
+    {
+      "id": "base-aero-940181",
+      "name": "Aerodrome",
+      "symbol": "AERO",
+      "feePips": 3000,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 18,
+      "chain": "base",
+      "token": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+      "pool": "0x3d5D143381916280ff91407FeBEB52f2b60f33Cf",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/base/pools/0x3d5d143381916280ff91407febeb52f2b60f33cf",
+        "https://basescan.org/token/0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+        "https://aerodrome.finance/security",
+        "https://aerodrome.finance/docs"
+      ]
+    },
+    {
+      "id": "robinhood-usdg-5fc536",
+      "name": "Global Dollar",
+      "symbol": "USDG",
+      "feePips": 100,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 6,
+      "chain": "robinhood",
+      "token": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      "pool": "0x52e65B17fB6E5BA00Ed806f37Afcd2DaA50271Ca",
+      "protocol": "V3",
+      "liquidityVenues": [
+        {
+          "protocol": "V2",
+          "pool": "0x8803c117ccae7B5146297876c2A25DF135141C4d"
+        }
+      ],
+      "sources": [
+        "https://www.geckoterminal.com/robinhood/pools/0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca",
+        "https://robinhoodchain.blockscout.com/token/0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "https://docs.robinhood.com/chain/contracts/"
+      ]
+    },
+    {
+      "id": "robinhood-spy-117cc2",
+      "name": "SPDR S&amp;P 500 ETF Trust • Robinhood Token",
+      "symbol": "SPY",
+      "feePips": 500,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 18,
+      "chain": "robinhood",
+      "token": "0x117cc2133c37B721F49dE2A7a74833232B3B4C0C",
+      "pool": "0xDDCBBa3666f578E3F09516f21Ff85BFee859AB5e",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/robinhood/pools/0xddcbba3666f578e3f09516f21ff85bfee859ab5e",
+        "https://robinhoodchain.blockscout.com/token/0x117cc2133c37B721F49dE2A7a74833232B3B4C0C",
+        "https://api.robinhood.com/rhj/assets",
+        "https://docs.robinhood.com/chain/stock-tokens/"
+      ]
+    },
+    {
+      "id": "robinhood-nvda-d0601c",
+      "name": "NVIDIA • Robinhood Token",
+      "symbol": "NVDA",
+      "feePips": 500,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 18,
+      "chain": "robinhood",
+      "token": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+      "pool": "0x62AB521f71431f78ac374CdbadC6cda3c8916b6C",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/robinhood/pools/0x62ab521f71431f78ac374cdbadc6cda3c8916b6c",
+        "https://robinhoodchain.blockscout.com/token/0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+        "https://docs.robinhood.com/chain/contracts/",
+        "https://docs.robinhood.com/chain/stock-tokens/"
+      ]
+    },
+    {
+      "id": "robinhood-aapl-af3d76",
+      "name": "Apple • Robinhood Token",
+      "symbol": "AAPL",
+      "feePips": 500,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 18,
+      "chain": "robinhood",
+      "token": "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
+      "pool": "0x8bb3514e2204E1cDF3Ac149EFEe7Ff04D91B719f",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/robinhood/pools/0x8bb3514e2204e1cdf3ac149efee7ff04d91b719f",
+        "https://robinhoodchain.blockscout.com/token/0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
+        "https://api.robinhood.com/rhj/assets",
+        "https://docs.robinhood.com/chain/stock-tokens/"
       ]
     }
   ]

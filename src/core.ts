@@ -10,6 +10,10 @@ export const harnesses = {
   opencode: { agent: "opencode", skillsPath: ".agents/skills", global: false, docs: "https://opencode.ai/docs/", setup: "Install OpenCode using its official guide, then run opencode from <directory> and connect a provider." },
 } as const;
 export type Harness = keyof typeof harnesses;
+export function compatibilitySetupMessage(harness: Harness): string | undefined {
+  // Native Hermes onboarding installs or reuses the runtime; keep this instruction for skill-only adapters.
+  return harness === "hermes" ? undefined : harnesses[harness].setup;
+}
 export type Pack = { id: string; source: string; path: string; package: string; version: string; revision: string; skills: string[]; description: string };
 export type Catalog = { schemaVersion: 3; packs: Pack[] };
 export type Config = { schemaVersion: 1; harness: Harness; directory: string; packs?: string[] };

@@ -4,7 +4,7 @@ import { resolve, join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import catalogFile from "../catalog/skills.json";
-import { harnesses, parseCatalog, parseHarness, parseConfig, installArgs, identity, fetchCatalog, catalogChanges, installedVersion, selectPacks, type Catalog, type Config } from "./core.ts";
+import { harnesses, parseCatalog, parseHarness, parseConfig, installArgs, identity, fetchCatalog, catalogChanges, installedVersion, selectPacks, compatibilitySetupMessage, type Catalog, type Config } from "./core.ts";
 
 import { tmpdir } from "node:os";
 import { checkoutPack, packageDirectory } from "./source.ts";
@@ -155,7 +155,8 @@ async function main() {
   }
   catalog = selectPacks(catalog, config.packs);
   config.packs = catalog.packs.map(pack => pack.id);
-  console.log(adapter.setup);
+  const setupHint = compatibilitySetupMessage(config.harness);
+  if (setupHint) console.log(setupHint);
   for (const pack of catalog.packs) console.log(`Install ${pack.source}/${pack.path}@${pack.version} from verified commit ${pack.revision}`);
   if (values["dry-run"]) return;
   await mkdir(directory, { recursive: true });
@@ -197,7 +198,7 @@ async function main() {
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; console.log(`Preserved ${identityPath}. Add the Boomkin identity from docs/IDENTITY.md if wanted.`); }
     await writeFile(join(stateDir, "last-sync.json.tmp"), JSON.stringify({ syncedAt: new Date().toISOString(), catalog }, null, 2) + "\n");
     await rename(join(stateDir, "last-sync.json.tmp"), join(stateDir, "last-sync.json"));
-    console.log(`Skills ready in ${join(directory, adapter.skillsPath)}. Use the installed skill matching your task; infrastructure and data skills establish tool readiness and evidence first. Restart the harness to reload.\n${adapter.setup}`);
+    console.log(`Skills ready in ${join(directory, adapter.skillsPath)}. Use the installed skill matching your task; infrastructure and data skills establish tool readiness and evidence first. Restart the harness to reload.${setupHint ? `\n${setupHint}` : ""}`);
   } finally { await rm(lock, { recursive: true }); }
 }
 main().catch(error => { console.error(`Boomkin: ${error.message}`); process.exitCode = 1; });

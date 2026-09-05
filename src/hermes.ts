@@ -4,6 +4,7 @@ import { resolve, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { isMap, parseDocument } from "yaml";
 
+export const HERMES_VERSION = "0.21.0";
 export const HERMES_COMMIT = "2e24e06e5513fa425ccf935d2e41991cb11ff383";
 export const HERMES_INSTALLER_SHA256 = "5854b15670b51a8daae8f59ddfa917062de9f74be261eb73b4b8d719710f8968";
 export const HERMES_INSTALLER_URL = `https://raw.githubusercontent.com/NousResearch/hermes-agent/${HERMES_COMMIT}/scripts/install.sh`;
@@ -63,7 +64,10 @@ export async function ensureRuntime(directory: string, options: { install: boole
   const root = await profilePath(directory);
   const existing = await findRuntime(root);
   if (existing) {
-    if (options.dryRun) return existing;
+    if (options.dryRun) {
+      console.log(`Would reuse the existing Hermes executable at ${existing}`);
+      return existing;
+    }
     await mkdir(root, { recursive: true, mode: 0o700 });
     const status = await localProfileStatus(root);
     if (!status.runtime.available) throw new Error("The existing Hermes executable did not report a valid version; repair it before onboarding");
@@ -73,7 +77,11 @@ export async function ensureRuntime(directory: string, options: { install: boole
   }
   if (!options.install) throw new Error("Hermes runtime is missing. Run onboarding with runtime installation enabled.");
   const runtime = join(root, ".boomkin", "runtime");
-  if (options.dryRun) return join(runtime, "venv", "bin", "hermes");
+  if (options.dryRun) {
+    const planned = join(runtime, "venv", "bin", "hermes");
+    console.log(`Would install Hermes ${HERMES_VERSION} at ${planned}`);
+    return planned;
+  }
   if (process.platform === "win32") throw new Error("Install Hermes with the official Windows installer first, then rerun Boomkin onboarding.");
   await mkdir(join(root, ".boomkin"), { recursive: true, mode: 0o700 });
   const response = await fetch(HERMES_INSTALLER_URL, { signal: AbortSignal.timeout(30_000) });

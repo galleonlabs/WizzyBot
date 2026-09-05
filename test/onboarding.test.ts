@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { aixbtConfig, coinbaseSettings, connectProvider, publicDataProbe, doctor } from "../src/onboarding";
 import catalog from "../catalog/skills.json";
-import { parseCatalog } from "../src/core";
+import { harnesses, parseCatalog } from "../src/core";
+import { HERMES_VERSION } from "../src/hermes";
 
 async function temporary(run: (root: string) => Promise<void>) {
   const root = await realpath(await mkdtemp(join(tmpdir(), "boomkin-onboard-")));
@@ -60,13 +61,37 @@ test("readiness reports missing installations and never asserts model authentica
 test("onboard dry run never creates the selected profile", async () => {
   await temporary(async root => {
     const path = join(root, "fresh");
-    const child = Bun.spawn([process.execPath, "src/cli.ts", "onboard", "--directory", path, "--dry-run"], { stdout: "pipe", stderr: "pipe" });
+    const emptyBin = join(root, "empty-bin");
+    await mkdir(emptyBin);
+    const child = Bun.spawn([process.execPath, "src/cli.ts", "onboard", "--directory", path, "--dry-run", "--offline-catalog"], {
+      stdout: "pipe", stderr: "pipe", env: { ...process.env, PATH: emptyBin },
+    });
     const output = await new Response(child.stdout).text();
     const errors = await new Response(child.stderr).text();
     expect(await child.exited).toBe(0);
     expect(errors).toBe("");
     expect(output).toContain("Hermes home:");
+    expect(output).not.toContain(harnesses.hermes.setup);
+    expect(output).toContain(`Would install Hermes ${HERMES_VERSION} at ${join(path, ".boomkin/runtime/venv/bin/hermes")}`);
     await expect(readFile(path)).rejects.toThrow();
+  });
+});
+test("onboard dry run reuses an existing runtime and still omits the manual Hermes install instruction", async () => {
+  await temporary(async root => {
+    const path = join(root, "existing");
+    const bin = join(path, ".boomkin/runtime/venv/bin");
+    await mkdir(bin, { recursive: true });
+    const executable = join(bin, "hermes");
+    await writeFile(executable, "#!/bin/sh\necho 'Hermes 0.21.0'\n");
+    await chmod(executable, 0o700);
+    const child = Bun.spawn([process.execPath, "src/cli.ts", "onboard", "--directory", path, "--dry-run", "--offline-catalog", "--skip-model-setup", "--no-install"], {
+      stdout: "pipe", stderr: "pipe", env: { ...process.env, PATH: join(root, "missing-bin") },
+    });
+    const output = await new Response(child.stdout).text();
+    expect(await child.exited).toBe(0);
+    expect(output).not.toContain(harnesses.hermes.setup);
+    expect(output).toContain(`Would reuse the existing Hermes executable at ${executable}`);
+    expect(await readFile(join(path, "SOUL.md")).catch(() => "")).toBe("");
   });
 });
 

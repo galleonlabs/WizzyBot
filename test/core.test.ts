@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { parse as parseYaml } from "yaml";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseCatalog, parseConfig, parseHarness, installArgs, harnesses, fetchCatalog, catalogChanges, installedVersion, selectPacks } from "../src/core";
+import { parseCatalog, parseConfig, parseHarness, installArgs, harnesses, fetchCatalog, catalogChanges, installedVersion, selectPacks, compatibilitySetupMessage } from "../src/core";
 import catalog from "../catalog/skills.json";
 
 describe("trust and installation boundaries", () => {
@@ -36,6 +36,26 @@ describe("trust and installation boundaries", () => {
       expect(await new Response(p.stdout).text()).toContain("galleonlabs/crypto-defi-skills/packages/hyperliquid");
       expect(await Bun.file(join(directory, ".boomkin/config.json")).exists()).toBe(false);
       await expect(readFile(directory)).rejects.toThrow();
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+  test("native Hermes setup omits the skill-only runtime instruction that other adapters still print", async () => {
+    expect(compatibilitySetupMessage("hermes")).toBeUndefined();
+    for (const harness of Object.keys(harnesses) as (keyof typeof harnesses)[]) {
+      if (harness === "hermes") continue;
+      expect(compatibilitySetupMessage(harness)).toBe(harnesses[harness].setup);
+    }
+    const root = await mkdtemp(join(tmpdir(), "boomkin-setup-hint-"));
+    try {
+      for (const harness of ["hermes", "codex"] as const) {
+        const p = Bun.spawn([process.execPath, "src/cli.ts", "setup", "--harness", harness, "--directory", join(root, harness), "--dry-run"], { stdout: "pipe", stderr: "pipe" });
+        const output = await new Response(p.stdout).text();
+        expect(await p.exited).toBe(0);
+        expect(output.includes(harnesses.hermes.setup)).toBe(false);
+        expect(output.includes(harnesses.codex.setup)).toBe(harness === "codex");
+      }
+      const listed = Bun.spawn([process.execPath, "src/cli.ts", "harnesses"], { stdout: "pipe", stderr: "pipe" });
+      expect(await new Response(listed.stdout).text()).toContain(harnesses.hermes.setup);
+      expect(await listed.exited).toBe(0);
     } finally { await rm(root, { recursive: true, force: true }); }
   });
   test("unknown flags and missing directories do not start installation", async () => {

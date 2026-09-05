@@ -41,7 +41,7 @@ is required to install skills. Running the harness may incur provider costs.
 
 Start with a prompt such as:
 
-> Use lp-research to compare these two pools. Separate verified facts from missing
+> Use lp-analyze to compare these two pools. Separate verified facts from missing
 > data, explain the risks, and give me a plan to review before I commit capital.
 
 Skills guide the agent; they do not provide live market data or a signer by
@@ -50,13 +50,14 @@ authority and a suitable execution tool. WizzyBot has no custody or transaction 
 
 ## The catalog
 
-| Pack | Coverage | Source |
-| --- | --- | --- |
-| LP Skills | Research, planning, monitoring, operations, engineering | [lp-skills](https://github.com/galleonlabs/lp-skills) |
-| Hyperliquid Skills | Research, planning, monitoring, operations, review, engineering | [hyperliquid-skills](https://github.com/galleonlabs/hyperliquid-skills) |
+| Pack | Version | Coverage | Source |
+| --- | --- | --- | --- |
+| LP Skills | 0.4.0 | Setup, analysis, planning, execution, monitoring, engineering | [lp-skills](https://github.com/galleonlabs/lp-skills) |
+| Hyperliquid Skills | 0.2.0 | Setup, analysis, planning, execution, monitoring, performance review, engineering | [hyperliquid-skills](https://github.com/galleonlabs/hyperliquid-skills) |
 
-The catalog starts with 11 skills across these two packs. New skills within a pack
-are included on the next update. New reviewed packs are added to
+The catalog contains 13 skills across these two packs. Start with `lp-setup` or
+`hyperliquid-setup` to discover your agent's tools and complete its first read.
+New published versions and reviewed packs are added to
 [`catalog/skills.json`](catalog/skills.json). The corpora stay in their own repositories.
 
 ## Stay current
@@ -67,11 +68,16 @@ bun run wizzy update --directory "$HOME/wizzy"
 bun run wizzy status --directory "$HOME/wizzy"
 ```
 
-`update` fetches the current Wizzy catalog, then installs every pack's latest
-upstream default-branch content through the pinned [Agent Skills CLI](https://github.com/vercel-labs/skills).
-This includes new packs and new skills. It is a rolling source channel, not a claim
-that every commit is a tagged release. Upstream lockfiles record installation state.
+`update` fetches the current Wizzy catalog, then installs each published version
+from a temporary checkout of its exact recorded commit through the pinned
+[Agent Skills CLI](https://github.com/vercel-labs/skills). The catalog records versions,
+revisions, and expected skill names. Setup verifies each checkout before installation,
+then checks installed skill versions before recording success.
+`check` compares your last successful sync with the current release catalog.
 
+This release renames `*-research` to `*-analyze` and `*-operate` to `*-execute`.
+Existing instructions are preserved; update saved prompts and review old skill
+folders using the [migration guide](docs/UPDATES.md).
 Updates are explicit. For automatic refresh, schedule the same command using your
 own [cron or systemd setup](docs/UPDATES.md). Restart the harness afterwards; redeploy
 Eve projects. Update WizzyBot itself with `git pull --ff-only && bun install --frozen-lockfile`.

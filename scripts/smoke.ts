@@ -1,7 +1,9 @@
 import { mkdtemp, mkdir, readdir, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { harnesses } from "../src/core";
+import { harnesses, parseCatalog } from "../src/core";
+
+import catalogFile from "../catalog/skills.json";
 
 const root = await mkdtemp(join(tmpdir(), "wizzy-smoke-"));
 const cli = resolve(import.meta.dir, "../src/cli.ts");
@@ -15,13 +17,14 @@ try {
     await mkdir(resolve(instruction, ".."), { recursive: true });
     await writeFile(instruction, "Keep my existing instructions.\n");
     for (const command of ["setup", "update"] as const) {
+      if (command === "update" && name === "hermes") await writeFile(join(directory, ".wizzy/last-sync.json"), "{broken");
       const p = Bun.spawn([process.execPath, cli, command, "--directory", directory, ...(command === "setup" ? ["--harness", name] : ["--offline-catalog"])], {
         env: { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), CODEX_HOME: join(home, ".codex") }, stdout: "pipe", stderr: "pipe",
       });
       const [stdout, stderr, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
       if (code !== 0) throw new Error(`${name} ${command}: ${stdout}\n${stderr}`);
       const entries = await readdir(join(directory, adapter.skillsPath));
-      for (const skill of ["lp-research", "hyperliquid-research"]) {
+      for (const skill of parseCatalog(catalogFile).packs.flatMap(p => p.skills)) {
         if (!entries.includes(skill)) throw new Error(`${name}: missing ${skill}`);
         if (!(await readFile(join(directory, adapter.skillsPath, skill, "SKILL.md"), "utf8")).includes("description:")) throw new Error("Missing skill metadata");
       }

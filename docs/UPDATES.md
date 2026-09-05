@@ -1,61 +1,99 @@
 # Updates and recovery
 
-`setup` installs the catalog bundled with the checkout. `update` fetches the latest
-catalog from `galleonlabs/WizzyBot` main, validates its schema and explicit Galleon
-repository allowlist, and reinstalls each pack from its default branch. Both use
-`skills@1.5.23`, pinned in the Bun lockfile, with copies suitable for deployment.
-No pack install scripts or runtime binaries are executed by Wizzy.
+## Release channel
 
-The catalog is curated, not an automatic scan of all organisation repositories.
-It can grow without users changing their configuration. A network failure or
-invalid catalog fails before any pack is changed. `--offline-catalog` deliberately
-uses the checked-out catalog instead; upstream Git access is still required.
+WizzyBot 0.2.0 uses catalog schema 2. Every pack records its npm release version,
+full source commit, source repository, and expected skill names. Installation uses
+a temporary checkout of that exact commit, verifies its revision, then passes the
+local checkout to `skills@1.5.23`. All sources are verified before any installation
+begins. Moving tags or branches cannot change the selected revision. Temporary
+checkouts are removed afterwards; trust still rests with the source repository
+and installer. Use `wizzy update` to refresh these managed installations: the
+upstream installer sees local sources, while Wizzy tracks their release provenance.
 
-## What changes
+`setup` uses the catalog in the checkout. `update` fetches the current public Wizzy
+catalog, validates it, and installs its pinned revisions. New pack versions enter
+this catalog after publication and verification. It can grow without users editing
+workspace configuration. `--offline-catalog` uses the checked-out catalog instead;
+GitHub access is still needed to download the pinned skills.
 
-- All skills in every current catalog pack are refreshed, including new skills.
-- Upstream installer lockfiles track sources and hashes. Do not edit them manually.
+`check` compares the last successful sync with the current published catalog. If
+revisions match, it also checks expected skill files and their declared versions.
+This is not a byte-for-byte integrity audit of local edits. `status` lists skills
+through the upstream installer. Neither command updates skill files.
+
+## Upgrade from WizzyBot 0.1.0
+
+Update the CLI first:
+
+```bash
+git pull --ff-only
+bun install --frozen-lockfile
+bun run wizzy update --directory "$HOME/wizzy"
+```
+
+Old CLI copies reject schema 2 rather than silently interpreting release pins as
+branch-head installs. Existing `.wizzy/config.json` stays compatible. A successful
+update writes the new versioned sync record. Current releases are LP Skills 0.4.0
+and Hyperliquid Skills 0.2.0.
+
+| Previous skill | Current skill |
+| --- | --- |
+| `lp-research` | `lp-analyze` |
+| `lp-operate` | `lp-execute` |
+| `hyperliquid-research` | `hyperliquid-analyze` |
+| `hyperliquid-operate` | `hyperliquid-execute` |
+
+Both packs add a `*-setup` skill. Saved prompts and agent instructions should use
+the new names. Wizzy preserves existing instructions and reports legacy folders;
+it does not delete potentially edited skills. Compare those folders with your backup,
+then use the upstream `skills remove` command scoped to the actual workspace and
+harness. For example, from an Eve workspace, after reviewing local edits:
+
+```bash
+/path/to/WizzyBot/node_modules/.bin/skills remove lp-research lp-operate hyperliquid-research hyperliquid-operate --agent eve
+```
+
+For Hermes, set `HERMES_HOME` to the intended profile and use `--global --agent
+hermes-agent`. Never remove unrelated skills. Restart the harness after migrating;
+rebuild and redeploy an Eve project to update its deployed copy.
+
+## State and failures
+
 - `.wizzy/config.json` binds one harness to one canonical workspace.
-- `XDG_STATE_HOME` scopes upstream global update tracking to `.wizzy/state/`,
-  so a Hermes profile does not replace another profile's update records.
-- `.wizzy/last-sync.json` records the last fully completed catalog refresh.
-- Existing agent instructions are preserved. The identity is written only if absent.
-- Managed skill files can be replaced. Keep custom skills under different names;
-  contribute pack edits upstream or back up local changes before updating.
-- Removed packs/skills are not automatically deleted. Review and remove obsolete
-  entries with the upstream `skills remove` command after backing up local edits.
+- `.wizzy/state/` scopes upstream global update records to that workspace.
+- `.wizzy/last-sync.json` records only a fully completed install and its catalog.
+- Existing instruction files are preserved; a missing file receives the starter identity.
+- Managed skill files can be replaced by the upstream installer. Back up custom edits.
+- Removed packs are reported by `check`; their installed files are preserved.
 
-`check` delegates to upstream `skills check`, which reports skills in this
-workspace's project lockfile and Wizzy-scoped global lockfile. It checks installed sources; run `update` to discover
-new catalog packs. It is informational and does not modify installed files.
+A failed catalog fetch or validation changes no packs. Installation is sequential,
+not transactional: one pack may succeed before the next fails. The command exits
+nonzero and keeps retry configuration, but leaves the last successful sync record
+unchanged. Fix the cause and rerun. A version mismatch also prevents a success record.
+The sync record is replaced atomically. If it is corrupt, `check` reports the issue;
+`setup` or `update` rebuilds it after a successful installation.
 
-Updates are sequential, not transactional. If the second pack fails, the first may
-already be updated. The command exits nonzero, preserves retry configuration, and
-does not write a new success record. Fix the cause and rerun. Concurrent Wizzy
-installs in one directory are blocked by `.wizzy/operation.lock`; after a hard crash,
-confirm no installer is running before removing that directory.
+Concurrent Wizzy installs in one workspace are blocked by `.wizzy/operation.lock`.
+After a hard crash, verify no installer is running before removing that directory.
 
 ## Automatic refresh (opt in)
 
-An agent's instructions are executable influence. Review the sources before opting
-into unattended changes. Wizzy does not register a service or restart an active
-trading session for you.
-
-A daily cron entry, with absolute paths adapted to your machine:
+Wizzy does not register a background service or restart an active session. Review
+pack sources before enabling unattended instruction updates. Adapt this cron entry
+to your machine, with absolute paths and Git available:
 
 ```cron
 17 4 * * * cd /home/alice/WizzyBot && /home/alice/.bun/bin/bun run wizzy update --directory /home/alice/wizzy >> /home/alice/wizzy-updates.log 2>&1
 ```
 
-Make Git and Bun available to cron. Monitor failures. Restart your harness in a
-maintenance window; rebuild/redeploy Eve. This updates skills and the catalog,
-not the harness or Wizzy CLI. Use each project's native update procedure for those.
+Monitor errors. Restart the harness in a maintenance window; redeploy Eve. This
+updates the catalog and skills, not the harness or Wizzy CLI. Use their native
+update procedures separately.
 
-## Reproduce or roll back
+## Rollback
 
-Before an update, back up the harness workspace including skills, upstream
-lockfiles, and `.wizzy/`. Restore that snapshot with the harness stopped if needed.
-A catalog snapshot does not pin skill revisions: source heads can advance. For a
-frozen deployment, retain the installed skill files and lockfile in your own private
-deployment repository, review the diff, and deploy that exact revision. Do not
-commit credentials. Wizzy does not silently switch an existing deployment.
+Before updating, back up the workspace's skills, lockfiles, instructions and `.wizzy/`.
+Restore that snapshot with the harness stopped when rollback is required. For a
+frozen deployment, retain installed skills and lockfiles in your private deployment
+repository, review the diff, and deploy that exact revision. Never commit credentials.

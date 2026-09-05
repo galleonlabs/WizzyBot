@@ -5,7 +5,8 @@ agent loops and hosting belong in the harness. Open an issue describing the user
 need before adding infrastructure.
 
 For a catalog pack, add a unique ID, matching `galleonlabs/<id>` source, and factual
-description to `catalog/skills.json`. Require an open-source license, valid Agent
+description to `catalog/skills.json`, with its published version, full source revision,
+and expected skill names. Verify the release before changing a catalog pin. Require an open-source license, valid Agent
 Skills files, maintained references, clear tool prerequisites, and explicit limits
 on financial actions. Install it in a clean directory before proposing inclusion.
 

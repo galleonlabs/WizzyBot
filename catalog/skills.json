@@ -1,7 +1,36 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "packs": [
-    {"id":"lp-skills","source":"galleonlabs/lp-skills","description":"Research, plan, monitor, and manage Uniswap and Aerodrome liquidity positions."},
-    {"id":"hyperliquid-skills","source":"galleonlabs/hyperliquid-skills","description":"Research, plan, monitor, operate, and review Hyperliquid trading activity."}
+    {
+      "id": "lp-skills",
+      "source": "galleonlabs/lp-skills",
+      "description": "Setup, analysis, planning, execution and monitoring for Uniswap and Aerodrome liquidity.",
+      "version": "0.4.0",
+      "revision": "211c6d92fd41920d103f459d868055ff30d2119e",
+      "skills": [
+        "lp-analyze",
+        "lp-engineer",
+        "lp-execute",
+        "lp-monitor",
+        "lp-plan",
+        "lp-setup"
+      ]
+    },
+    {
+      "id": "hyperliquid-skills",
+      "source": "galleonlabs/hyperliquid-skills",
+      "description": "Setup, analysis, planning, execution and monitoring for Hyperliquid, plus performance review.",
+      "version": "0.2.0",
+      "revision": "894cf1f1681fa74191cb0b161a41655ff23341d2",
+      "skills": [
+        "hyperliquid-analyze",
+        "hyperliquid-engineer",
+        "hyperliquid-execute",
+        "hyperliquid-monitor",
+        "hyperliquid-plan",
+        "hyperliquid-review",
+        "hyperliquid-setup"
+      ]
+    }
   ]
 }

@@ -32,5 +32,5 @@ jobs:
           ref: 2e24e06e5513fa425ccf935d2e41991cb11ff383
           path: .hermes-upstream
       - run: python -m venv /tmp/hermes-native
-      - run: /tmp/hermes-native/bin/pip install --disable-pip-version-check './.hermes-upstream[mcp]'
+      - run: /tmp/hermes-native/bin/pip install --disable-pip-version-check -e './.hermes-upstream[mcp]'
       - run: python scripts/hermes-native-smoke.py --hermes /tmp/hermes-native/bin/hermes

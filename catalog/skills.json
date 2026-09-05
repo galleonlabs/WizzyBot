@@ -22,8 +22,8 @@
       "id": "hyperliquid-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Agent skills for Hyperliquid setup, market analysis, trade planning and execution, monitoring, and performance review.",
-      "version": "0.3.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.3.1",
+      "revision": "38e58b1c9c345af0f3a61ce1d25fe33095c2003b",
       "skills": [
         "hyperliquid-analyze",
         "hyperliquid-engineer",
@@ -40,8 +40,8 @@
       "id": "defi-infra-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "RPC, wallet and Hermes infrastructure skills with read-only readiness diagnostics.",
-      "version": "0.2.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.2.1",
+      "revision": "38e58b1c9c345af0f3a61ce1d25fe33095c2003b",
       "skills": [
         "galleon-defi-infra"
       ],
@@ -124,8 +124,8 @@
       "id": "defi-derivatives-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Plan derivatives positions and reconcile venue execution.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "38e58b1c9c345af0f3a61ce1d25fe33095c2003b",
       "skills": [
         "galleon-defi-derivatives"
       ],
@@ -148,8 +148,8 @@
       "id": "defi-security-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Review transaction intent, permissions and simulation evidence.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "38e58b1c9c345af0f3a61ce1d25fe33095c2003b",
       "skills": [
         "galleon-defi-security"
       ],

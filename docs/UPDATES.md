@@ -47,6 +47,8 @@ Onboarding preserves existing SOUL and instruction files. It opens native model 
 
 ## Verified releases
 
+Boomkin 0.5.1 pins Infra 0.2.1, Hyperliquid 0.3.1, Derivatives 0.1.1 and Security 0.1.1 after independent npm verification. These add CLI recovery, bot/manual-control handoffs and full-recipient verification. The [source review](https://github.com/galleonlabs/crypto-defi-skills/blob/38e58b1c9c345af0f3a61ce1d25fe33095c2003b/docs/research/minara-review.md) records attribution and validation limits. Other pack pins and selected-pack behavior remain unchanged.
+
 The [catalog](../catalog/skills.json) records each pack's npm package, published version, full source commit, package path and expected skills. `setup` and `onboard` use the checked-out catalog; `update` fetches the current public Boomkin catalog. New pins enter that catalog after publication and verification.
 
 Before installation, Boomkin verifies every selected source revision, package identity, version, skill metadata and path containment. Packages containing symlinks are rejected. Only the selected package paths and skill names reach the upstream installer, and temporary source checkouts are removed afterward.

@@ -7,7 +7,7 @@ import catalog from "../catalog/skills.json";
 
 describe("trust and installation boundaries", () => {
   test("catalog rejects external sources, options, duplicates, and schema drift", () => {
-    expect(parseCatalog(catalog).packs).toHaveLength(2);
+    expect(parseCatalog(catalog).packs).toHaveLength(4);
     for (const source of ["evil/lp-skills", "--global", "galleonlabs/crypto-defi-skills@evil"]) {
       expect(() => parseCatalog({ ...catalog, packs: [{ ...catalog.packs[0], source }] })).toThrow();
     }
@@ -55,7 +55,7 @@ test("pins release versions and rejects branch names or missing version metadata
 test("checks report new revisions, new packs, and retirement without installing", () => {
   const current = parseCatalog(catalog);
   expect(catalogChanges(current, current)).toEqual([]);
-  expect(catalogChanges(current)).toHaveLength(2);
+  expect(catalogChanges(current)).toHaveLength(4);
   expect(catalogChanges({ ...current, packs: [current.packs[0]!] }, current)[0]).toContain("retired");
 });
 test("catalog fetch fails closed on HTTP failure and invalid data", async () => {
@@ -110,5 +110,5 @@ test("legacy configurations never opt into future catalog packs", () => {
     ...current.packs[0], id: "aave-skills", path: "packages/aave", package: "galleon-aave-skills", skills: ["aave-setup"],
   }] });
   expect(selectPacks(future, config.packs).packs.map(pack => pack.id)).toEqual(["lp-skills", "hyperliquid-skills"]);
-  expect(selectPacks(future).packs).toHaveLength(3);
+  expect(selectPacks(future).packs).toHaveLength(5);
 });

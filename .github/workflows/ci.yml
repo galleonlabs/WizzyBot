@@ -13,3 +13,24 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run check
       - run: bun run build
+
+  native-hermes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.12
+      - run: bun install --frozen-lockfile
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/checkout@v4
+        with:
+          repository: NousResearch/hermes-agent
+          ref: 2e24e06e5513fa425ccf935d2e41991cb11ff383
+          path: .hermes-upstream
+      - run: python -m venv /tmp/hermes-native
+      - run: /tmp/hermes-native/bin/pip install --disable-pip-version-check './.hermes-upstream[mcp]'
+      - run: python scripts/hermes-native-smoke.py --hermes /tmp/hermes-native/bin/hermes

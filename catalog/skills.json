@@ -35,6 +35,30 @@
       ],
       "path": "packages/hyperliquid",
       "package": "galleon-hyperliquid-skills"
+    },
+    {
+      "id": "defi-infra-skills",
+      "source": "galleonlabs/crypto-defi-skills",
+      "description": "RPC, wallet and agent infrastructure using official Alchemy and Coinbase tools.",
+      "version": "0.1.0",
+      "revision": "1665210f8c80f5b671aa01caea811946527c875e",
+      "skills": [
+        "galleon-defi-infra"
+      ],
+      "path": "packages/infra",
+      "package": "galleon-defi-infra-skills"
+    },
+    {
+      "id": "defi-data-skills",
+      "source": "galleonlabs/crypto-defi-skills",
+      "description": "DeFiLlama and CoinGecko data access, asset identity, freshness and methodology.",
+      "version": "0.1.0",
+      "revision": "1665210f8c80f5b671aa01caea811946527c875e",
+      "skills": [
+        "galleon-defi-data"
+      ],
+      "path": "packages/data",
+      "package": "galleon-defi-data-skills"
     }
   ]
 }

@@ -9,24 +9,38 @@ import { harnesses, parseCatalog, parseHarness, parseConfig, installArgs, identi
 import { tmpdir } from "node:os";
 import { stateDirectory } from "./state.ts";
 import { checkoutPack, packageDirectory } from "./source.ts";
+import { defaultProfile, prepareHermes, connectProvider, providers, doctor } from "./onboarding.ts";
+import { runHermes } from "./hermes.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const help = `Boomkin — your harness, Galleon skills.
+const help = `Boomkin — your Hermes DeFi agent.
 
+bun run boomkin onboard
+bun run boomkin doctor --live
+bun run boomkin start
+bun run boomkin providers
+bun run boomkin connect --provider alchemy
+bun run boomkin model
+bun run boomkin check --directory ~/.boomkin/hermes
+bun run boomkin update --directory ~/.boomkin/hermes
+
+onboard installs the official Hermes runtime if needed, prepares an isolated profile,
+installs four Galleon skill packs and public CoinGecko MCP, then runs native model setup.
+--directory chooses the Hermes home (default ~/.boomkin/hermes for the commands above).
+--skip-model-setup prepares files without an interactive model login.
+--no-install uses an existing Hermes executable. --dry-run previews without writes.
+--all-packs opts an existing onboarding profile into all four current packs.
+doctor distinguishes configuration from verified reads; --live probes public MCP only.
+connect uses native Hermes OAuth and tool selection, or the official local Coinbase MCP.
+Wallet/account setup stays in its official CLI; see docs/CONNECTIONS.md.
+
+Advanced skill-only compatibility:
+bun run boomkin setup --harness codex --directory ./agent --pack lp-skills
 bun run boomkin harnesses
 bun run boomkin catalog
-bun run boomkin setup --harness hermes --directory ~/boomkin --pack lp-skills
-bun run boomkin check --directory ~/boomkin
-bun run boomkin update --directory ~/boomkin
-bun run boomkin status --directory ~/boomkin
-
-setup prints the upstream runtime setup guide and installs skills.
-Install/sign into the harness separately with its native setup flow.
-update refreshes the public catalog and installs its pinned published revisions.
 --pack selects a pack (repeat for several); updates preserve your saved selection.
---offline-catalog uses the catalog bundled with this checkout.
---dry-run prints installation commands without writing files or installing skills.
-No wallet, signer, hosted runtime, or background service is installed.`;
+--offline-catalog uses this checkout's catalog. Runtime updates use native Hermes.
+No model call, wallet funding, trading, paid data request or service starts in onboarding.`;
 
 async function canonicalPath(path: string): Promise<string> {
   try { return await realpath(path); }
@@ -38,11 +52,46 @@ async function canonicalPath(path: string): Promise<string> {
 
 async function main() {
   const { values, positionals } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, strict: true, options: {
-    pack: { type: "string", multiple: true }, harness: { type: "string" }, directory: { type: "string" }, "dry-run": { type: "boolean" }, "offline-catalog": { type: "boolean" }, help: { type: "boolean", short: "h" },
+    "key-file": { type: "string" }, provider: { type: "string" }, live: { type: "boolean" }, "all-packs": { type: "boolean" }, "skip-model-setup": { type: "boolean" }, "no-install": { type: "boolean" }, pack: { type: "string", multiple: true }, harness: { type: "string" }, directory: { type: "string" }, "dry-run": { type: "boolean" }, "offline-catalog": { type: "boolean" }, help: { type: "boolean", short: "h" },
   } });
   const command = positionals[0] ?? "help";
   if (values.help || command === "help") return console.log(help);
   if (positionals.length > 1) throw new Error("Unexpected positional arguments");
+  if (values["key-file"] && (command !== "connect" || values.provider !== "coinbase")) throw new Error("--key-file is only available for connect --provider coinbase");
+  if (values.provider && command !== "connect") throw new Error("--provider is only available for connect");
+  if (values.live && command !== "doctor") throw new Error("--live is only available for doctor");
+  if ((values["all-packs"] || values["skip-model-setup"] || values["no-install"]) && command !== "onboard") throw new Error("Onboarding options are only available for onboard");
+  if (values["dry-run"] && !["onboard", "setup", "update", "connect", "start", "model"].includes(command)) throw new Error("--dry-run is unavailable for this read-only command");
+
+  if (command === "providers") {
+    for (const [name, provider] of Object.entries(providers)) console.log(`${name}: ${provider.access}`);
+    console.log("coinbase: official local MCP with a scoped account CLI environment and read tools. Agentic Wallet is separate; see docs/CONNECTIONS.md.");
+    return;
+  }
+  if (["onboard", "doctor", "start", "connect", "model"].includes(command)) {
+    if (values.harness && values.harness !== "hermes") throw new Error("Boomkin onboarding uses Hermes. Use setup for skill-only compatibility with another harness.");
+    const directory = await canonicalPath(resolve(values.directory ?? defaultProfile()));
+    if (command === "onboard") {
+      if (values.pack && values["all-packs"]) throw new Error("Choose --pack or --all-packs, not both");
+      const selected = values["all-packs"] ? parseCatalog(catalogFile).packs.map(pack => pack.id) : values.pack;
+      const args = [process.execPath, fileURLToPath(import.meta.url), "setup", "--harness", "hermes", "--directory", directory,
+        ...(selected?.flatMap(id => ["--pack", id]) ?? []), ...(values["dry-run"] ? ["--dry-run"] : [])];
+      const child = Bun.spawn(args, { stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+      if (await child.exited !== 0) throw new Error("Skill setup did not finish. Resolve its reported issue and rerun onboard.");
+      console.log(`Hermes home: ${directory}. Native model setup and keyless CoinGecko data; other providers are opt-in.`);
+      await prepareHermes(directory, { install: !values["no-install"], dryRun: values["dry-run"], skipModelSetup: values["skip-model-setup"] });
+      if (values["dry-run"]) return;
+      console.log(JSON.stringify(await doctor(directory, parseCatalog(catalogFile)), null, 2));
+      console.log("Onboarding saved. Use doctor --live to check public data, then start to launch Hermes. Complete any listed setup gaps first.");
+      return;
+    }
+    if (values.pack || values["all-packs"] || values["skip-model-setup"] || values["no-install"]) throw new Error("Pack and installer options are only available for onboard here");
+    if (command === "doctor") return console.log(JSON.stringify(await doctor(directory, parseCatalog(catalogFile), values.live), null, 2));
+    if (command === "connect") return connectProvider(directory, values.provider ?? "", values["dry-run"], values["key-file"] ? resolve(values["key-file"]) : undefined);
+    if (values["dry-run"]) return console.log(`Hermes ${command === "model" ? "setup model" : "chat"} in ${directory}`);
+    return runHermes(directory, command === "model" ? ["setup", "model"] : ["chat"]);
+  }
+
   if (command === "harnesses") {
     for (const [name, h] of Object.entries(harnesses)) console.log(`${name}\n  ${h.setup}\n  ${h.docs}\n`);
     return;
@@ -151,7 +200,7 @@ async function main() {
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; console.log(`Preserved ${identityPath}. Add the Boomkin identity from docs/IDENTITY.md if wanted.`); }
     await writeFile(join(stateDir, "last-sync.json.tmp"), JSON.stringify({ syncedAt: new Date().toISOString(), catalog }, null, 2) + "\n");
     await rename(join(stateDir, "last-sync.json.tmp"), join(stateDir, "last-sync.json"));
-    console.log(`Skills ready in ${join(directory, adapter.skillsPath)}. Start with lp-setup or hyperliquid-setup. Restart the harness to reload.\n${adapter.setup}`);
+    console.log(`Skills ready in ${join(directory, adapter.skillsPath)}. Start with galleon-defi-infra, galleon-defi-data, lp-setup or hyperliquid-setup as installed. Restart the harness to reload.\n${adapter.setup}`);
   } finally { await rm(lock, { recursive: true }); }
 }
 main().catch(error => { console.error(`Boomkin: ${error.message}`); process.exitCode = 1; });

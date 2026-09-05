@@ -1,3 +1,9 @@
+# Hermes-first upgrade
+
+Existing Hermes installations can run `bun run boomkin onboard --directory <existing-home> --all-packs` to explicitly add infrastructure and data. Model setup runs natively unless `--skip-model-setup` is given. Existing SOUL and instructions are preserved. Other harness installations retain their selected packs and skill-only commands.
+
+Boomkin `update` changes skill packs; native Hermes owns runtime upgrades. New onboarding installs the reviewed runtime only when no working Hermes is available. Run `doctor --live` and perform a first task after updating.
+
 # Updates and recovery
 
 ## Release channel

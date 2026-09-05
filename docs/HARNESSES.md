@@ -1,3 +1,7 @@
+# Advanced skill-only compatibility
+
+Boomkin's main onboarding product uses Hermes; start with the root README. The adapters below preserve portable skill installation in other harnesses and do not provision a complete Boomkin runtime there.
+
 # Choose a harness
 
 Boomkin supplies the crypto skill catalog and setup/update commands. The upstream

@@ -1,129 +1,128 @@
 # Boomkin
 
-**An open-source crypto agent for research, trading, and DeFi.**
+**A Hermes agent wired for DeFi.**
 
-Your harness runs the agent. Galleon skills give it the domain knowledge.
-Boomkin brings them together and keeps the skill catalog current. The name nods to the
-moonkin meme; the project is an independent Galleon Labs agent setup layer.
+Boomkin brings the native [Hermes Agent](https://github.com/NousResearch/hermes-agent) runtime together with four independently published Galleon skill packs, public market data and optional infrastructure and wallet connections. It gives you a dedicated DeFi profile, then hands model login, tool authentication and the agent loop to Hermes.
 
 [![CI](https://github.com/galleonlabs/boomkin/actions/workflows/ci.yml/badge.svg)](https://github.com/galleonlabs/boomkin/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ## Get started
 
-You need [Bun](https://bun.sh), Git, and an agent harness.
+Use macOS or Linux, [Bun](https://bun.sh), Git and a terminal. For Windows, use WSL2 or install Hermes with its official Windows flow first. Optional Coinbase tooling requires Node.js 22+; Agentic Wallet's current guide requires Node.js 24+.
 
 ```bash
 git clone https://github.com/galleonlabs/boomkin.git
 cd boomkin
 bun install --frozen-lockfile
-bun run boomkin harnesses
+bun run boomkin onboard
+bun run boomkin doctor --live
+bun run boomkin start
 ```
 
-Choose [Hermes, Eve, OpenClaw, Codex, Claude Code, or OpenCode](docs/HARNESSES.md).
-Complete its native setup, then install the skills. For a dedicated Hermes profile:
+`onboard` prepares `~/.boomkin/hermes`, installs the reviewed official Hermes runtime if none is available, installs the four skill packs, creates Boomkin's SOUL and instructions, configures public CoinGecko MCP, and opens native Hermes model setup. Choose your provider and sign in there. `start` launches the native Hermes chat in that same profile.
+
+Hermes remains the runtime: its tools, sessions, memory, model adapters, MCP support and scheduling are not forked. A new runtime installation uses reviewed Hermes v0.21.0 source; the native installer also manages the user-level `hermes` command and dependencies. Browser/computer-use dependencies are skipped initially and can be added through native Hermes setup. An existing working Hermes installation at 0.21.0 or newer is reused, not downgraded.
+
+Model authentication requires your account or local model configuration. Optional providers can require subscriptions, OAuth or scoped credentials. Onboarding makes no model call, pays for no data, creates or funds no wallet, and starts no background service.
+
+Useful options:
 
 ```bash
-HERMES_HOME="$HOME/boomkin" hermes setup
-bun run boomkin setup --harness hermes --directory "$HOME/boomkin"
-HERMES_HOME="$HOME/boomkin" hermes
+bun run boomkin onboard --directory "$HOME/defi-agent" --dry-run
+bun run boomkin onboard --directory "$HOME/defi-agent" --skip-model-setup
+bun run boomkin onboard --directory "$HOME/defi-agent" --no-install
+bun run boomkin model --directory "$HOME/defi-agent"
 ```
 
-Use `--dry-run` to preview an installation. No model account, wallet, or paid hosting
-is required to install skills. Running the harness may incur provider costs.
+Use the same `--directory` for subsequent commands. `--skip-model-setup` is for preparing a profile before interactive login; it does not mark the model authenticated. Existing SOUL, instructions and unrelated settings are preserved. A conflicting named MCP configuration is reported for review instead of overwritten.
 
-## What can Boomkin help with?
+## Four skill packs
 
-- Compare liquidity pools and make a sourced research case.
-- Plan Uniswap and Aerodrome positions with explicit assumptions and risk limits.
-- Inspect Hyperliquid positions, funding, orders, and exposure using connected tools.
-- Prepare trade plans, monitor positions, and review completed activity.
-- Build and review integrations with the same operational guidance.
+| Pack | Version | Role |
+| --- | --- | --- |
+| [Infrastructure](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/infra) | 0.1.0 | RPC, Alchemy, Coinbase account/wallet access, permissions and readiness |
+| [Data](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/data) | 0.1.0 | DeFiLlama and CoinGecko access, asset identity, freshness and methodology |
+| [LP](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/lp) | 0.4.2 | Uniswap and Aerodrome analysis, planning and position workflows; Revert and VFAT guidance |
+| [Hyperliquid](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/hyperliquid) | 0.2.1 | Market analysis, planning, execution, monitoring and performance review |
 
-Start with a prompt such as:
+The catalog contains **15 skills**. Start with `galleon-defi-infra` and `galleon-defi-data`, then use `lp-setup` or `hyperliquid-setup` for the chosen protocol. The foundation skills use a Galleon prefix to avoid upstream name collisions.
 
-> Use lp-analyze to compare these two pools. Separate verified facts from missing
-> data, explain the risks, and give me a plan to review before I commit capital.
+Each pack is independently versioned and published from [crypto-defi-skills](https://github.com/galleonlabs/crypto-defi-skills). Boomkin's [catalog](catalog/skills.json) records the npm identity, version, immutable source commit, package directory and expected skills. Downloads and installed metadata are checked before a successful sync is recorded.
 
-Skills guide the agent; they do not provide live market data or a signer by
-themselves. Connect tools through your harness. Financial actions require explicit
-authority and a suitable execution tool. Boomkin has no custody or transaction code.
-
-## The catalog
-
-| Pack | Version | Coverage | Source |
-| --- | --- | --- | --- |
-| LP Skills | 0.4.2 | Setup, analysis, planning, execution, monitoring, engineering | [lp-skills](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/lp) |
-| Hyperliquid Skills | 0.2.1 | Setup, analysis, planning, execution, monitoring, performance review, engineering | [hyperliquid-skills](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/hyperliquid) |
-
-The catalog contains 13 skills across these two packs. Start with `lp-setup` or
-`hyperliquid-setup` to discover your agent's tools and complete its first read.
-New published versions and reviewed packs are added to
-[`catalog/skills.json`](catalog/skills.json). The corpora live in the modular
-[crypto-defi-skills monorepo](https://github.com/galleonlabs/crypto-defi-skills),
-with independently versioned npm packages (`galleon-lp-skills` and
-`galleon-hyperliquid-skills`).
-
-Install only what you need, or omit `--pack` at first setup to install both:
+Fresh onboarding includes all four. Select fewer with repeated `--pack` options:
 
 ```bash
-bun run boomkin setup --harness codex --directory "$HOME/boomkin-codex" --pack lp-skills
-# Add another pack by naming the full desired selection:
-bun run boomkin update --directory "$HOME/boomkin-codex" --pack lp-skills --pack hyperliquid-skills
+bun run boomkin onboard --pack defi-infra-skills --pack defi-data-skills
 ```
 
-Updates preserve your saved selection. Newly added catalog packs are opt-in.
-Changing the selection preserves deselected skill files; review local edits before
-removing them with your harness or the upstream skills CLI.
-
-## Stay current
+Updates preserve your selection. Future packs are opt-in. To expand an older two-pack installation deliberately:
 
 ```bash
-bun run boomkin check --directory "$HOME/boomkin"
-bun run boomkin update --directory "$HOME/boomkin"
-bun run boomkin status --directory "$HOME/boomkin"
+bun run boomkin onboard --directory "$HOME/your-existing-hermes-profile" --all-packs
 ```
 
-`update` fetches the current Boomkin catalog, then installs each published version
-from a temporary checkout of its exact recorded commit through the pinned
-[Agent Skills CLI](https://github.com/vercel-labs/skills). The catalog records versions,
-revisions, package paths, package identities, and expected skill names. Setup verifies
-each checkout and its selected package metadata before installation,
-then checks installed skill versions before recording success.
-`check` compares your last successful sync with the current release catalog.
+Other harnesses can still install the portable skills through [advanced compatibility setup](docs/HARNESSES.md). Boomkin's end-to-end product flow is Hermes-first.
 
-Existing installations migrate their saved state to Boomkin. Existing instructions
-are preserved. If upgrading older skill releases, replace `*-research` with
-`*-analyze` and `*-operate` with `*-execute` in saved prompts, and review old skill
-folders using the [migration guide](docs/UPDATES.md).
-Updates are explicit. For automatic refresh, schedule the same command using your
-own [cron or systemd setup](docs/UPDATES.md). Restart the harness afterwards; redeploy
-Eve projects. Update Boomkin itself with `git pull --ff-only && bun install --frozen-lockfile`.
+## Connect your tools
 
-## How it fits together
-
-```text
-Boomkin                 Upstream harness              crypto-defi-skills
-catalog + setup/update → Hermes / Eve / OpenClaw …  ←  LP + Hyperliquid + future packs
-                         models, tools, memory,
-                         permissions, deployment
+```bash
+bun run boomkin providers
+bun run boomkin connect --provider alchemy
+bun run boomkin connect --provider defillama
+bun run boomkin connect --provider coinbase
 ```
 
-Boomkin contains no agent loop, copied harness, vendored skill corpus, exchange
-adapter, signer, or hosted trading service. Harness releases remain upstream.
-There is no required Boomkin account, subscription, platform fee, or token.
+| Connection | Setup and scope |
+| --- | --- |
+| CoinGecko | Public, keyless MCP configured during onboarding. Its reviewed tools are `execute` and `search_docs`; hosted execution is restricted to the provider's data SDK. |
+| Alchemy | Native Hermes OAuth and explicit tool selection. Select the intended Alchemy app; data/RPC access and wallet/admin actions have different scopes. |
+| DeFiLlama | Native Hermes OAuth with an API subscription. Queries consume credits; connecting another client can disconnect the previous client. |
+| Coinbase account | Official local MCP through a pinned CLI, with six read tools and a profile-specific configuration/keychain environment. Account credentials remain a separate step. |
+| Agentic Wallet | Separate official `awal` CLI flow for managed wallet and x402 use. Login, wallet creation, funding and spend limits require your choices; see the connection guide. |
 
-## Contribute
+For Coinbase, supply a scoped key file to the native CLI through Boomkin:
+
+```bash
+bun run boomkin connect --provider coinbase --key-file /absolute/path/to/scoped-key.json
+```
+
+The command uses the OS keychain and does not opt into plaintext secret storage. It configures credentials; it does not check balances, trade or approve payments. Coinbase's remote account MCP currently restricts custom harnesses, so Boomkin uses its supported local server. Coinbase for Agents and Agentic Wallet have different custody and payment capabilities.
+
+Read [the connection guide](docs/CONNECTIONS.md) for exact prerequisites, diagnostics and limits. Restart Hermes after changing MCP settings. MCP tool selection controls that connection; it is not a sandbox around Hermes's terminal or a substitute for provider-enforced account and spending limits.
+
+## First useful task
+
+> Use galleon-defi-infra to report my available RPC and wallet tools without changing permissions. Use galleon-defi-data to read a public ETH price with its source, timestamp and limitations. Then use lp-analyze to assess this pool: [chain and pool address]. Keep any proposed transaction unsigned.
+
+Boomkin loads only the relevant skills and provider references. It separates infrastructure readiness, data evidence, analysis, planning and execution. It uses Hermes's native memory and scheduling when appropriate; a scheduled task retains the same authorization and freshness requirements as an interactive task.
+
+`doctor` reports configuration and installed versions. `doctor --live` additionally verifies keyless CoinGecko MCP initialization and tool discovery. Neither is proof of a successful model response, authenticated paid data, wallet authority or an executed transaction. Use the data pack's public diagnostic for a first market observation, and the infrastructure pack's RPC diagnostic for a configured chain.
+
+## Updates and recovery
+
+```bash
+bun run boomkin check --directory "$HOME/.boomkin/hermes"
+bun run boomkin update --directory "$HOME/.boomkin/hermes"
+bun run boomkin doctor --live
+bun run boomkin start
+```
+
+Pull this repo and run `bun install --frozen-lockfile` when updating Boomkin itself. `update` refreshes the reviewed skill catalog, not the Hermes runtime. Use native Hermes updates separately and rerun the readiness checks afterward. The reviewed runtime pin and installer checksum are in [src/hermes.ts](src/hermes.ts).
+
+Onboarding can be rerun after a failed install or interrupted login. Completed skill installs and existing instructions remain intact. Review any reported operation lock before removing it. Provider failure does not change the approved route or cause an automatic retry of a financial action.
+
+See [updates and migration](docs/UPDATES.md) for old `.wizzy` state, previous skill names and selected-pack behavior. Credentials, private evidence and generated profiles must stay outside this repository.
+
+## Development
 
 ```bash
 bun install --frozen-lockfile
 bun run check
 bun run build
+bun run smoke
 ```
 
-See [contributing](CONTRIBUTING.md), [harness support](docs/HARNESSES.md),
-[update behaviour and recovery](docs/UPDATES.md), and [security](SECURITY.md).
-Propose a pack or adapter through an issue or pull request. Improve domain guidance
-in the corresponding monorepo package so every consumer benefits.
+The compatibility smoke checks fresh setup/update and independent pack selection. [Native Hermes smoke](scripts/hermes-native-smoke.py) additionally checks the actual runtime's profile, SOUL, MCP configuration and tool filtering in a temporary home, using a local mock MCP. `--public` adds a keyless CoinGecko discovery check. No model or wallet action is part of these checks.
 
-Built by [Galleon Labs](https://galleonlabs.io). MIT licensed.
+Built by [Galleon Labs](https://galleonlabs.io). [MIT licensed](LICENSE).

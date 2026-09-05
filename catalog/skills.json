@@ -51,9 +51,9 @@
     {
       "id": "defi-data-skills",
       "source": "galleonlabs/crypto-defi-skills",
-      "description": "DeFiLlama and CoinGecko data access, asset identity, freshness and methodology.",
-      "version": "0.1.0",
-      "revision": "1665210f8c80f5b671aa01caea811946527c875e",
+      "description": "DeFiLlama, CoinGecko and AIXBT research, asset identity, freshness and risk diligence.",
+      "version": "0.2.0",
+      "revision": "49f64c67a4889c5137b3edcb3b1e9b53eb6a11f9",
       "skills": [
         "galleon-defi-data"
       ],

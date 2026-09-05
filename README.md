@@ -44,7 +44,7 @@ Use the same `--directory` for subsequent commands. `--skip-model-setup` is for 
 | Pack | Version | Role |
 | --- | --- | --- |
 | [Infrastructure](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/infra) | 0.1.0 | RPC, Alchemy, Coinbase account/wallet access, permissions and readiness |
-| [Data](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/data) | 0.1.0 | DeFiLlama and CoinGecko access, asset identity, freshness and methodology |
+| [Data](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/data) | 0.2.0 | DeFiLlama, CoinGecko and AIXBT research, asset identity, freshness and risk diligence |
 | [LP](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/lp) | 0.4.2 | Uniswap and Aerodrome analysis, planning and position workflows; Revert and VFAT guidance |
 | [Hyperliquid](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/hyperliquid) | 0.2.1 | Market analysis, planning, execution, monitoring and performance review |
 
@@ -101,7 +101,7 @@ Read [the connection guide](docs/CONNECTIONS.md) for exact prerequisites, diagno
 
 Boomkin loads only the relevant skills and provider references. It separates infrastructure readiness, data evidence, analysis, planning and execution. It uses Hermes's native memory and scheduling when appropriate; a scheduled task retains the same authorization and freshness requirements as an interactive task.
 
-`doctor` reports configuration and installed versions. `doctor --live` additionally verifies keyless CoinGecko MCP initialization and tool discovery. Neither is proof of a successful model response, authenticated paid data, wallet authority or an executed transaction. Use the data pack's public diagnostic for a first market observation, and the infrastructure pack's RPC diagnostic for a configured chain.
+`doctor` reports configuration and installed versions. `doctor --live` additionally verifies keyless CoinGecko MCP initialization and tool discovery, plus credential-free AIXBT discovery when connected. Neither is proof of a successful model response, authenticated paid data, wallet authority or an executed transaction. Use the data pack's public diagnostic for a first market observation, and the infrastructure pack's RPC diagnostic for a configured chain.
 
 ## Updates and recovery
 

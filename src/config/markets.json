@@ -1,6 +1,6 @@
 {
-  "version": 6,
-  "updatedAt": "2026-09-02",
+  "version": 7,
+  "updatedAt": "2026-09-04",
   "chains": [
     {
       "slug": "base",
@@ -241,6 +241,44 @@
           "status": "active",
           "risk": "experimental",
           "color": "#ff6f83",
+          "liquidityVenues": []
+        },
+        {
+          "id": "base-drb",
+          "name": "DebtReliefBot",
+          "symbol": "DRB",
+          "token": "0x3ec2156D4c0A9CBdAB4a016633b7BcF6a8d68Ea2",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0x5116773e18A9C7bB03EBB961b38678E45E238923",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#5ef0b6",
+          "liquidityVenues": []
+        },
+        {
+          "id": "base-bnkr",
+          "name": "BankrCoin",
+          "symbol": "BNKR",
+          "token": "0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b",
+          "tokenDecimals": 18,
+          "quoteToken": "0x4200000000000000000000000000000000000006",
+          "quoteSymbol": "WETH",
+          "quoteDecimals": 18,
+          "protocol": "V3",
+          "pool": "0xAEC085E5A5CE8d96A7bDd3eB3A62445d4f6CE703",
+          "fee": 10000,
+          "tickSpacing": 200,
+          "rangeWidthPct": 50,
+          "status": "active",
+          "risk": "experimental",
+          "color": "#ff8a62",
           "liquidityVenues": []
         }
       ]

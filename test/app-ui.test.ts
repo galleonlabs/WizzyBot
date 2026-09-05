@@ -41,10 +41,12 @@ const achievementsRoute = readFileSync("app/api/achievements/route.ts", "utf8");
 const shotFixture = readFileSync("app/lib/shot-fixture.ts", "utf8");
 
 describe("meme yield curator surface", () => {
-  it("serves the app at the root and retires the coming-soon gate", () => {
-    expect(page).toContain("<PortfolioApp />");
-    expect(page).not.toContain("coming-soon");
-    expect(appPage).toContain('redirect("/")');
+  it("keeps the coming-soon gate at the root and serves the app at /app", () => {
+    expect(page).toContain("coming-soon");
+    expect(page).toContain("Coming soon");
+    expect(page).not.toContain("PortfolioApp");
+    expect(appPage).toContain("<PortfolioApp />");
+    expect(appPage).toContain("index: false");
     expect(existsSync("app/admin/page.tsx")).toBe(false);
     expect(existsSync("app/markets/market-ledger.tsx")).toBe(false);
     expect(layout).toContain('const socialTitle = "Wizzy: Meme Yield, Curated"');

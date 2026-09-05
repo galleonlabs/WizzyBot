@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readdir, rm, readFile, writeFile, rename } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { harnesses, parseCatalog } from "../src/core";
@@ -17,14 +17,6 @@ try {
     await mkdir(resolve(instruction, ".."), { recursive: true });
     await writeFile(instruction, "Keep my existing instructions.\n");
     for (const command of ["setup", "update"] as const) {
-      if (command === "update" && name === "eve") {
-        // Exercise an existing installation's legacy state migration on a real update.
-        const configPath = join(directory, ".boomkin/config.json");
-        const legacyConfig = JSON.parse(await readFile(configPath, "utf8"));
-        delete legacyConfig.packs;
-        await writeFile(configPath, JSON.stringify(legacyConfig));
-        await rename(join(directory, ".boomkin"), join(directory, ".wizzy"));
-      }
       if (command === "update" && name === "hermes") await writeFile(join(directory, ".boomkin/last-sync.json"), "{broken");
       const p = Bun.spawn([process.execPath, cli, command, "--directory", directory, ...(command === "setup" ? ["--harness", name] : ["--offline-catalog"])], {
         env: { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), CODEX_HOME: join(home, ".codex") }, stdout: "pipe", stderr: "pipe",

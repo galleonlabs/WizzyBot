@@ -1,8 +1,8 @@
 # Advanced skill-only compatibility
 
-Boomkin's main onboarding product uses Hermes; start with the root README. The adapters below preserve portable skill installation in other harnesses and do not provision a complete Boomkin runtime there.
+Boomkin's main onboarding product uses Hermes; start with the [getting-started guide](../README.md#get-started). The adapters below preserve portable skill installation in other harnesses and do not provision a complete Boomkin runtime there.
 
-# Choose a harness
+## Choose a harness
 
 Boomkin supplies the crypto skill catalog and setup/update commands. The upstream
 harness owns models, authentication, tools, chat, memory, permissions, and hosting.
@@ -10,20 +10,20 @@ Install the runtime from its official source; Boomkin does not vendor it.
 
 ## Hermes
 
-[Install Hermes](https://hermes-agent.nousresearch.com/docs/getting-started/installation/)
-using its upstream installer, then create a dedicated profile directory:
+For a complete Boomkin profile, use native onboarding:
 
 ```bash
-HERMES_HOME="$HOME/boomkin" hermes setup
-# From your Boomkin checkout:
-bun run boomkin setup --harness hermes --directory "$HOME/boomkin"
-HERMES_HOME="$HOME/boomkin" hermes
+bun run boomkin onboard --directory "$HOME/boomkin-hermes"
+bun run boomkin start --directory "$HOME/boomkin-hermes"
 ```
 
-Keep `HERMES_HOME` set on every launch, including a gateway/service. Boomkin passes it
-through to the skill installer, which writes to that profile's `skills/` directory.
-Follow [Hermes gateway documentation](https://hermes-agent.nousresearch.com/docs/)
-for persistent operation. Credentials and service management remain with Hermes.
+To add only the skills to an existing Hermes home:
+
+```bash
+bun run boomkin setup --harness hermes --directory "$HOME/your-hermes-profile"
+```
+
+Boomkin passes that directory as `HERMES_HOME` to the skill installer, which writes to its `skills/` directory. Use your existing native Hermes launch configuration for that profile. Follow [Hermes gateway documentation](https://hermes-agent.nousresearch.com/docs/) for persistent operation.
 
 ## Eve
 

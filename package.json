@@ -1,6 +1,6 @@
 {
   "name": "boomkin",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Onboard a Hermes DeFi agent with four modular Galleon skill packs and official tool connections.",
   "type": "module",

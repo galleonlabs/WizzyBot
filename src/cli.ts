@@ -7,7 +7,6 @@ import catalogFile from "../catalog/skills.json";
 import { harnesses, parseCatalog, parseHarness, parseConfig, installArgs, identity, fetchCatalog, catalogChanges, installedVersion, selectPacks, type Catalog, type Config } from "./core.ts";
 
 import { tmpdir } from "node:os";
-import { stateDirectory } from "./state.ts";
 import { checkoutPack, packageDirectory } from "./source.ts";
 import { defaultProfile, prepareHermes, connectProvider, providers, doctor } from "./onboarding.ts";
 import { runHermes } from "./hermes.ts";
@@ -100,8 +99,8 @@ async function main() {
   if (!["setup", "update", "check", "status"].includes(command)) throw new Error(`Unknown command: ${command}`);
   if (!values.directory) throw new Error("Pass --directory with your harness workspace (Hermes: its HERMES_HOME).");
   const directory = await canonicalPath(resolve(values.directory));
-  let stateDir = await stateDirectory(directory, false);
-  let configPath = join(stateDir, "config.json");
+  const stateDir = join(directory, ".boomkin");
+  const configPath = join(stateDir, "config.json");
   let config: Config;
   if (command === "setup") {
     config = { schemaVersion: 1, harness: parseHarness(values.harness), directory };
@@ -158,9 +157,6 @@ async function main() {
   console.log(adapter.setup);
   for (const pack of catalog.packs) console.log(`Install ${pack.source}/${pack.path}@${pack.version} from verified commit ${pack.revision}`);
   if (values["dry-run"]) return;
-  stateDir = await stateDirectory(directory, true);
-  configPath = join(stateDir, "config.json");
-  env.XDG_STATE_HOME = join(stateDir, "state");
   await mkdir(directory, { recursive: true });
   await mkdir(stateDir, { recursive: true });
   const lock = join(stateDir, "operation.lock");

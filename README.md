@@ -4,6 +4,8 @@
 
 Boomkin brings the native [Hermes Agent](https://github.com/NousResearch/hermes-agent) runtime together with four independently published Galleon skill packs, public market data and optional infrastructure and wallet connections. It gives you a dedicated DeFi profile, then hands model login, tool authentication and the agent loop to Hermes.
 
+[Get started](#get-started) · [Skill packs](#four-skill-packs) · [Connections](docs/CONNECTIONS.md) · [Contribute](CONTRIBUTING.md)
+
 [![CI](https://github.com/galleonlabs/boomkin/actions/workflows/ci.yml/badge.svg)](https://github.com/galleonlabs/boomkin/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -112,9 +114,13 @@ Pull this repo and run `bun install --frozen-lockfile` when updating Boomkin its
 
 Onboarding can be rerun after a failed install or interrupted login. Completed skill installs and existing instructions remain intact. Review any reported operation lock before removing it. Provider failure does not change the approved route or cause an automatic retry of a financial action.
 
-See [updates and migration](docs/UPDATES.md) for old `.wizzy` state, previous skill names and selected-pack behavior. Credentials, private evidence and generated profiles must stay outside this repository.
+See [updates and recovery](docs/UPDATES.md) for pack selection, backups and troubleshooting. Keep credentials, private evidence and generated profiles outside this repository.
 
-## Development
+## Contributing
+
+Bug reports, clearer guides, new workflows and focused pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup and the checks relevant to your change. Report a reproducible problem in [GitHub Issues](https://github.com/galleonlabs/boomkin/issues); use [private reporting](SECURITY.md) for security concerns.
+
+### Local development
 
 ```bash
 bun install --frozen-lockfile

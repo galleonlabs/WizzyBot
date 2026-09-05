@@ -2,46 +2,6 @@ import { expect, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { stateDirectory } from "../src/state";
-
-async function fixture(run: (directory: string, legacy: string) => Promise<void>) {
-  const { realpath } = await import("node:fs/promises");
-  const directory = await realpath(await mkdtemp(join(tmpdir(), "boomkin-migrate-")));
-  const legacy = join(directory, ".wizzy");
-  await mkdir(legacy);
-  await writeFile(join(legacy, "config.json"), JSON.stringify({ schemaVersion: 1, harness: "eve", directory }));
-  try { await run(directory, legacy); }
-  finally { await rm(directory, { recursive: true, force: true }); }
-}
-
-test("legacy state is moved intact only by a mutating command", async () => {
-  await fixture(async (directory, legacy) => {
-    await writeFile(join(legacy, "last-sync.json"), "saved provenance");
-    expect(await stateDirectory(directory, false)).toBe(legacy);
-    expect(await Bun.file(join(legacy, "config.json")).exists()).toBe(true);
-    const current = await stateDirectory(directory, true);
-    expect(current).toBe(join(directory, ".boomkin"));
-    expect(await readFile(join(current, "last-sync.json"), "utf8")).toBe("saved provenance");
-    expect(await Bun.file(join(legacy, "config.json")).exists()).toBe(false);
-  });
-});
-test("migration refuses conflicting state and interrupted operations", async () => {
-  await fixture(async (directory, legacy) => {
-    await mkdir(join(legacy, "operation.lock"));
-    await expect(stateDirectory(directory, true)).rejects.toThrow("operation");
-    await rm(join(legacy, "operation.lock"), { recursive: true });
-    await mkdir(join(directory, ".boomkin"));
-    await expect(stateDirectory(directory, true)).rejects.toThrow("Both");
-    expect(await Bun.file(join(legacy, "config.json")).exists()).toBe(true);
-  });
-});
-test("migration rejects state copied from another workspace", async () => {
-  await fixture(async (directory, legacy) => {
-    await writeFile(join(legacy, "config.json"), JSON.stringify({ schemaVersion: 1, harness: "eve", directory: "/other" }));
-    await expect(stateDirectory(directory, true)).rejects.toThrow("moved");
-  });
-});
-
 test("failed source fetch preserves successful sync and releases the operation lock", async () => {
   const { realpath, chmod, access } = await import("node:fs/promises");
   const directory = await realpath(await mkdtemp(join(tmpdir(), "boomkin-failed-install-")));

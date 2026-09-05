@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { parse as parseYaml } from "yaml";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseCatalog, parseConfig, parseHarness, installArgs, harnesses, fetchCatalog, catalogChanges, installedVersion, selectPacks } from "../src/core";
@@ -111,4 +112,12 @@ test("legacy configurations never opt into future catalog packs", () => {
   }] });
   expect(selectPacks(future, config.packs).packs.map(pack => pack.id)).toEqual(["lp-skills", "hyperliquid-skills"]);
   expect(selectPacks(future).packs).toHaveLength(5);
+});
+
+test("harness compatibility runs on pull requests that touch catalog pins", async () => {
+  const text = await readFile(new URL("../.github/workflows/compatibility.yml", import.meta.url), "utf8");
+  const workflow = parseYaml(text) as { on: { pull_request?: { paths?: string[] }; push?: { paths?: string[] } } };
+  expect(workflow.on.pull_request?.paths).toEqual(workflow.on.push?.paths);
+  expect(workflow.on.pull_request?.paths).toContain("catalog/**");
+  expect(workflow.on.pull_request?.paths).toContain("scripts/smoke.ts");
 });

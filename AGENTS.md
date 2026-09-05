@@ -1,9 +1,12 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# WizzyBot
 
-# This is NOT the Next.js you know
+WizzyBot is a setup and update layer for upstream agent harnesses and Galleon skill packs.
+Use TypeScript and Bun. Run `bun run check` and `bun run build` before shipping.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
-
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->
+- Never copy or fork a harness runtime or skill corpus here. Use upstream installers.
+- Keep the catalog explicit, source-controlled, and restricted to reviewed Galleon repositories.
+- Never add signing, custody, transaction submission, hidden fees, or telemetry to setup.
+- Preserve user instructions and harness configuration. Keep every command scoped to its selected workspace.
+- Harness support requires a documented upstream discovery path and a clean-directory installation smoke test.
+- Be precise: installing skills is not proof of a live model, connected wallet, or deployed service.
+- Test failure paths for network failures, malformed catalogs, and interrupted installs.

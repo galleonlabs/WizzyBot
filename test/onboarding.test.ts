@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, readFile, writeFile, rm, realpath } from "node:fs/promises";
+import { mkdtemp, mkdir, chmod, readFile, writeFile, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { aixbtConfig, coinbaseSettings, connectProvider, publicDataProbe, doctor } from "../src/onboarding";
@@ -113,6 +113,10 @@ test("AIXBT discovery fails closed on removed tools and does not expose server e
 
 test("AIXBT configuration retains only environment references, preserves config, and diagnoses missing credentials", async () => {
   await temporary(async root => {
+    const bin = join(root, ".boomkin/runtime/venv/bin");
+    await mkdir(bin, { recursive: true });
+    await writeFile(join(bin, "hermes"), '#!/bin/sh\necho "Hermes Agent v0.21.0"\n');
+    await chmod(join(bin, "hermes"), 0o700);
     await writeFile(join(root, "config.yaml"), "# Keep my configuration\nmodel:\n  default: existing-model\n");
     // A blank profile value intentionally overrides any inherited environment.
     await writeFile(join(root, ".env"), "AIXBT_API_KEY=\n");

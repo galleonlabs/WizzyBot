@@ -41,7 +41,7 @@ export const CuratorResearchDecisionSchema = z.object({
   schemaVersion: z.literal(2),
   verdict: z.enum(["no_change", "update"]),
   summary: z.string().min(1).max(1_500),
-  candidateReviews: z.array(CandidateReviewSchema).max(32),
+  candidateReviews: z.array(CandidateReviewSchema),
   candidateNominations: z.array(CandidateNominationSchema).max(16),
   venueAdditions: z.array(VenueAdditionSchema).max(16),
   marketAdmissions: z.array(MarketAdmissionSchema).max(32),

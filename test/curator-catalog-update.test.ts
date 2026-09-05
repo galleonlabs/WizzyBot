@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planCentralizedCatalogUpdate, type CuratorResearchDecision } from "../src/curator/catalog-update.js";
+import { CuratorResearchDecisionSchema, planCentralizedCatalogUpdate, type CuratorResearchDecision } from "../src/curator/catalog-update.js";
 import { getCuratorConfig } from "../src/curator/config.js";
 import type { MarketEvaluation } from "../src/curator/policy.js";
 import type { CuratorReport } from "../src/curator/run.js";
@@ -20,6 +20,17 @@ const sources = [
 ];
 
 describe("agentic centralized curator", () => {
+  it("accepts a review for every configured candidate as the registry grows", () => {
+    const candidateReviews = Array.from({ length: 34 }, (_, index) => ({
+      candidateId: `candidate-${index}`,
+      identity: "watch" as const,
+      rationale: ["standing identity retained"],
+      sources: [],
+    }));
+
+    expect(CuratorResearchDecisionSchema.parse(decision({ candidateReviews })).candidateReviews).toHaveLength(34);
+  });
+
   it("promotes identity research without allowing the agent to bypass market policy", () => {
     const config = structuredClone(getCuratorConfig());
     const candidate = config.candidates.find((row) => row.id === "robinhood-gg")!;

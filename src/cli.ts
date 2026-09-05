@@ -30,7 +30,7 @@ installs four Galleon skill packs and public CoinGecko MCP, then runs native mod
 --no-install uses an existing Hermes executable. --dry-run previews without writes.
 --all-packs opts an existing onboarding profile into all four current packs.
 doctor distinguishes configuration from verified reads; --live probes public MCP only.
-connect uses native Hermes OAuth and tool selection, or the official local Coinbase MCP.
+connect uses native Hermes OAuth, AIXBT environment-backed authentication, or the official local Coinbase MCP.
 Wallet/account setup stays in its official CLI; see docs/CONNECTIONS.md.
 
 Advanced skill-only compatibility:

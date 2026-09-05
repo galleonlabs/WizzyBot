@@ -70,6 +70,7 @@ Other harnesses can still install the portable skills through [advanced compatib
 
 ```bash
 bun run boomkin providers
+bun run boomkin connect --provider aixbt
 bun run boomkin connect --provider alchemy
 bun run boomkin connect --provider defillama
 bun run boomkin connect --provider coinbase
@@ -79,6 +80,7 @@ bun run boomkin connect --provider coinbase
 | --- | --- |
 | CoinGecko | Public, keyless MCP configured during onboarding. Its reviewed tools are `execute` and `search_docs`; hosted execution is restricted to the provider's data SDK. |
 | Alchemy | Native Hermes OAuth and explicit tool selection. Select the intended Alchemy app; data/RPC access and wallet/admin actions have different scopes. |
+| AIXBT | Optional crypto intelligence through native Hermes MCP; the key stays in `AIXBT_API_KEY`. Discovery is public; protected research reads require account access. |
 | DeFiLlama | Native Hermes OAuth with an API subscription. Queries consume credits; connecting another client can disconnect the previous client. |
 | Coinbase account | Official local MCP through a pinned CLI, with six read tools and a profile-specific configuration/keychain environment. Account credentials remain a separate step. |
 | Agentic Wallet | Separate official `awal` CLI flow for managed wallet and x402 use. Login, wallet creation, funding and spend limits require your choices; see the connection guide. |

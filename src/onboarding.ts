@@ -9,6 +9,7 @@ export const defaultProfile = () => join(homedir(), ".boomkin", "hermes");
 export const providers = {
   coingecko: { url: "https://mcp.api.coingecko.com/mcp", access: "Public data; no key. Enabled by onboard with a reviewed tool selection." },
   defillama: { url: "https://mcp.defillama.com/mcp", access: "Optional API subscription and OAuth; queries consume credits. One MCP client per account." },
+  aixbt: { url: "https://api.aixbt.tech/mcp", access: "Optional crypto intelligence. Set AIXBT_API_KEY in the selected Hermes profile; only Topic reads are public. Protected tools use account access and quotas." },
   alchemy: { url: "https://mcp.alchemy.com/mcp", access: "Optional OAuth and selected app. Review tool selection, RPC limits and app costs." },
 } as const;
 export const coinGeckoConfig = {
@@ -16,6 +17,19 @@ export const coinGeckoConfig = {
   enabled: true,
   trust: "untrusted",
   tools: { include: ["execute", "search_docs"], resources: false, prompts: false },
+};
+
+// Reviewed through unauthenticated tools/list on 2026-09-05. New upstream tools
+// remain excluded until reviewed; schemas are discovered by native Hermes.
+export const aixbtConfig = {
+  url: providers.aixbt.url,
+  headers: { Authorization: "Bearer ${AIXBT_API_KEY}" },
+  enabled: true,
+  trust: "untrusted",
+  tools: {
+    include: ["list_projects", "get_project", "get_project_series", "list_intel", "get_intel", "get_report", "get_vocabulary", "list_clusters", "me", "list_topics", "get_topic", "get_topic_series"],
+    resources: false, prompts: false,
+  },
 };
 
 export function coinbaseSettings(directory: string) {
@@ -56,12 +70,14 @@ export async function connectProvider(directory: string, provider: string, dryRu
     console.log(JSON.stringify({ configDirectory: settings.env.COINBASE_CONFIG_DIR, environment: settings.env.COINBASE_ENV, nextAction: "Use connect --provider coinbase --key-file /absolute/path/to/scoped-key.json to configure the native CLI, or follow docs/CONNECTIONS.md. Balances and account authority have not been checked." }, null, 2));
     return;
   }
-  if (!Object.hasOwn(providers, provider)) throw new Error("Choose coingecko, defillama, alchemy or coinbase. Agentic Wallet setup is a separate official CLI path in docs/CONNECTIONS.md.");
+  if (!Object.hasOwn(providers, provider)) throw new Error("Choose coingecko, aixbt, defillama, alchemy or coinbase. Agentic Wallet setup is a separate official CLI path in docs/CONNECTIONS.md.");
   const selected = providers[provider as keyof typeof providers];
   console.log(`${provider}: ${selected.access}`);
   if (dryRun) return;
   if (provider === "coingecko") {
     await configureMcpServers(directory, { coingecko: coinGeckoConfig });
+  } else if (provider === "aixbt") {
+    await configureMcpServers(directory, { aixbt: aixbtConfig });
   } else {
     if (!process.stdin.isTTY) throw new Error("This provider requires interactive OAuth and tool selection. Run connect in your terminal.");
     await runHermes(directory, ["mcp", "add", provider, "--url", selected.url, "--auth", "oauth"]);
@@ -70,17 +86,19 @@ export async function connectProvider(directory: string, provider: string, dryRu
   const status = await localProfileStatus(directory);
   const server = status.mcpServers.find(entry => entry.name === provider);
   if (!server?.enabled || server.missingEnvironment.length) throw new Error("Provider setup is incomplete. Resolve its native authentication/configuration before relying on it.");
-  if (provider !== "coingecko") await setMcpTrustUntrusted(directory, provider);
+  if (!["coingecko", "aixbt"].includes(provider)) await setMcpTrustUntrusted(directory, provider);
   console.log(`${provider} configuration is present. Restart Hermes to load it; configuration alone does not prove a successful data read.`);
 }
 
 type Fetcher = (url: string, options: RequestInit) => Promise<Response>;
-export async function publicDataProbe(fetcher: Fetcher = fetch) {
-  // Only this keyless public endpoint is probed. No paid MCP, wallet or model calls.
+export async function publicDataProbe(fetcher: Fetcher = fetch, provider: "coingecko" | "aixbt" = "coingecko") {
+  // Discovery is keyless for both providers. Never send credential headers or
+  // invoke tools/call: protected data reads may consume account quotas.
+  const selected = provider === "aixbt" ? aixbtConfig : coinGeckoConfig;
   let session: string | null = null;
   let protocol: string | undefined;
   async function call(body: unknown) {
-    const response = await fetcher(providers.coingecko.url, {
+    const response = await fetcher(selected.url, {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(15_000),
       headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", ...(session ? { "Mcp-Session-Id": session } : {}), ...(protocol ? { "MCP-Protocol-Version": protocol } : {}) },
       body: JSON.stringify(body),
@@ -113,10 +131,10 @@ export async function publicDataProbe(fetcher: Fetcher = fetch) {
     await call({ jsonrpc: "2.0", method: "notifications/initialized" });
     const tools = await call({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
     const names = tools.result?.tools?.map((tool: { name: string }) => tool.name);
-    if (!Array.isArray(names) || !coinGeckoConfig.tools.include.every(name => names.includes(name))) throw new Error("reviewed MCP tool contract changed");
-    return { provider: "coingecko", status: "verified" as const, observedAt: new Date().toISOString(), evidence: "public MCP initialization and reviewed tool discovery", tools: coinGeckoConfig.tools.include, marketRead: "not-tested", scope: "Provider connectivity only; Hermes tool loading is checked by the native runtime" };
+    if (!Array.isArray(names) || !selected.tools.include.every(name => names.includes(name))) throw new Error("reviewed MCP tool contract changed");
+    return { provider, status: "verified" as const, observedAt: new Date().toISOString(), evidence: "public MCP initialization and reviewed tool discovery", tools: selected.tools.include, marketRead: "not-tested", scope: "Provider connectivity only; Hermes tool loading is checked by the native runtime" };
   } catch {
-    return { provider: "coingecko", status: "unavailable" as const, observedAt: new Date().toISOString(), evidence: "Public MCP could not verify the reviewed tool contract. Retry later or use the data skill's public REST diagnostic." };
+    return { provider, status: "unavailable" as const, observedAt: new Date().toISOString(), evidence: "Public MCP could not verify the reviewed tool contract. Retry later or consult the provider connection guide." };
   }
 }
 
@@ -143,5 +161,6 @@ export async function doctor(directory: string, catalog: Catalog, live = false) 
   if (!profile.mcpServers.some(server => server.name === "coingecko" && server.enabled)) gaps.push("Connect public CoinGecko data with onboard or connect --provider coingecko");
   for (const server of profile.mcpServers) if (server.missingEnvironment.length) gaps.push(`Configure missing environment for ${server.name}`);
   const publicData = live ? await publicDataProbe() : { status: "not-tested", nextAction: "Run doctor --live for a keyless public MCP connection check" };
-  return { directory, state: gaps.length ? "needs-setup" : "configured", ...profile, packs, publicData, gaps, financialAccess: "No wallet, payment or trading authority is granted by onboarding", nextAction: gaps.length ? gaps[0] : "Run start; authentication and a successful model response are verified by Hermes at use time" };
+  const optionalData = live && profile.mcpServers.some(server => server.name === "aixbt" && server.enabled) ? [await publicDataProbe(fetch, "aixbt")] : [];
+  return { directory, state: gaps.length ? "needs-setup" : "configured", ...profile, packs, publicData, optionalData, gaps, financialAccess: "No wallet, payment or trading authority is granted by onboarding", nextAction: gaps.length ? gaps[0] : "Run start; authentication and a successful model response are verified by Hermes at use time" };
 }

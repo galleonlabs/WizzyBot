@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, realpath } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { coinbaseSettings, connectProvider, publicDataProbe, doctor } from "../src/onboarding";
+import { aixbtConfig, coinbaseSettings, connectProvider, publicDataProbe, doctor } from "../src/onboarding";
 import catalog from "../catalog/skills.json";
 import { parseCatalog } from "../src/core";
 
@@ -76,4 +76,68 @@ test("onboarding-only and connection-only options cannot be silently ignored", a
     const child = Bun.spawn([process.execPath, "src/cli.ts", ...args], { stdout: "pipe", stderr: "pipe" });
     expect(await child.exited).toBe(1);
   }
+});
+
+
+test("AIXBT discovery is credential-free and verifies the reviewed read tools", async () => {
+  const methods: string[] = [];
+  const probe = await publicDataProbe(async (url, options) => {
+    expect(url).toBe("https://api.aixbt.tech/mcp");
+    expect(options.redirect).toBe("error");
+    expect(Object.keys(options.headers as Record<string, string>).some(key => /authorization/i.test(key))).toBe(false);
+    const body = JSON.parse(options.body as string); methods.push(body.method);
+    if (body.method === "initialize") return Response.json({ result: { protocolVersion: "2025-03-26", serverInfo: { name: "aixbt" } } });
+    if (body.method === "notifications/initialized") return new Response(null, { status: 202 });
+    return Response.json({ result: { tools: [...aixbtConfig.tools.include, "unreviewed_future_tool"].map(name => ({ name })) } });
+  }, "aixbt");
+  expect(probe.status).toBe("verified");
+  expect(probe.provider).toBe("aixbt");
+  expect(probe.tools).toEqual(aixbtConfig.tools.include);
+  expect(methods).toEqual(["initialize", "notifications/initialized", "tools/list"]);
+});
+
+test("AIXBT discovery fails closed on removed tools and does not expose server errors", async () => {
+  for (const result of [{ tools: [{ name: "list_topics" }] }, { tools: "malformed" }]) {
+    const probe = await publicDataProbe(async (_url, options) => {
+      const body = JSON.parse(options.body as string);
+      if (body.method === "initialize") return Response.json({ result: { protocolVersion: "2025-03-26", serverInfo: { name: "aixbt" } } });
+      if (body.method === "notifications/initialized") return new Response(null, { status: 202 });
+      return Response.json({ result });
+    }, "aixbt");
+    expect(probe.status).toBe("unavailable");
+  }
+  const probe = await publicDataProbe(async () => { throw new Error("private-error-fixture"); }, "aixbt");
+  expect(probe.status).toBe("unavailable");
+  expect(JSON.stringify(probe)).not.toContain("private-error-fixture");
+});
+
+test("AIXBT configuration retains only environment references, preserves config, and diagnoses missing credentials", async () => {
+  await temporary(async root => {
+    await writeFile(join(root, "config.yaml"), "# Keep my configuration\nmodel:\n  default: existing-model\n");
+    // A blank profile value intentionally overrides any inherited environment.
+    await writeFile(join(root, ".env"), "AIXBT_API_KEY=\n");
+    await expect(connectProvider(root, "aixbt")).rejects.toThrow("Provider setup is incomplete");
+    let profile = await doctor(root, parseCatalog(catalog));
+    expect(profile.mcpServers.find(server => server.name === "aixbt")?.missingEnvironment).toEqual(["AIXBT_API_KEY"]);
+    await writeFile(join(root, ".env"), "AIXBT_API_KEY=fixture-never-sent-to-network\n");
+    await connectProvider(root, "aixbt");
+    const config = await readFile(join(root, "config.yaml"), "utf8");
+    expect(config).toContain("Bearer ${AIXBT_API_KEY}");
+    expect(config).not.toContain("fixture-never-sent-to-network");
+    expect(config).toContain("# Keep my configuration");
+    expect(config).toContain("default: existing-model");
+    expect(config).toContain("trust: untrusted");
+    profile = await doctor(root, parseCatalog(catalog));
+    expect(profile.mcpServers.find(server => server.name === "aixbt")?.missingEnvironment).toEqual([]);
+    expect(profile.optionalData).toEqual([]);
+    expect(JSON.stringify(profile)).not.toContain("fixture-never-sent-to-network");
+  });
+});
+
+test("AIXBT connection dry run creates no profile", async () => {
+  await temporary(async root => {
+    const path = join(root, "fresh");
+    await connectProvider(path, "aixbt", true);
+    await expect(readFile(join(path, "config.yaml"))).rejects.toThrow();
+  });
 });

@@ -26,7 +26,7 @@ Replace the directory above if you use another profile, and pass it to `doctor` 
 | Hermes runtime | Use Hermes's native update procedure, then rerun `doctor --live` |
 | Provider credentials and tools | Use the native setup paths in the [connection guide](CONNECTIONS.md) |
 
-`doctor` checks configuration; `--live` also checks public CoinGecko tool discovery. Confirm a successful first task through Hermes before relying on the updated setup. These checks do not establish wallet or trading authority.
+`doctor` checks configuration; `--live` also checks public CoinGecko tool discovery and credential-free AIXBT discovery when that optional connection is configured. Confirm a successful first task through Hermes before relying on the updated setup. These checks do not establish wallet or trading authority.
 
 ## Select your packs
 

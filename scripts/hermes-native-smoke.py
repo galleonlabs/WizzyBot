@@ -37,9 +37,9 @@ with tempfile.TemporaryDirectory(prefix="boomkin-native-smoke-") as temporary:
         return result.stdout
 
     run([bun, "-e", '''import { initializeProfile, configureMcpServers } from "./src/hermes.ts";
-import { coinGeckoConfig } from "./src/onboarding.ts";
+import { coinGeckoConfig, aixbtConfig } from "./src/onboarding.ts";
 await initializeProfile(process.env.BOOMKIN_SMOKE_ROOT!, "# Boomkin smoke identity\\n");
-await configureMcpServers(process.env.BOOMKIN_SMOKE_ROOT!, { coingecko: { ...coinGeckoConfig, enabled: false } });'''], cwd=repo)
+await configureMcpServers(process.env.BOOMKIN_SMOKE_ROOT!, { coingecko: { ...coinGeckoConfig, enabled: false }, aixbt: { ...aixbtConfig, enabled: false } });'''], cwd=repo)
     version = run([str(hermes), "--profile", "default", "--version"])
     assert "Hermes Agent v" in version
     assert run([str(hermes), "--profile", "default", "config", "path"]).strip() == str(root / "config.yaml")
@@ -54,12 +54,23 @@ await configureMcpServers(process.env.BOOMKIN_SMOKE_ROOT!, { coingecko: { ...coi
 from hermes_constants import get_hermes_home
 from agent.prompt_builder import load_soul_md
 from tools.mcp_tool_registration import _make_tool_filter
+from tools.mcp_tool_config import _interpolate_env_vars
 import os
 assert str(get_hermes_home()) == os.environ['HERMES_HOME']
 assert 'Boomkin smoke identity' in load_soul_md()
 f = _make_tool_filter('smoke', {'tools': {'include': ['read_price'], 'exclude': ['read_price']}})
 assert f('read_price') and not f('send_transaction')
 assert not _make_tool_filter('smoke', {'tools': {'include': []}})('read_price')
+from hermes_cli.config import load_config
+cfg = load_config()['mcp_servers']['aixbt']
+assert cfg['enabled'] is False
+assert cfg['url'] == 'https://api.aixbt.tech/mcp'
+assert cfg['headers']['Authorization'] == 'Bearer ${AIXBT_API_KEY}'
+os.environ['AIXBT_API_KEY'] = 'isolated-native-fixture'
+assert _interpolate_env_vars(cfg)['headers']['Authorization'] == 'Bearer isolated-native-fixture'
+aixbt_filter = _make_tool_filter('aixbt', cfg)
+assert aixbt_filter('list_topics') and aixbt_filter('me')
+assert not aixbt_filter('unreviewed_future_tool') and not aixbt_filter('send_transaction')
 '''])
     # Minimal stdio MCP: schema discovery only; a tools/call request fails this smoke.
     mock = root / "mock_mcp.py"
@@ -91,4 +102,4 @@ await configureMcpServers(process.env.BOOMKIN_SMOKE_ROOT!, { local_smoke: { comm
         output = run([str(hermes), "--profile", "default", "mcp", "test", "coingecko"])
         assert "Connected" in output and "Tools discovered: 2" in output and "execute" in output and "search_docs" in output, "Public native MCP contract did not positively verify"
         public_verified = True
-    print(json.dumps({"runtime": version.splitlines()[0], "profile_isolation": "passed", "soul": "passed", "config": "passed", "native_tool_filters": "passed", "local_mcp_discovery": "passed", "public_coingecko_discovery": "passed" if public_verified else "not-requested", "model_auth_wallet_calls": "none"}))
+    print(json.dumps({"runtime": version.splitlines()[0], "profile_isolation": "passed", "soul": "passed", "config": "passed", "native_tool_filters": "passed", "aixbt_environment_and_filters": "passed", "local_mcp_discovery": "passed", "public_coingecko_discovery": "passed" if public_verified else "not-requested", "model_auth_wallet_calls": "none"}))

@@ -5,8 +5,8 @@
       "id": "lp-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Setup, analysis, planning, execution and monitoring for Uniswap and Aerodrome liquidity.",
-      "version": "0.4.1",
-      "revision": "7e86a57d0248afe9afcaed63ccd1859f066e9f25",
+      "version": "0.4.2",
+      "revision": "63545fab634109b0018a065a1d159d97d26adf9c",
       "skills": [
         "lp-analyze",
         "lp-engineer",

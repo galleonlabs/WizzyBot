@@ -1,6 +1,6 @@
 {
   "name": "boomkin",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Set up an open-source crypto agent with your harness and Galleon skills.",
   "type": "module",

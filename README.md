@@ -53,7 +53,7 @@ authority and a suitable execution tool. Boomkin has no custody or transaction c
 
 | Pack | Version | Coverage | Source |
 | --- | --- | --- | --- |
-| LP Skills | 0.4.1 | Setup, analysis, planning, execution, monitoring, engineering | [lp-skills](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/lp) |
+| LP Skills | 0.4.2 | Setup, analysis, planning, execution, monitoring, engineering | [lp-skills](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/lp) |
 | Hyperliquid Skills | 0.2.1 | Setup, analysis, planning, execution, monitoring, performance review, engineering | [hyperliquid-skills](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/hyperliquid) |
 
 The catalog contains 13 skills across these two packs. Start with `lp-setup` or

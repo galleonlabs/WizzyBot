@@ -49,3 +49,7 @@ Describe the user-visible change, why it is needed and the checks you ran. For a
 Keep secrets, private profiles and generated artifacts out of commits. Report vulnerabilities through the [security policy](SECURITY.md), rather than a public issue.
 
 Boomkin is [MIT licensed](LICENSE). Contributions are provided under the same license.
+
+## Credit and reuse
+
+Retain existing authorship and license notices in contributions and derived work. [ATTRIBUTION.md](ATTRIBUTION.md) explains MIT notice requirements and offers an optional visible credit line.

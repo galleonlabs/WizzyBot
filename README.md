@@ -133,4 +133,8 @@ bun run smoke
 
 The compatibility smoke checks fresh setup/update and independent pack selection. [Native Hermes smoke](scripts/hermes-native-smoke.py) additionally checks the actual runtime's profile, SOUL, MCP configuration and tool filtering in a temporary home, using a local mock MCP. `--public` adds a keyless CoinGecko discovery check. No model or wallet action is part of these checks.
 
-Built by [Galleon Labs](https://galleonlabs.io). [MIT licensed](LICENSE).
+## License and credit
+
+[MIT licensed](LICENSE), with the copyright and permission notice retained when reusing copies or substantial portions. Created by [Andrew Wilkinson](https://andrewwilkinson.io) and [Galleon Labs](https://github.com/galleonlabs).
+
+See [reuse and attribution](ATTRIBUTION.md) for a ready-to-copy credit line. If Boomkin helps your work, [a star on the original repository](https://github.com/galleonlabs/boomkin) is appreciated and entirely optional.

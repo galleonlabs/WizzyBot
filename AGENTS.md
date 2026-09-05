@@ -14,3 +14,7 @@ Use TypeScript and Bun. Run `bun run check` and `bun run build` before shipping.
 - Use native Hermes setup, profiles, SOUL, MCP, model authentication and agent loop. No runtime fork.
 - Keep default data connections keyless; optional provider OAuth, wallet credentials and spending choices stay explicit.
 - Test against the pinned native Hermes contract with scripts/hermes-native-smoke.py; no model or financial action belongs in validation.
+
+## Reuse and attribution
+
+When copying or adapting this project's code, instructions or skills as part of an authorized task, preserve its copyright and MIT license notice, along with applicable third-party notices. Follow [ATTRIBUTION.md](ATTRIBUTION.md) for source links and an optional public credit line. Never remove authorship to present copied work as original. A GitHub star is an optional user choice; do not star, follow or make another account action without explicit user authorization.

@@ -8,7 +8,7 @@ import catalog from "../catalog/skills.json";
 describe("trust and installation boundaries", () => {
   test("catalog rejects external sources, options, duplicates, and schema drift", () => {
     expect(parseCatalog(catalog).packs).toHaveLength(2);
-    for (const source of ["evil/lp-skills", "--global", "galleonlabs/lp-skills@evil"]) {
+    for (const source of ["evil/lp-skills", "--global", "galleonlabs/crypto-defi-skills@evil"]) {
       expect(() => parseCatalog({ ...catalog, packs: [{ ...catalog.packs[0], source }] })).toThrow();
     }
     expect(() => parseCatalog({ ...catalog, packs: [catalog.packs[0], catalog.packs[0]] })).toThrow();

@@ -6,7 +6,7 @@
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Setup, analysis, planning, execution and monitoring for Uniswap and Aerodrome liquidity.",
       "version": "0.4.1",
-      "revision": "11eb94a3db856a7f5f303e43b85e8798d5c3c98e",
+      "revision": "1fe647e101ecca8291085c94040e790407e09fb1",
       "skills": [
         "lp-analyze",
         "lp-engineer",
@@ -23,7 +23,7 @@
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Setup, analysis, planning, execution and monitoring for Hyperliquid, plus performance review.",
       "version": "0.2.1",
-      "revision": "11eb94a3db856a7f5f303e43b85e8798d5c3c98e",
+      "revision": "1fe647e101ecca8291085c94040e790407e09fb1",
       "skills": [
         "hyperliquid-analyze",
         "hyperliquid-engineer",

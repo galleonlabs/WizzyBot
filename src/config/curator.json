@@ -1,6 +1,6 @@
 {
-  "version": 13,
-  "updatedAt": "2026-09-04",
+  "version": 14,
+  "updatedAt": "2026-09-05",
   "policy": {
     "snapshotMinutes": 360,
     "historyDays": 30,
@@ -63,7 +63,7 @@
       "symbol": "MICRODUCK",
       "feePips": 10000,
       "risk": "experimental",
-      "identity": "watch",
+      "identity": "reviewed",
       "tokenDecimals": 18,
       "chain": "robinhood",
       "token": "0xD5f1afEA47b1A9eab414D2ee740cF1d6d039E725",
@@ -607,16 +607,16 @@
       "risk": "experimental",
       "identity": "reviewed",
       "tokenDecimals": 18,
-      "chain": "base",
-      "token": "0x3792DBDD07e87413247DF995e692806aa13D3299",
-      "pool": "0x6E7b4416E3a2b873F6Cd4840e6bee7d88f07dA8f",
-      "protocol": "V3",
-      "liquidityVenues": [],
       "sources": [
         "https://www.geckoterminal.com/base/pools/0x6e7b4416e3a2b873f6cd4840e6bee7d88f07da8f",
         "https://basescan.org/token/0x3792dbdd07e87413247df995e692806aa13d3299",
         "https://medium.com/ecomi/omi-has-a-new-base-d59326b52cf3"
-      ]
+      ],
+      "chain": "base",
+      "token": "0x3792DBDD07e87413247DF995e692806aa13D3299",
+      "pool": "0x6E7b4416E3a2b873F6Cd4840e6bee7d88f07dA8f",
+      "protocol": "V3",
+      "liquidityVenues": []
     },
     {
       "id": "base-vcnt-dcf513",
@@ -626,16 +626,16 @@
       "risk": "experimental",
       "identity": "reviewed",
       "tokenDecimals": 18,
-      "chain": "base",
-      "token": "0xdCf5130274753c8050aB061B1a1DCbf583f5bFd0",
-      "pool": "0x5eC8FD9B09454e7E2662A2C4c0432f95E896EA79",
-      "protocol": "V3",
-      "liquidityVenues": [],
       "sources": [
         "https://www.geckoterminal.com/base/pools/0x5ec8fd9b09454e7e2662a2c4c0432f95e896ea79",
         "https://basescan.org/token/0xdcf5130274753c8050ab061b1a1dcbf583f5bfd0",
         "https://vicicoin.io/profile/"
-      ]
+      ],
+      "chain": "base",
+      "token": "0xdCf5130274753c8050aB061B1a1DCbf583f5bFd0",
+      "pool": "0x5eC8FD9B09454e7E2662A2C4c0432f95E896EA79",
+      "protocol": "V3",
+      "liquidityVenues": []
     },
     {
       "id": "base-tig-0c03ce",
@@ -645,17 +645,17 @@
       "risk": "experimental",
       "identity": "reviewed",
       "tokenDecimals": 18,
-      "chain": "base",
-      "token": "0x0C03Ce270B4826Ec62e7DD007f0B716068639F7B",
-      "pool": "0xe7cbC50685031608edC09940B328C55D9DEC7d09",
-      "protocol": "V3",
-      "liquidityVenues": [],
       "sources": [
         "https://www.geckoterminal.com/base/pools/0xe7cbc50685031608edc09940b328c55d9dec7d09",
         "https://basescan.org/token/0x0c03ce270b4826ec62e7dd007f0b716068639f7b",
         "https://github.com/tig-foundation/tig-monorepo/blob/main/tig-token/README.md",
         "https://www.tig.foundation/"
-      ]
+      ],
+      "chain": "base",
+      "token": "0x0C03Ce270B4826Ec62e7DD007f0B716068639F7B",
+      "pool": "0xe7cbC50685031608edC09940B328C55D9DEC7d09",
+      "protocol": "V3",
+      "liquidityVenues": []
     },
     {
       "id": "robinhood-spcx-4a0e65",
@@ -665,17 +665,17 @@
       "risk": "experimental",
       "identity": "reviewed",
       "tokenDecimals": 18,
-      "chain": "robinhood",
-      "token": "0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa",
-      "pool": "0xC3c9F0171490Ef0F4536fe493F3b0EbB5ee0CB5e",
-      "protocol": "V3",
-      "liquidityVenues": [],
       "sources": [
         "https://www.geckoterminal.com/robinhood/pools/0xc3c9f0171490ef0f4536fe493f3b0ebb5ee0cb5e",
         "https://robinhoodchain.blockscout.com/token/0x4a0e65a3eccec6dbe60ae065f2e7bb85fae35eea",
         "https://api.robinhood.com/rhj/assets",
         "https://docs.robinhood.com/chain/stock-tokens/"
-      ]
+      ],
+      "chain": "robinhood",
+      "token": "0x4a0E65A3EcceC6dBe60AE065F2e7bb85Fae35eEa",
+      "pool": "0xC3c9F0171490Ef0F4536fe493F3b0EbB5ee0CB5e",
+      "protocol": "V3",
+      "liquidityVenues": []
     },
     {
       "id": "robinhood-meta-c0d645",
@@ -685,14 +685,110 @@
       "risk": "experimental",
       "identity": "reviewed",
       "tokenDecimals": 18,
+      "sources": [
+        "https://www.geckoterminal.com/robinhood/pools/0xa4bdb396a69617eb7f70e2cc1ef526f7340b1b0d",
+        "https://robinhoodchain.blockscout.com/token/0xc0d6457c16cc70d6790dd43521c899c87ce02f35",
+        "https://api.robinhood.com/rhj/assets",
+        "https://docs.robinhood.com/chain/stock-tokens/"
+      ],
       "chain": "robinhood",
       "token": "0xc0D6457C16Cc70d6790Dd43521C899C87ce02f35",
       "pool": "0xa4BdB396a69617eb7F70E2cc1EF526f7340b1B0d",
       "protocol": "V3",
+      "liquidityVenues": []
+    },
+    {
+      "id": "base-usdt-fde4c9",
+      "name": "Tether USD",
+      "symbol": "USDT",
+      "feePips": 3000,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 6,
+      "chain": "base",
+      "token": "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
+      "pool": "0xcE1d8c90A5F0ef28fe0F457e5Ad615215899319a",
+      "protocol": "V3",
       "liquidityVenues": [],
       "sources": [
-        "https://www.geckoterminal.com/robinhood/pools/0xa4bdb396a69617eb7f70e2cc1ef526f7340b1b0d",
-        "https://robinhoodchain.blockscout.com/token/0xc0d6457c16cc70d6790dd43521c899c87ce02f35",
+        "https://www.geckoterminal.com/base/pools/0xce1d8c90a5f0ef28fe0f457e5ad615215899319a",
+        "https://basescan.org/token/0xfde4c96c8593536e31f229ea8f37b2ada2699bb2",
+        "https://www.coinbase.com/es-ar/price/base-tether-usd"
+      ]
+    },
+    {
+      "id": "base-vvv-acfe60",
+      "name": "Venice Token",
+      "symbol": "VVV",
+      "feePips": 10000,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 18,
+      "chain": "base",
+      "token": "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf",
+      "pool": "0x1D2bdB7117a5A7D7fE4c1d95681a92e4Df13bB69",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/base/pools/0x1d2bdb7117a5a7d7fe4c1d95681a92e4df13bb69",
+        "https://basescan.org/token/0xacfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf",
+        "https://www.linkedin.com/posts/venice-ai_venice-token-vvv-is-now-live-on-base-activity-7289744399788347392-Jveu"
+      ]
+    },
+    {
+      "id": "base-auki-f9569c",
+      "name": "Auki Token",
+      "symbol": "AUKI",
+      "feePips": 10000,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 18,
+      "chain": "base",
+      "token": "0xF9569cFb8FD265e91aa478d86ae8c78b8AF55Df4",
+      "pool": "0x2Fa9D6085c91151200e61a3e627D35001772C0D1",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/base/pools/0x2fa9d6085c91151200e61a3e627d35001772c0d1",
+        "https://basescan.org/token/0xf9569cfb8fd265e91aa478d86ae8c78b8af55df4",
+        "https://auki.gitbook.io/whitepaper/tokenomics/on-chain-info"
+      ]
+    },
+    {
+      "id": "base-udoge-12e96c",
+      "name": "Dogecoin (Universal)",
+      "symbol": "uDOGE",
+      "feePips": 3000,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 18,
+      "chain": "base",
+      "token": "0x12E96C2BFEA6E835CF8Dd38a5834fa61Cf723736",
+      "pool": "0x84a8FEDc7f310045C06bE3F9E412E58ec82448b2",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/base/pools/0x84a8fedc7f310045c06be3f9e412e58ec82448b2",
+        "https://basescan.org/token/0x12e96c2bfea6e835cf8dd38a5834fa61cf723736",
+        "https://docs.universal.xyz/docs/developers/contract-addresses"
+      ]
+    },
+    {
+      "id": "robinhood-gme-1b0e31",
+      "name": "GameStop • Robinhood Token",
+      "symbol": "GME",
+      "feePips": 500,
+      "risk": "experimental",
+      "identity": "reviewed",
+      "tokenDecimals": 18,
+      "chain": "robinhood",
+      "token": "0x1b0E319c6A659F002271B69dB8A7df2F911c153E",
+      "pool": "0xc6BCC95043DC48C204bB2D57fb264a10Efe0a607",
+      "protocol": "V3",
+      "liquidityVenues": [],
+      "sources": [
+        "https://www.geckoterminal.com/robinhood/pools/0xc6bcc95043dc48c204bb2d57fb264a10efe0a607",
+        "https://robinhoodchain.blockscout.com/token/0x1b0E319c6A659F002271B69dB8A7df2F911c153E",
         "https://api.robinhood.com/rhj/assets",
         "https://docs.robinhood.com/chain/stock-tokens/"
       ]

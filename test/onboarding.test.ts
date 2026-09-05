@@ -50,7 +50,7 @@ test("Coinbase configuration isolates both config directory and native keychain 
 });
 test("readiness reports missing installations and never asserts model authentication", async () => {
   await temporary(async root => {
-    const result = await doctor(root, parseCatalog(catalog));
+    const result = await doctor(join(root, "fresh"), parseCatalog(catalog));
     expect(result.state).toBe("needs-setup");
     expect(result.authenticated).toBe("unverified");
     expect(result.packs).toEqual([]);

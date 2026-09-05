@@ -145,3 +145,12 @@ test("AIXBT connection dry run creates no profile", async () => {
     await expect(readFile(join(path, "config.yaml"))).rejects.toThrow();
   });
 });
+
+
+test("Tenderly opt-in setup previews paid access without creating a profile or calling tools", async () => {
+  await temporary(async root => {
+    const path = join(root, "tenderly-profile");
+    await connectProvider(path, "tenderly", true);
+    await expect(readFile(join(path, "config.yaml"))).rejects.toThrow();
+  });
+});

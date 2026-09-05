@@ -1,6 +1,6 @@
 # Boomkin
 
-Boomkin is a Hermes-first DeFi agent onboarding product with four independent Galleon skill packs. Other harness adapters preserve existing skill-only installations.
+Boomkin is a Hermes-first DeFi agent onboarding product with independently published Galleon skill packs across DeFi primitives. Other harness adapters preserve existing skill-only installations.
 Use TypeScript and Bun. Run `bun run check` and `bun run build` before shipping.
 
 - Never copy or fork a harness runtime or skill corpus here. Use upstream installers.

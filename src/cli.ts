@@ -19,16 +19,17 @@ bun run boomkin doctor --live
 bun run boomkin start
 bun run boomkin providers
 bun run boomkin connect --provider alchemy
+bun run boomkin connect --provider tenderly
 bun run boomkin model
 bun run boomkin check --directory ~/.boomkin/hermes
 bun run boomkin update --directory ~/.boomkin/hermes
 
 onboard installs the official Hermes runtime if needed, prepares an isolated profile,
-installs four Galleon skill packs and public CoinGecko MCP, then runs native model setup.
+installs the selected Galleon skill packs and public CoinGecko MCP, then runs native model setup.
 --directory chooses the Hermes home (default ~/.boomkin/hermes for the commands above).
 --skip-model-setup prepares files without an interactive model login.
 --no-install uses an existing Hermes executable. --dry-run previews without writes.
---all-packs opts an existing onboarding profile into all four current packs.
+--all-packs opts an existing onboarding profile into every pack in the current catalog.
 doctor distinguishes configuration from verified reads; --live probes public MCP only.
 connect uses native Hermes OAuth, AIXBT environment-backed authentication, or the official local Coinbase MCP.
 Wallet/account setup stays in its official CLI; see docs/CONNECTIONS.md.
@@ -196,7 +197,7 @@ async function main() {
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; console.log(`Preserved ${identityPath}. Add the Boomkin identity from docs/IDENTITY.md if wanted.`); }
     await writeFile(join(stateDir, "last-sync.json.tmp"), JSON.stringify({ syncedAt: new Date().toISOString(), catalog }, null, 2) + "\n");
     await rename(join(stateDir, "last-sync.json.tmp"), join(stateDir, "last-sync.json"));
-    console.log(`Skills ready in ${join(directory, adapter.skillsPath)}. Start with galleon-defi-infra, galleon-defi-data, lp-setup or hyperliquid-setup as installed. Restart the harness to reload.\n${adapter.setup}`);
+    console.log(`Skills ready in ${join(directory, adapter.skillsPath)}. Use the installed skill matching your task; infrastructure and data skills establish tool readiness and evidence first. Restart the harness to reload.\n${adapter.setup}`);
   } finally { await rm(lock, { recursive: true }); }
 }
 main().catch(error => { console.error(`Boomkin: ${error.message}`); process.exitCode = 1; });

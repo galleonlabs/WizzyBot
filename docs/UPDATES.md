@@ -30,7 +30,7 @@ Replace the directory above if you use another profile, and pass it to `doctor` 
 
 ## Select your packs
 
-Fresh onboarding includes all four packs. Updates preserve the saved selection, and future packs are opt-in. Use repeated `--pack` options to set the full desired selection:
+Fresh onboarding includes every pack in the checked-out catalog. Updates preserve the saved selection, and new catalog packs are opt-in for existing profiles. Use repeated `--pack` options to set the full desired selection:
 
 ```bash
 bun run boomkin update --directory "$HOME/.boomkin/hermes" \

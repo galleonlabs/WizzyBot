@@ -10,6 +10,7 @@ export const providers = {
   coingecko: { url: "https://mcp.api.coingecko.com/mcp", access: "Public data; no key. Enabled by onboard with a reviewed tool selection." },
   defillama: { url: "https://mcp.defillama.com/mcp", access: "Optional API subscription and OAuth; queries consume credits. One MCP client per account." },
   aixbt: { url: "https://api.aixbt.tech/mcp", access: "Optional crypto intelligence. Set AIXBT_API_KEY in the selected Hermes profile; only Topic reads are public. Protected tools use account access and quotas." },
+  tenderly: { url: "https://mcp.tenderly.co/mcp", access: "Optional paid-plan OAuth and project access. Select simulation and inspection tools; simulation results persist in the project." },
   alchemy: { url: "https://mcp.alchemy.com/mcp", access: "Optional OAuth and selected app. Review tool selection, RPC limits and app costs." },
 } as const;
 export const coinGeckoConfig = {
@@ -70,7 +71,7 @@ export async function connectProvider(directory: string, provider: string, dryRu
     console.log(JSON.stringify({ configDirectory: settings.env.COINBASE_CONFIG_DIR, environment: settings.env.COINBASE_ENV, nextAction: "Use connect --provider coinbase --key-file /absolute/path/to/scoped-key.json to configure the native CLI, or follow docs/CONNECTIONS.md. Balances and account authority have not been checked." }, null, 2));
     return;
   }
-  if (!Object.hasOwn(providers, provider)) throw new Error("Choose coingecko, aixbt, defillama, alchemy or coinbase. Agentic Wallet setup is a separate official CLI path in docs/CONNECTIONS.md.");
+  if (!Object.hasOwn(providers, provider)) throw new Error("Choose coingecko, aixbt, defillama, alchemy, tenderly or coinbase. Agentic Wallet setup is a separate official CLI path in docs/CONNECTIONS.md.");
   const selected = providers[provider as keyof typeof providers];
   console.log(`${provider}: ${selected.access}`);
   if (dryRun) return;
@@ -125,7 +126,7 @@ export async function publicDataProbe(fetcher: Fetcher = fetch, provider: "coing
     return JSON.parse(text);
   }
   try {
-    const init = await call({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "boomkin-doctor", version: "0.4.1" } } });
+    const init = await call({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "boomkin-doctor", version: "0.5.0" } } });
     if (!init.result?.serverInfo || init.error) throw new Error("MCP initialization failed");
     protocol = init.result.protocolVersion;
     await call({ jsonrpc: "2.0", method: "notifications/initialized" });

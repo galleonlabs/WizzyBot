@@ -18,17 +18,20 @@ export function parseCatalog(value: unknown): Catalog {
   if (!c || c.schemaVersion !== 3 || !Array.isArray(c.packs) || !c.packs.length) throw new Error("Catalog requires the current Boomkin CLI. Pull this repository and reinstall dependencies.");
   const ids = new Set<string>();
   const names = new Set<string>();
+  const paths = new Set<string>();
   for (const p of c.packs) {
-    const namespace = typeof p?.id === "string" ? p.id.replace(/-skills$/, "") : "";
-    const directoryName = ["defi-infra", "defi-data"].includes(namespace) ? namespace.replace(/^defi-/, "") : namespace;
-    if (!p || typeof p.id !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(p.id) || p.source !== "galleonlabs/crypto-defi-skills" || typeof p.path !== "string" || !/^packages\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(p.path) || p.path !== `packages/${directoryName}` || p.package !== `galleon-${p.id}` || typeof p.description !== "string" || ids.has(p.id)) throw new Error("Invalid or duplicate catalog pack; only explicit Galleon monorepo packages are allowed");
+    const namespace = typeof p?.id === "string" ? p.id.match(/^([a-z0-9]+(?:-[a-z0-9]+)*)-skills$/)?.[1] : undefined;
+    const namespaced = namespace?.startsWith("defi-") ?? false;
+    const directoryName = namespaced ? namespace!.slice(5) : namespace;
+    if (!p || !namespace || typeof p.id !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(p.id) || p.source !== "galleonlabs/crypto-defi-skills" || typeof p.path !== "string" || !/^packages\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(p.path) || p.path !== `packages/${directoryName}` || p.package !== `galleon-${p.id}` || typeof p.description !== "string" || ids.has(p.id) || paths.has(p.path)) throw new Error("Invalid or duplicate catalog pack; only explicit Galleon monorepo packages are allowed");
     if (typeof p.version !== "string" || !/^\d+\.\d+\.\d+$/.test(p.version) || typeof p.revision !== "string" || !/^[0-9a-f]{40}$/.test(p.revision)) throw new Error("Catalog pack must pin a release version and full Git revision");
     if (!Array.isArray(p.skills) || !p.skills.length) throw new Error("Catalog pack must name its installed skills");
     for (const skill of p.skills) {
-      if (typeof skill !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skill) || names.has(skill) || !(skill.startsWith(namespace + "-") || (["defi-infra", "defi-data"].includes(namespace) && skill === `galleon-${namespace}`))) throw new Error("Invalid or duplicate skill name");
+      if (typeof skill !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skill) || names.has(skill) || !(namespaced ? skill === `galleon-${namespace}` || skill.startsWith(`galleon-${namespace}-`) : skill.startsWith(namespace + "-"))) throw new Error("Invalid or duplicate skill name");
       names.add(skill);
     }
     ids.add(p.id);
+    paths.add(p.path);
   }
   return c;
 }
@@ -72,12 +75,22 @@ Use Hermes's native tools, memory, skills and credential facilities. Load only t
 skill and provider references needed for the current task. Prefer official tools
 already available over adding a service or writing another adapter.
 
-Start with galleon-defi-infra for RPC, wallet and tool readiness, and galleon-defi-data
-for source discovery, market data and provenance. Use lp-setup or hyperliquid-setup
-for protocol-specific read checks. Analyze assesses opportunities; plan produces
-unsigned proposals; execute handles explicitly approved actions; monitor reconciles
-state; hyperliquid-review examines performance. Engineer fills integration gaps.
-A missing pack is a capability gap; use available tools and report it accurately.
+Start with galleon-defi-infra for RPC, wallets and tool readiness; use
+galleon-defi-data for source identity, market evidence and research including AIXBT.
+Select only the installed workflow needed for the user's task:
+- lp-* and hyperliquid-* for their venue-specific setup, analysis, unsigned plans,
+  approved execution, monitoring and review.
+- galleon-defi-lending, galleon-defi-staking and galleon-defi-yield for borrowing,
+  collateral, staking/restaking and vault/yield workflows.
+- galleon-defi-routing and galleon-defi-derivatives for swap/bridge routes and
+  derivative exposure, pricing and venue constraints.
+- galleon-defi-portfolio for holdings, debt, flows and performance reconciliation;
+  galleon-defi-security for transaction effects, signatures and continuing authority.
+- galleon-defi-payments for payment/account protocols and settlement evidence;
+  galleon-defi-governance for proposal, voting and delegation workflows;
+  galleon-defi-tokenized-assets for claims, eligibility and redemption constraints.
+Do not load every skill or provider reference for a simple task. A missing pack is
+a capability gap; use available tools and describe the gap accurately.
 
 Research and planning are the default. Installed skills and tool credentials do not
 grant financial authority. Before signing, trading, transferring, enabling wallet

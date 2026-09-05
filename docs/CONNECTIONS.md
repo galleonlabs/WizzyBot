@@ -102,3 +102,20 @@ For an authorized service release, first verify the unpaid capability and test-n
 - Unknown transaction or payment outcomes require reconciliation, not an automatic resend.
 
 Provider-specific instructions and source pins live in the infrastructure and data packs; the onboarding wrapper does not duplicate their SDKs or runtimes.
+
+
+## Tenderly transaction review
+
+```bash
+bun run boomkin connect --provider tenderly
+```
+
+Boomkin uses native Hermes OAuth and tool selection for the [official Tenderly MCP](https://docs.tenderly.co/ai-tools/overview) at `https://mcp.tenderly.co/mcp`. Tenderly documents paid-plan enablement and an account/project prerequisite. The command connects the provider; it does not purchase access, simulate a transaction or broadcast one.
+
+Choose the intended project and only the simulation/inspection tools needed for the task. The [official tool reference](https://docs.tenderly.co/ai-tools/tools) includes allowance/exposure and balance-change reads as well as tools that create/delete virtual environments and send impersonated transactions. Simulation results persist in the project dashboard, so consider unsigned calldata's privacy before submitting it. No-gas simulation is not a free-service or future-execution guarantee.
+
+Use `galleon-defi-security` to review exact transaction inputs, continuing permissions, state overrides and unresolved results. Native MCP configuration is marked untrusted after setup. `doctor --live` does not call paid Tenderly tools or verify its authenticated simulation capabilities; confirm a bounded authorized task separately.
+
+## Other primitive providers
+
+Lending, staking, vault, routing, derivative, payment, governance and tokenized-asset packs contain dated official provider references and access requirements. They reuse available official SDKs, APIs, CLIs or MCP servers. Installing a pack adds its procedures; it does not automatically create accounts, install every provider, purchase subscriptions or grant wallet authority. Start with [workflow examples](WORKFLOWS.md) and load the relevant skill's provider reference when a connection is needed.

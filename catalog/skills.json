@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "packs": [
     {
       "id": "lp-skills",
-      "source": "galleonlabs/lp-skills",
+      "source": "galleonlabs/crypto-defi-skills",
       "description": "Setup, analysis, planning, execution and monitoring for Uniswap and Aerodrome liquidity.",
-      "version": "0.4.0",
-      "revision": "211c6d92fd41920d103f459d868055ff30d2119e",
+      "version": "0.4.1",
+      "revision": "11eb94a3db856a7f5f303e43b85e8798d5c3c98e",
       "skills": [
         "lp-analyze",
         "lp-engineer",
@@ -14,14 +14,16 @@
         "lp-monitor",
         "lp-plan",
         "lp-setup"
-      ]
+      ],
+      "path": "packages/lp",
+      "package": "galleon-lp-skills"
     },
     {
       "id": "hyperliquid-skills",
-      "source": "galleonlabs/hyperliquid-skills",
+      "source": "galleonlabs/crypto-defi-skills",
       "description": "Setup, analysis, planning, execution and monitoring for Hyperliquid, plus performance review.",
-      "version": "0.2.0",
-      "revision": "894cf1f1681fa74191cb0b161a41655ff23341d2",
+      "version": "0.2.1",
+      "revision": "11eb94a3db856a7f5f303e43b85e8798d5c3c98e",
       "skills": [
         "hyperliquid-analyze",
         "hyperliquid-engineer",
@@ -30,7 +32,9 @@
         "hyperliquid-plan",
         "hyperliquid-review",
         "hyperliquid-setup"
-      ]
+      ],
+      "path": "packages/hyperliquid",
+      "package": "galleon-hyperliquid-skills"
     }
   ]
 }

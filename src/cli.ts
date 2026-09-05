@@ -4,24 +4,26 @@ import { resolve, join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import catalogFile from "../catalog/skills.json";
-import { harnesses, parseCatalog, parseHarness, parseConfig, installArgs, identity, fetchCatalog, catalogChanges, installedVersion, type Catalog, type Config } from "./core.ts";
+import { harnesses, parseCatalog, parseHarness, parseConfig, installArgs, identity, fetchCatalog, catalogChanges, installedVersion, selectPacks, type Catalog, type Config } from "./core.ts";
 
 import { tmpdir } from "node:os";
-import { checkoutPack } from "./source.ts";
+import { stateDirectory } from "./state.ts";
+import { checkoutPack, packageDirectory } from "./source.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const help = `WizzyBot — your harness, Galleon skills.
+const help = `Boomkin — your harness, Galleon skills.
 
-bun run wizzy harnesses
-bun run wizzy catalog
-bun run wizzy setup --harness hermes --directory ~/wizzy
-bun run wizzy check --directory ~/wizzy
-bun run wizzy update --directory ~/wizzy
-bun run wizzy status --directory ~/wizzy
+bun run boomkin harnesses
+bun run boomkin catalog
+bun run boomkin setup --harness hermes --directory ~/boomkin --pack lp-skills
+bun run boomkin check --directory ~/boomkin
+bun run boomkin update --directory ~/boomkin
+bun run boomkin status --directory ~/boomkin
 
 setup prints the upstream runtime setup guide and installs skills.
 Install/sign into the harness separately with its native setup flow.
 update refreshes the public catalog and installs its pinned published revisions.
+--pack selects a pack (repeat for several); updates preserve your saved selection.
 --offline-catalog uses the catalog bundled with this checkout.
 --dry-run prints installation commands without writing files or installing skills.
 No wallet, signer, hosted runtime, or background service is installed.`;
@@ -36,7 +38,7 @@ async function canonicalPath(path: string): Promise<string> {
 
 async function main() {
   const { values, positionals } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, strict: true, options: {
-    harness: { type: "string" }, directory: { type: "string" }, "dry-run": { type: "boolean" }, "offline-catalog": { type: "boolean" }, help: { type: "boolean", short: "h" },
+    pack: { type: "string", multiple: true }, harness: { type: "string" }, directory: { type: "string" }, "dry-run": { type: "boolean" }, "offline-catalog": { type: "boolean" }, help: { type: "boolean", short: "h" },
   } });
   const command = positionals[0] ?? "help";
   if (values.help || command === "help") return console.log(help);
@@ -49,11 +51,20 @@ async function main() {
   if (!["setup", "update", "check", "status"].includes(command)) throw new Error(`Unknown command: ${command}`);
   if (!values.directory) throw new Error("Pass --directory with your harness workspace (Hermes: its HERMES_HOME).");
   const directory = await canonicalPath(resolve(values.directory));
-  const stateDir = join(directory, ".wizzy");
-  const configPath = join(stateDir, "config.json");
+  let stateDir = await stateDirectory(directory, false);
+  let configPath = join(stateDir, "config.json");
   let config: Config;
-  if (command === "setup") config = { schemaVersion: 1, harness: parseHarness(values.harness), directory };
+  if (command === "setup") {
+    config = { schemaVersion: 1, harness: parseHarness(values.harness), directory };
+    try {
+      const existing = parseConfig(JSON.parse(await readFile(configPath, "utf8")), directory);
+      if (existing.harness !== config.harness) throw new Error("This directory belongs to another harness. Use a separate workspace.");
+      config = existing;
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  }
   else config = parseConfig(JSON.parse(await readFile(configPath, "utf8")), directory);
+  if (values.pack && !["setup", "update"].includes(command)) throw new Error("--pack is available for setup and update");
+  if (values.pack) config.packs = values.pack;
   const adapter = harnesses[config.harness];
   const env = { ...process.env, DISABLE_TELEMETRY: "1", XDG_STATE_HOME: join(stateDir, "state"), ...(config.harness === "hermes" ? { HERMES_HOME: directory } : {}) };
   const skillsBin = join(root, "node_modules/skills/bin/cli.mjs");
@@ -78,24 +89,29 @@ async function main() {
   let previous: Catalog | undefined;
   try {
     const record = JSON.parse(await readFile(join(stateDir, "last-sync.json"), "utf8"));
-    if (record.catalog?.schemaVersion === 2) previous = parseCatalog(record.catalog);
+    if (record.catalog?.schemaVersion === 3) previous = parseCatalog(record.catalog);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT" && command === "check") throw new Error("Sync record is incomplete; run update to rebuild it.");
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.log("Rebuilding an incomplete sync record.");
   }
   if (command === "check") {
-    const current = await fetchCatalog();
+    const current = selectPacks(await fetchCatalog(), config.packs);
     const changes = catalogChanges(current, previous);
     if (!changes.length && previous) await verifyInstalled(current);
-    return console.log(changes.length ? changes.join("\n") : "Recorded releases and installed skill versions match the published Wizzy catalog.");
+    return console.log(changes.length ? changes.join("\n") : "Recorded releases and installed skill versions match the published Boomkin catalog.");
   }
   let catalog = parseCatalog(catalogFile);
   if (command === "update" && !values["offline-catalog"]) {
     catalog = await fetchCatalog();
   }
+  catalog = selectPacks(catalog, config.packs);
+  config.packs = catalog.packs.map(pack => pack.id);
   console.log(adapter.setup);
-  for (const pack of catalog.packs) console.log(`Install ${pack.source}@${pack.version} from verified commit ${pack.revision}`);
+  for (const pack of catalog.packs) console.log(`Install ${pack.source}/${pack.path}@${pack.version} from verified commit ${pack.revision}`);
   if (values["dry-run"]) return;
+  stateDir = await stateDirectory(directory, true);
+  configPath = join(stateDir, "config.json");
+  env.XDG_STATE_HOME = join(stateDir, "state");
   await mkdir(directory, { recursive: true });
   await mkdir(stateDir, { recursive: true });
   const lock = join(stateDir, "operation.lock");
@@ -108,11 +124,22 @@ async function main() {
     // Keep enough state to retry safely if one of the independent upstream installs fails.
     await writeFile(`${configPath}.tmp`, JSON.stringify(config, null, 2) + "\n");
     await rename(`${configPath}.tmp`, configPath);
-    const staging = await mkdtemp(join(tmpdir(), "wizzy-sources-"));
+    const staging = await mkdtemp(join(tmpdir(), "boomkin-sources-"));
     try {
       // Resolve every source before installing; the installer receives only verified local checkouts.
-      for (const pack of catalog.packs) await checkoutPack(pack, join(staging, pack.id));
-      for (const pack of catalog.packs) await run(installArgs(join(staging, pack.id), config.harness));
+      const sources = new Map<string, string>();
+      const packages = new Map<string, string>();
+      for (const pack of catalog.packs) {
+        const key = `${pack.source}@${pack.revision}`;
+        let checkout = sources.get(key);
+        if (!checkout) {
+          checkout = join(staging, `source-${sources.size}`);
+          await checkoutPack(pack, checkout);
+          sources.set(key, checkout);
+        }
+        packages.set(pack.id, await packageDirectory(pack, checkout));
+      }
+      for (const pack of catalog.packs) await run(installArgs(packages.get(pack.id)!, config.harness, pack.skills));
     } finally { await rm(staging, { recursive: true, force: true }); }
     await verifyInstalled(catalog);
     for (const retired of ["lp-research", "lp-operate", "hyperliquid-research", "hyperliquid-operate"]) {
@@ -121,10 +148,10 @@ async function main() {
     const identityPath = join(directory, config.harness === "eve" ? "agent/instructions.md" : "AGENTS.md");
     await mkdir(dirname(identityPath), { recursive: true });
     try { await writeFile(identityPath, identity, { flag: "wx" }); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; console.log(`Preserved ${identityPath}. Add the Wizzy identity from docs/IDENTITY.md if wanted.`); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; console.log(`Preserved ${identityPath}. Add the Boomkin identity from docs/IDENTITY.md if wanted.`); }
     await writeFile(join(stateDir, "last-sync.json.tmp"), JSON.stringify({ syncedAt: new Date().toISOString(), catalog }, null, 2) + "\n");
     await rename(join(stateDir, "last-sync.json.tmp"), join(stateDir, "last-sync.json"));
     console.log(`Skills ready in ${join(directory, adapter.skillsPath)}. Start with lp-setup or hyperliquid-setup. Restart the harness to reload.\n${adapter.setup}`);
   } finally { await rm(lock, { recursive: true }); }
 }
-main().catch(error => { console.error(`Wizzy: ${error.message}`); process.exitCode = 1; });
+main().catch(error => { console.error(`Boomkin: ${error.message}`); process.exitCode = 1; });

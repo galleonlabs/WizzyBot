@@ -12,5 +12,5 @@ assignees: ''
 
 ## Reproduce
 
-Include the command, OS, Bun version, Wizzy commit, and selected harness.
+Include the command, OS, Bun version, Boomkin commit, and selected harness.
 Remove credentials and personal data from output.

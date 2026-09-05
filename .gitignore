@@ -15,4 +15,7 @@ output/
 *.log
 *.tsbuildinfo
 .DS_Store
+.boomkin/
+
+# Legacy workspace state retained only for migration.
 .wizzy/

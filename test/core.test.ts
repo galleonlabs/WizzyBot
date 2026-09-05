@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseCatalog, parseConfig, parseHarness, installArgs, harnesses, fetchCatalog, catalogChanges, installedVersion } from "../src/core";
+import { parseCatalog, parseConfig, parseHarness, installArgs, harnesses, fetchCatalog, catalogChanges, installedVersion, selectPacks } from "../src/core";
 import catalog from "../catalog/skills.json";
 
 describe("trust and installation boundaries", () => {
@@ -12,7 +12,7 @@ describe("trust and installation boundaries", () => {
       expect(() => parseCatalog({ ...catalog, packs: [{ ...catalog.packs[0], source }] })).toThrow();
     }
     expect(() => parseCatalog({ ...catalog, packs: [catalog.packs[0], catalog.packs[0]] })).toThrow();
-    expect(() => parseCatalog({ ...catalog, schemaVersion: 3 })).toThrow();
+    expect(() => parseCatalog({ ...catalog, schemaVersion: 2 })).toThrow();
   });
   test("unrecognized harnesses and moved state fail closed", () => {
     for (const name of ["toString", "constructor", "unknown"]) expect(() => parseHarness(name)).toThrow();
@@ -20,20 +20,20 @@ describe("trust and installation boundaries", () => {
   });
   test("Hermes targets its profile, other adapters stay project scoped", () => {
     for (const harness of Object.keys(harnesses) as (keyof typeof harnesses)[]) {
-      const args = installArgs("/tmp/verified-skills", harness);
+      const args = installArgs("/tmp/verified-skills", harness, ["lp-setup"]);
       expect(args.includes("--global")).toBe(harness === "hermes");
       expect(args).toContain("--copy");
       expect(args).toContain(harnesses[harness].agent);
     }
   });
   test("dry run does not create a workspace, config, or install files", async () => {
-    const root = await mkdtemp(join(tmpdir(), "wizzy-test-"));
+    const root = await mkdtemp(join(tmpdir(), "boomkin-test-"));
     const directory = join(root, "not-created");
     try {
       const p = Bun.spawn([process.execPath, "src/cli.ts", "setup", "--harness", "eve", "--directory", directory, "--dry-run"], { stdout: "pipe", stderr: "pipe" });
       expect(await p.exited).toBe(0);
-      expect(await new Response(p.stdout).text()).toContain("galleonlabs/hyperliquid-skills");
-      expect(await Bun.file(join(directory, ".wizzy/config.json")).exists()).toBe(false);
+      expect(await new Response(p.stdout).text()).toContain("galleonlabs/crypto-defi-skills/packages/hyperliquid");
+      expect(await Bun.file(join(directory, ".boomkin/config.json")).exists()).toBe(false);
       await expect(readFile(directory)).rejects.toThrow();
     } finally { await rm(root, { recursive: true, force: true }); }
   });
@@ -48,9 +48,9 @@ describe("trust and installation boundaries", () => {
 
 test("pins release versions and rejects branch names or missing version metadata", () => {
   const pack = parseCatalog(catalog).packs[0]!;
-  expect(installArgs("/tmp/verified-skills", "eve")[1]).toBe("/tmp/verified-skills");
-  for (const revision of ["main", "v0.4.0", "../../evil", "shortsha"]) expect(() => parseCatalog({ schemaVersion: 2, packs: [{ ...pack, revision }] })).toThrow();
-  expect(() => parseCatalog({ schemaVersion: 2, packs: [{ ...pack, version: undefined }] })).toThrow();
+  expect(installArgs("/tmp/verified-skills", "eve", ["lp-setup"])[1]).toBe("/tmp/verified-skills");
+  for (const revision of ["main", "v0.4.0", "../../evil", "shortsha"]) expect(() => parseCatalog({ schemaVersion: 3, packs: [{ ...pack, revision }] })).toThrow();
+  expect(() => parseCatalog({ schemaVersion: 3, packs: [{ ...pack, version: undefined }] })).toThrow();
 });
 test("checks report new revisions, new packs, and retirement without installing", () => {
   const current = parseCatalog(catalog);
@@ -60,7 +60,7 @@ test("checks report new revisions, new packs, and retirement without installing"
 });
 test("catalog fetch fails closed on HTTP failure and invalid data", async () => {
   await expect(fetchCatalog((async () => new Response("down", { status: 503 })))).rejects.toThrow("503");
-  await expect(fetchCatalog((async () => Response.json({ schemaVersion: 2, packs: [] })))).rejects.toThrow();
+  await expect(fetchCatalog((async () => Response.json({ schemaVersion: 3, packs: [] })))).rejects.toThrow();
 });
 
 
@@ -77,4 +77,38 @@ test("checks detect corrected release metadata even with the same revision", () 
   previous.packs[0]!.version = current.packs[0]!.version;
   previous.packs[0]!.skills.pop();
   expect(catalogChanges(current, previous)).toHaveLength(1);
+});
+
+test("monorepo package paths and identities are explicit and cannot escape", () => {
+  for (const path of ["../lp", "packages/../../evil", "packages/lp/../hyperliquid", "/tmp/lp", "packages/hyperliquid"]) {
+    expect(() => parseCatalog({ ...catalog, packs: [{ ...catalog.packs[0], path }] })).toThrow();
+  }
+  expect(() => parseCatalog({ ...catalog, packs: [{ ...catalog.packs[0], package: "evil" }] })).toThrow();
+});
+test("pack selection installs only requested packages and rejects unknown names", () => {
+  const current = parseCatalog(catalog);
+  expect(selectPacks(current, ["lp-skills"]).packs.map(p => p.id)).toEqual(["lp-skills"]);
+  expect(() => selectPacks(current, ["missing"])).toThrow();
+  expect(() => selectPacks(current, ["lp-skills", "lp-skills"])).toThrow();
+  const args = installArgs("/tmp/packages/lp", "eve", ["lp-setup", "lp-plan"]);
+  expect(args).toContain("lp-setup");
+  expect(args).not.toContain("*");
+  expect(args).not.toContain("hyperliquid-setup");
+});
+test("saved selections validate and source path changes require an update", () => {
+  expect(() => parseConfig({ schemaVersion: 1, harness: "eve", directory: "/tmp", packs: [] }, "/tmp")).toThrow();
+  const current = parseCatalog(catalog);
+  const previous = structuredClone(current);
+  previous.packs[0]!.path = "packages/old";
+  expect(catalogChanges(current, previous)).toHaveLength(1);
+});
+
+test("legacy configurations never opt into future catalog packs", () => {
+  const config = parseConfig({ schemaVersion: 1, harness: "codex", directory: "/tmp/legacy" }, "/tmp/legacy");
+  const current = parseCatalog(catalog);
+  const future = parseCatalog({ ...catalog, packs: [...current.packs, {
+    ...current.packs[0], id: "aave-skills", path: "packages/aave", package: "galleon-aave-skills", skills: ["aave-setup"],
+  }] });
+  expect(selectPacks(future, config.packs).packs.map(pack => pack.id)).toEqual(["lp-skills", "hyperliquid-skills"]);
+  expect(selectPacks(future).packs).toHaveLength(3);
 });

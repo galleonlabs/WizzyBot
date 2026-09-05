@@ -1,6 +1,6 @@
-# WizzyBot
+# Boomkin
 
-WizzyBot is a setup and update layer for upstream agent harnesses and Galleon skill packs.
+Boomkin is a setup and update layer for upstream agent harnesses and Galleon skill packs.
 Use TypeScript and Bun. Run `bun run check` and `bun run build` before shipping.
 
 - Never copy or fork a harness runtime or skill corpus here. Use upstream installers.

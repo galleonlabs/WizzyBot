@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "",
+  "buildCommand": "",
+  "outputDirectory": "redirect",
+  "routes": [
+    {
+      "src": "/api(?:/.*)?",
+      "status": 410
+    },
+    {
+      "src": "/.*",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "status": 308,
+      "headers": {
+        "Location": "https://github.com/galleonlabs/WizzyBot"
+      }
+    },
+    {
+      "src": "/.*",
+      "status": 410
+    }
+  ]
+}

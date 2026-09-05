@@ -1,0 +1,24 @@
+{
+  "name": "wizzybot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Set up an open-source crypto agent with your harness and Galleon skills.",
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "bun@1.3.12",
+  "scripts": {
+    "wizzy": "bun src/cli.ts",
+    "test": "bun test test",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun run test",
+    "build": "bun build src/cli.ts --target=bun --outdir=dist",
+    "smoke": "bun scripts/smoke.ts"
+  },
+  "dependencies": {
+    "skills": "1.5.23"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.10",
+    "typescript": "5.9.3"
+  }
+}

@@ -41,7 +41,7 @@ Use the same `--directory` for subsequent commands. `--skip-model-setup` is for 
 
 ## Skill packs
 
-The reviewed catalog contains **14 independent packs and 25 skills**. Install all of them or choose the workflows you need; the agent loads relevant instructions on demand.
+The reviewed catalog contains **14 independent packs and 26 skills**. Install all of them or choose the workflows you need; the agent loads relevant instructions on demand.
 
 | Pack | What it covers |
 | --- | --- |
@@ -56,7 +56,7 @@ The reviewed catalog contains **14 independent packs and 25 skills**. Install al
 | [Routing](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/routing) | Swap and bridge quotes, route limits and settlement |
 | [Derivatives](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/derivatives) | Exposure, margin, funding and venue-specific constraints |
 | [Portfolio](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/portfolio) | Assets, debt, cash flows, performance and rebalance plans |
-| [Security](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/security) | Transaction effects, signatures, approvals and simulation evidence |
+| [Security](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/security) | Token diligence, evidence comparisons, transaction effects and permissions |
 | [Payments](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/payments) | Agent payments, x402 challenges and settlement evidence |
 | [Governance](https://github.com/galleonlabs/crypto-defi-skills/tree/main/packages/governance) | Proposals, voting, delegation and execution stages |
 

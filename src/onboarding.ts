@@ -126,7 +126,7 @@ export async function publicDataProbe(fetcher: Fetcher = fetch, provider: "coing
     return JSON.parse(text);
   }
   try {
-    const init = await call({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "boomkin-doctor", version: "0.5.1" } } });
+    const init = await call({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "boomkin-doctor", version: "0.6.0" } } });
     if (!init.result?.serverInfo || init.error) throw new Error("MCP initialization failed");
     protocol = init.result.protocolVersion;
     await call({ jsonrpc: "2.0", method: "notifications/initialized" });

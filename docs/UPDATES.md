@@ -47,6 +47,8 @@ Onboarding preserves existing SOUL and instruction files. It opens native model 
 
 ## Verified releases
 
+Boomkin 0.6.0 adds token diligence through Security 0.2.0, bringing the catalog to 26 skills across 14 packs. Investigate token controls, launch flows, liquidity custody and exit evidence, then compare repeat reviews without treating lost coverage or omitted findings as resolved risks. Security includes an optional read-only snapshot collector and evidence validator; these do not sign, broadcast or establish economic safety. Existing profiles with Security selected receive both Security skills when updated.
+
 Boomkin 0.5.1 pins Infra 0.2.1, Hyperliquid 0.3.1, Derivatives 0.1.1 and Security 0.1.1 after independent npm verification. These add CLI recovery, bot/manual-control handoffs and full-recipient verification. The [source review](https://github.com/galleonlabs/crypto-defi-skills/blob/38e58b1c9c345af0f3a61ce1d25fe33095c2003b/docs/research/minara-review.md) records attribution and validation limits. Other pack pins and selected-pack behavior remain unchanged.
 
 The [catalog](../catalog/skills.json) records each pack's npm package, published version, full source commit, package path and expected skills. `setup` and `onboard` use the checked-out catalog; `update` fetches the current public Boomkin catalog. New pins enter that catalog after publication and verification.

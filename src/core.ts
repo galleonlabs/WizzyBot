@@ -90,6 +90,8 @@ Select only the installed workflow needed for the user's task:
   derivative exposure, pricing and venue constraints.
 - galleon-defi-portfolio for holdings, debt, flows and performance reconciliation;
   galleon-defi-security for transaction effects, signatures and continuing authority.
+  galleon-defi-security-token-diligence for exact token controls, launch flows,
+  liquidity custody, exits and evidence changes between reviews.
 - galleon-defi-payments for payment/account protocols and settlement evidence;
   galleon-defi-governance for proposal, voting and delegation workflows;
   galleon-defi-tokenized-assets for claims, eligibility and redemption constraints.

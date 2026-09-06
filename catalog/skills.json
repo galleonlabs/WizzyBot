@@ -147,11 +147,12 @@
     {
       "id": "defi-security-skills",
       "source": "galleonlabs/crypto-defi-skills",
-      "description": "Review transaction intent, permissions and simulation evidence.",
-      "version": "0.1.1",
-      "revision": "38e58b1c9c345af0f3a61ce1d25fe33095c2003b",
+      "description": "Investigate token risks, compare evidence and review transaction permissions.",
+      "version": "0.2.0",
+      "revision": "c0bfa8437d8340910593cba646f986c692ed32fd",
       "skills": [
-        "galleon-defi-security"
+        "galleon-defi-security",
+        "galleon-defi-security-token-diligence"
       ],
       "path": "packages/security",
       "package": "galleon-defi-security-skills"

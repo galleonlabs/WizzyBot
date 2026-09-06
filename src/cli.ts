@@ -145,14 +145,16 @@ async function main() {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.log("Rebuilding an incomplete sync record.");
   }
   if (command === "check") {
-    const current = selectPacks(await fetchCatalog(), config.packs);
+    const current = selectPacks(values["offline-catalog"] ? parseCatalog(catalogFile) : await fetchCatalog(), config.packs);
     const changes = catalogChanges(current, previous);
-    if (!changes.length && previous) {
-      await verifyInstalled(current);
-      const issues = await verifyIntegrity(join(directory, adapter.skillsPath), current, await readIntegrity(directory));
-      if (issues.length) throw new Error(issues.join("; "));
-    }
-    return console.log(changes.length ? changes.join("\n") : "Recorded releases and installed skill files match the published Boomkin catalog.");
+    // Recorded digests describe the installed release, so a pending catalog change must not hide changed files.
+    const issues = previous ? await verifyIntegrity(join(directory, adapter.skillsPath), previous, await readIntegrity(directory)) : [];
+    // Installed versions are only comparable to the published catalog while no update is pending.
+    if (!changes.length && previous) await verifyInstalled(current);
+    if (changes.length) console.log(changes.join("\n"));
+    if (issues.length) throw new Error(issues.join("; "));
+    if (!changes.length) console.log("Recorded releases and installed skill files match the published Boomkin catalog.");
+    return;
   }
   let catalog = parseCatalog(catalogFile);
   if (command === "update" && !values["offline-catalog"]) {

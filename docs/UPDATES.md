@@ -55,9 +55,9 @@ The [catalog](../catalog/skills.json) records each pack's npm package, published
 
 Before installation, Boomkin verifies every selected source revision, package identity, version, skill metadata and path containment. Packages containing symlinks are rejected. Only the selected package paths and skill names reach the upstream installer, and temporary source checkouts are removed afterward.
 
-`--offline-catalog` uses the checked-out catalog for an update. It still requires GitHub access to download the pinned sources.
+`--offline-catalog` uses the checked-out catalog for `check` and `update` instead of the published one. An update still requires GitHub access to download the pinned sources.
 
-`check` compares the last successful sync with the published catalog and, when the revisions match, checks installed skill names and declared versions. It is not a byte-for-byte audit of local edits. `status` lists installed skills. Neither command updates files.
+`check` compares the last successful sync with the published catalog and always verifies the recorded file digests of the installed skills, so a pending update never hides changed files. Installed skill names and declared versions are additionally checked when no update is pending, because they are only comparable to the release you have installed. `status` lists installed skills. Neither command updates files.
 
 ## Profile files
 

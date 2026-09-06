@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { checkoutPack, packageDirectory } from "./source.ts";
 import { defaultProfile, prepareHermes, connectProvider, providers, doctor } from "./onboarding.ts";
 import { runHermes } from "./hermes.ts";
+import { verifyCopiedSkill, verifyIntegrity, readIntegrity, type SkillIntegrity } from "./integrity.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const help = `Boomkin — your Hermes DeFi agent.
@@ -146,8 +147,12 @@ async function main() {
   if (command === "check") {
     const current = selectPacks(await fetchCatalog(), config.packs);
     const changes = catalogChanges(current, previous);
-    if (!changes.length && previous) await verifyInstalled(current);
-    return console.log(changes.length ? changes.join("\n") : "Recorded releases and installed skill versions match the published Boomkin catalog.");
+    if (!changes.length && previous) {
+      await verifyInstalled(current);
+      const issues = await verifyIntegrity(join(directory, adapter.skillsPath), current, await readIntegrity(directory));
+      if (issues.length) throw new Error(issues.join("; "));
+    }
+    return console.log(changes.length ? changes.join("\n") : "Recorded releases and installed skill files match the published Boomkin catalog.");
   }
   let catalog = parseCatalog(catalogFile);
   if (command === "update" && !values["offline-catalog"]) {
@@ -172,6 +177,7 @@ async function main() {
     await writeFile(`${configPath}.tmp`, JSON.stringify(config, null, 2) + "\n");
     await rename(`${configPath}.tmp`, configPath);
     const staging = await mkdtemp(join(tmpdir(), "boomkin-sources-"));
+    const integrity: SkillIntegrity = {};
     try {
       // Resolve every source before installing; the installer receives only verified local checkouts.
       const sources = new Map<string, string>();
@@ -186,7 +192,10 @@ async function main() {
         }
         packages.set(pack.id, await packageDirectory(pack, checkout));
       }
-      for (const pack of catalog.packs) await run(installArgs(packages.get(pack.id)!, config.harness, pack.skills));
+      for (const pack of catalog.packs) {
+        await run(installArgs(packages.get(pack.id)!, config.harness, pack.skills));
+        for (const skill of pack.skills) integrity[skill] = await verifyCopiedSkill(join(packages.get(pack.id)!, "skills", skill), join(directory, adapter.skillsPath, skill));
+      }
     } finally { await rm(staging, { recursive: true, force: true }); }
     await verifyInstalled(catalog);
     for (const retired of ["lp-research", "lp-operate", "hyperliquid-research", "hyperliquid-operate"]) {
@@ -196,7 +205,7 @@ async function main() {
     await mkdir(dirname(identityPath), { recursive: true });
     try { await writeFile(identityPath, identity, { flag: "wx" }); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; console.log(`Preserved ${identityPath}. Add the Boomkin identity from docs/IDENTITY.md if wanted.`); }
-    await writeFile(join(stateDir, "last-sync.json.tmp"), JSON.stringify({ syncedAt: new Date().toISOString(), catalog }, null, 2) + "\n");
+    await writeFile(join(stateDir, "last-sync.json.tmp"), JSON.stringify({ syncedAt: new Date().toISOString(), catalog, integrity }, null, 2) + "\n");
     await rename(join(stateDir, "last-sync.json.tmp"), join(stateDir, "last-sync.json"));
     console.log(`Skills ready in ${join(directory, adapter.skillsPath)}. Use the installed skill matching your task; infrastructure and data skills establish tool readiness and evidence first. Restart the harness to reload.${setupHint ? `\n${setupHint}` : ""}`);
   } finally { await rm(lock, { recursive: true }); }

@@ -40,6 +40,29 @@ with tempfile.TemporaryDirectory(prefix="boomkin-native-smoke-") as temporary:
 import { coinGeckoConfig, aixbtConfig } from "./src/onboarding.ts";
 await initializeProfile(process.env.BOOMKIN_SMOKE_ROOT!, "# Boomkin smoke identity\\n");
 await configureMcpServers(process.env.BOOMKIN_SMOKE_ROOT!, { coingecko: { ...coinGeckoConfig, enabled: false }, aixbt: { ...aixbtConfig, enabled: false } });'''], cwd=repo)
+    # Exercise the real published corpus through native progressive disclosure.
+    run([bun, "src/cli.ts", "setup", "--harness", "hermes", "--directory", str(root)], cwd=repo)
+    expected = [skill for pack in json.loads((repo / "catalog/skills.json").read_text())["packs"] for skill in pack["skills"]]
+    (root / "expected-skills.json").write_text(json.dumps(expected))
+    run([str(python), "-c", '''
+import json, os
+from pathlib import Path
+from tools.skills_tool import skills_list, skill_view
+root = Path(os.environ['HERMES_HOME'])
+expected = json.loads((root / 'expected-skills.json').read_text())
+listing = json.loads(skills_list())
+assert listing['success']
+assert set(expected).issubset({s['name'] for s in listing['skills']})
+for name in expected:
+    body = json.loads(skill_view(name))
+    assert body['success'], name
+    assert body.get('content'), name
+    for path in (root / 'skills' / name / 'references').rglob('*.md'):
+        reference = json.loads(skill_view(name, str(path.relative_to(root / 'skills' / name))))
+        assert reference['success'] and reference.get('content'), str(path)
+reference = json.loads(skill_view('galleon-defi-data', 'references/diagnostic.md'))
+assert reference['success'] and 'price-check.mjs' in reference['content']
+'''])
     version = run([str(hermes), "--profile", "default", "--version"])
     assert "Hermes Agent v" in version
     assert run([str(hermes), "--profile", "default", "config", "path"]).strip() == str(root / "config.yaml")
@@ -102,4 +125,4 @@ await configureMcpServers(process.env.BOOMKIN_SMOKE_ROOT!, { local_smoke: { comm
         output = run([str(hermes), "--profile", "default", "mcp", "test", "coingecko"])
         assert "Connected" in output and "Tools discovered: 2" in output and "execute" in output and "search_docs" in output, "Public native MCP contract did not positively verify"
         public_verified = True
-    print(json.dumps({"runtime": version.splitlines()[0], "profile_isolation": "passed", "soul": "passed", "config": "passed", "native_tool_filters": "passed", "aixbt_environment_and_filters": "passed", "local_mcp_discovery": "passed", "public_coingecko_discovery": "passed" if public_verified else "not-requested", "model_auth_wallet_calls": "none"}))
+    print(json.dumps({"runtime": version.splitlines()[0], "installed_skills": len(expected), "native_skill_discovery": "passed", "reference_loading": "passed", "references_loaded": len(list((root / "skills").glob("*/references/**/*.md"))), "profile_isolation": "passed", "soul": "passed", "config": "passed", "native_tool_filters": "passed", "aixbt_environment_and_filters": "passed", "local_mcp_discovery": "passed", "public_coingecko_discovery": "passed" if public_verified else "not-requested", "model_auth_wallet_calls": "none"}))

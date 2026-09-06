@@ -40,8 +40,8 @@
       "id": "defi-infra-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "RPC, wallet and Hermes infrastructure skills with read-only readiness diagnostics.",
-      "version": "0.2.1",
-      "revision": "38e58b1c9c345af0f3a61ce1d25fe33095c2003b",
+      "version": "0.2.2",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-infra"
       ],
@@ -52,8 +52,8 @@
       "id": "defi-data-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Portable DeFi data skills for CoinGecko, DefiLlama, AIXBT, and source-aware research.",
-      "version": "0.3.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.3.1",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-data"
       ],
@@ -64,8 +64,8 @@
       "id": "defi-lending-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Research lending markets, plan borrowing and monitor liquidation exposure.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-lending"
       ],
@@ -76,8 +76,8 @@
       "id": "defi-staking-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Plan liquid staking, restaking and queued withdrawals.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-staking"
       ],
@@ -88,8 +88,8 @@
       "id": "defi-yield-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Evaluate vaults and yield tokens, including liquidity and maturity.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-yield"
       ],
@@ -100,8 +100,8 @@
       "id": "defi-tokenized-assets-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Research tokenized assets, eligibility and issuer settlement.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-tokenized-assets"
       ],
@@ -112,8 +112,8 @@
       "id": "defi-routing-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Compare swaps and bridges and track cross-chain settlement.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-routing"
       ],
@@ -124,8 +124,8 @@
       "id": "defi-derivatives-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Plan derivatives positions and reconcile venue execution.",
-      "version": "0.1.1",
-      "revision": "38e58b1c9c345af0f3a61ce1d25fe33095c2003b",
+      "version": "0.1.2",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-derivatives"
       ],
@@ -136,8 +136,8 @@
       "id": "defi-portfolio-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Reconcile DeFi assets, liabilities, cash flows and exposure.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-portfolio"
       ],
@@ -161,8 +161,8 @@
       "id": "defi-payments-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Plan stablecoin payments, x402 purchases and token streams.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-payments"
       ],
@@ -173,8 +173,8 @@
       "id": "defi-governance-skills",
       "source": "galleonlabs/crypto-defi-skills",
       "description": "Research proposals, prepare votes and track governance execution.",
-      "version": "0.1.0",
-      "revision": "7e3224c0aacd70624f99e34381d9b2a5d8d60cbb",
+      "version": "0.1.1",
+      "revision": "86610c62c52e3f7998dbb8fc4d669188b8c2a4a7",
       "skills": [
         "galleon-defi-governance"
       ],

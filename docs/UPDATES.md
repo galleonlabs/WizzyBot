@@ -92,3 +92,9 @@ For a reproducible deployment, retain the reviewed source revisions and installe
 ## Scheduled updates
 
 Unattended instruction updates are optional. Review pack sources first, use absolute paths and explicitly select the profile in your scheduler. Monitor failures and restart Hermes during a maintenance window. Boomkin does not create a background service or restart a session automatically.
+
+## Installed file integrity
+
+Boomkin 0.6.1 checks each copied reference, script and asset against the reviewed source before recording success. The sync record stores installed file digests, including the harness-normalized SKILL.md. `check` and `doctor` report later missing or changed files, even when the version header still matches. These local digests diagnose installation drift; they are not signed attestations.
+
+Older sync records remain readable. Run `update` once to establish integrity records. Before updating a modified skill, preserve your edits outside its installed directory and review them against the new release. Diagnostics do not delete or repair files automatically.

@@ -62,7 +62,7 @@ The reviewed catalog contains **14 independent packs and 26 skills**. Install al
 
 Start with `galleon-defi-infra` for tools and `galleon-defi-data` for evidence. Then select the workflow matching the task. The broader primitive skills use the `galleon-defi-` prefix to avoid upstream name collisions. Read [workflow examples](docs/WORKFLOWS.md) for useful combinations.
 
-Each pack is independently versioned and published from [crypto-defi-skills](https://github.com/galleonlabs/crypto-defi-skills). Boomkin's [catalog](catalog/skills.json) records the npm identity, version, immutable source commit, package directory and expected skills. Downloads and installed metadata are checked before a successful sync is recorded.
+Each pack is independently versioned and published from [crypto-defi-skills](https://github.com/galleonlabs/crypto-defi-skills). Boomkin's [catalog](catalog/skills.json) records the npm identity, version, immutable source commit, package directory and expected skills. Downloads, installed metadata and every copied supporting file are checked before a successful sync is recorded. Local file digests let `check` and `doctor` detect missing references and changed scripts afterward.
 
 Fresh onboarding includes every pack in the checked-out catalog. Select fewer with repeated `--pack` options:
 
@@ -115,7 +115,7 @@ Read [the connection guide](docs/CONNECTIONS.md) for exact prerequisites, diagno
 
 Boomkin loads only the relevant skills and provider references. It separates infrastructure readiness, data evidence, protocol workflows, portfolio reporting and transaction review from execution. It uses Hermes's native memory and scheduling when appropriate; a scheduled task retains the same authorization and freshness requirements as an interactive task.
 
-`doctor` reports configuration and installed versions. `doctor --live` additionally verifies keyless CoinGecko MCP initialization and tool discovery, plus credential-free AIXBT discovery when connected. Neither is proof of a successful model response, authenticated paid data, wallet authority or an executed transaction. Use the data pack's public diagnostic for a first market observation, and the infrastructure pack's RPC diagnostic for a configured chain.
+`doctor` reports configuration, installed versions and file integrity. Older installations can run `update` once to record file digests; preserve any local skill edits first. `doctor --live` additionally verifies keyless CoinGecko MCP initialization and tool discovery, plus credential-free AIXBT discovery when connected. Neither is proof of a successful model response, authenticated paid data, wallet authority or an executed transaction. Use the data pack's public diagnostic for a first market observation, and the infrastructure pack's RPC diagnostic for a configured chain.
 
 ## Updates and recovery
 

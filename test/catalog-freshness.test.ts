@@ -48,18 +48,21 @@ test("exact matching tags report current and pass verify", () => {
 });
 
 test("a newer upstream release is advisory in freshness and ignored by verify", () => {
-  const newer = [...matching, { package: "galleon-defi-infra-skills", version: "0.2.2", revision: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }];
+  const pinned = catalog.packs.find(pack => pack.id === "defi-infra-skills")!;
+  const [major, minor, patch] = pinned.version.split(".").map(Number);
+  const nextVersion = `${major}.${minor}.${patch! + 1}`;
+  const newer = [...matching, { package: pinned.package, version: nextVersion, revision: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }];
   const reports = evaluateCatalog(catalog, newer);
   const infra = reports.find(report => report.id === "defi-infra-skills")!;
   expect(infra.authenticity).toBe("ok");
   expect(infra.freshness).toBe("behind");
-  expect(infra.latestVersion).toBe("0.2.2");
+  expect(infra.latestVersion).toBe(nextVersion);
   expect(reportCatalog(catalog, newer, "verify").exitCode).toBe(0);
   const freshness = reportCatalog(catalog, newer, "freshness");
   expect(freshness.exitCode).toBe(1);
   expect(freshness.failures[0]).toContain("galleon-defi-infra-skills is behind");
-  expect(freshness.failures[0]).toContain("0.2.1");
-  expect(freshness.failures[0]).toContain("0.2.2");
+  expect(freshness.failures[0]).toContain(pinned.version);
+  expect(freshness.failures[0]).toContain(nextVersion);
 });
 
 test("a missing release tag fails verify", () => {

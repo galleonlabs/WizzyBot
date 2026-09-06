@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { createHash } from "node:crypto";
 import { installedVersion, parseCatalog, parseConfig, selectPacks, identity, type Catalog } from "./core.ts";
 import { ensureRuntime, runHermes, initializeProfile, configureMcpServers, localProfileStatus, setMcpTrustUntrusted } from "./hermes.ts";
+import { verifyIntegrity, readIntegrity } from "./integrity.ts";
 
 export const defaultProfile = () => join(homedir(), ".boomkin", "hermes");
 export const providers = {
@@ -126,7 +127,7 @@ export async function publicDataProbe(fetcher: Fetcher = fetch, provider: "coing
     return JSON.parse(text);
   }
   try {
-    const init = await call({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "boomkin-doctor", version: "0.6.0" } } });
+    const init = await call({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "boomkin-doctor", version: "0.6.1" } } });
     if (!init.result?.serverInfo || init.error) throw new Error("MCP initialization failed");
     protocol = init.result.protocolVersion;
     await call({ jsonrpc: "2.0", method: "notifications/initialized" });
@@ -146,6 +147,7 @@ export async function doctor(directory: string, catalog: Catalog, live = false) 
   try {
     const config = parseConfig(JSON.parse(await readFile(join(directory, ".boomkin/config.json"), "utf8")), directory);
     if (config.harness !== "hermes") throw new Error("Not a Hermes profile");
+    gaps.push(...await verifyIntegrity(join(directory, "skills"), selectPacks(parseCatalog(catalog), config.packs), await readIntegrity(directory)));
     for (const pack of selectPacks(parseCatalog(catalog), config.packs).packs) {
       let installed = true;
       for (const skill of pack.skills) {
